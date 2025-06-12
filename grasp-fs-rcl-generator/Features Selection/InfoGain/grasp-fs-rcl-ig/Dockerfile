@@ -8,4 +8,4 @@ RUN mvn clean package -DskipTests
 FROM openjdk:17
 ARG JAR_FILE=target/*.jar
 COPY ${JAR_FILE} grasp-fs-rcl-ig.jar
-ENTRYPOINT ["java", "-jar", "/grasp-fs-rcl-ig.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /grasp-fs-rcl-ig.jar"]

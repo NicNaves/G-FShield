@@ -3,12 +3,18 @@ package br.com.graspfs.rcl.ig.util;
 import weka.classifiers.AbstractClassifier;
 import weka.core.Instance;
 import weka.core.Instances;
+import weka.core.converters.ArffLoader;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 public class MachineLearningUtils {
+    
+    private static final Logger LOGGER = Logger.getLogger(MachineLearningUtils.class.getName());
 
     public static double normalClass = 0; // isso aqui representa as classes com o valor N
 
@@ -21,13 +27,39 @@ public class MachineLearningUtils {
         return classificador;
     }
 
-    public static Instances lerDataset(InputStream inputStream) throws IOException {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-            Instances data = new Instances(reader);
-            data.setClassIndex(data.numAttributes() - 1);
-            return data;
+     public static Instances lerDataset(InputStream inputStream) throws IOException {
+            LOGGER.info("Iniciando leitura incremental do dataset ARFF...");
+
+            ArffLoader loader = new ArffLoader();
+            loader.setSource(inputStream);
+
+            Instances structure = loader.getStructure();
+            structure.setClassIndex(structure.numAttributes() - 1);
+            LOGGER.info("Estrutura carregada: " + structure.numAttributes() + " atributos.");
+
+            List<Instance> instancias = new ArrayList<>();
+            int count = 0;
+
+            Instance instance;
+            while ((instance = loader.getNextInstance(structure)) != null) {
+                instancias.add(instance);
+                count++;
+
+                if (count % 1000 == 0) {
+                    LOGGER.info("Instâncias carregadas até agora: " + count);
+                }
+            }
+
+            // Cria objeto final com todas as instâncias
+            Instances dataFinal = new Instances(structure, count);
+            for (Instance inst : instancias) {
+                dataFinal.add(inst);
+            }
+
+            LOGGER.info("Leitura concluída. Total de instâncias: " + count);
+            return dataFinal;
         }
-    }
+    
 
 
     public static Instances selecionaFeatures(Instances amostras, ArrayList<Integer> features) {

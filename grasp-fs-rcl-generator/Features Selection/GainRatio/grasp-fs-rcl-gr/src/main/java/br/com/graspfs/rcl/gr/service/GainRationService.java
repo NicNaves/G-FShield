@@ -117,9 +117,9 @@ public class GainRationService {
         String precFormatted = String.format(Locale.US, "%.4f", rcl.getPrecision());
         String recFormatted = String.format(Locale.US, "%.4f", rcl.getRecall());
         String timeFormatted = String.format(Locale.US, "%d", rcl.getRunnigTime());
-        String cpuFormatted = String.format(Locale.US, "%.4f", avgCpu);
-        String memFormatted = String.format(Locale.US, "%.4f", avgMemory);
-        String memPercentFormatted = String.format(Locale.US, "%.4f", avgMemoryPercent);
+        String cpuFormatted = Float.isFinite(avgCpu) ? String.format(Locale.US, "%.4f", avgCpu) : "0.0000";
+        String memFormatted = Float.isFinite(avgMemory) ? String.format(Locale.US, "%.4f", avgMemory) : "0.0000";
+        String memPercentFormatted = Float.isFinite(avgMemoryPercent) ? String.format(Locale.US, "%.4f", avgMemoryPercent) : "0.0000";
 
         // Escreve a métrica no arquivo CSV com precisão aprimorada
         writer.write(String.join(";",
@@ -128,10 +128,6 @@ public class GainRationService {
             accFormatted,
             precFormatted,
             recFormatted,
-            String.valueOf(rcl.getNeighborhood()),
-            String.valueOf(rcl.getIterationNeighborhood()),
-            String.valueOf(rcl.getLocalSearch()),
-            String.valueOf(rcl.getIterationLocalSearch()),
             timeFormatted,
             cpuFormatted,
             memFormatted,

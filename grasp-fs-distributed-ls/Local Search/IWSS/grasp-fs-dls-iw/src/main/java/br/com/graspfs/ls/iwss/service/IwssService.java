@@ -79,10 +79,11 @@ public class IwssService {
 
     private DataSolution addMovement(DataSolution solution, BufferedWriter writer) throws Exception {
         long startTime = System.currentTimeMillis();
-        // ⏱️ Inicia coleta de métricas em paralelo
+
         MetricsCollector collector = new MetricsCollector();
         Thread monitor = new Thread(collector);
         monitor.start();
+
         solution.getSolutionFeatures().add(solution.getRclfeatures().remove(0));
 
         Instances trainingDataset = MachineLearningUtils.lerDataset(
@@ -92,53 +93,50 @@ public class IwssService {
 
         AbstractClassifier classifier = getClassifier(solution.getClassfier());
 
-        
-
         EvaluationResult Scores = MachineLearning.evaluateSolution(
                 new ArrayList<>(solution.getSolutionFeatures()),
                 new Instances(trainingDataset),
                 new Instances(testingDataset),
                 classifier);
 
-        // 🚫 Para a coleta
         collector.stop();
         monitor.join();
-        
+
         solution.setF1Score(Scores.getF1Score());
         solution.setAccuracy(Scores.getAccuracy());
         solution.setRecall(Scores.getRecall());
         solution.setPrecision(Scores.getPrecision());
-        solution.setRunnigTime(System.currentTimeMillis() - startTime);;
+        solution.setRunnigTime(System.currentTimeMillis() - startTime);  // ✅ tempo de execução ajustado
 
         float avgCpu = collector.getAvgCpu();
         float avgMemory = collector.getAvgMemory();
         float avgMemoryPercent = collector.getAvgMemoryPercent();
+
         String f1Formatted = String.format(Locale.US, "%.4f", solution.getF1Score());
         String accFormatted = String.format(Locale.US, "%.4f", solution.getAccuracy());
         String precFormatted = String.format(Locale.US, "%.4f", solution.getPrecision());
         String recFormatted = String.format(Locale.US, "%.4f", solution.getRecall());
         String timeFormatted = String.format(Locale.US, "%d", solution.getRunnigTime());
-        String cpuFormatted = String.format(Locale.US, "%.4f", avgCpu);
-        String memFormatted = String.format(Locale.US, "%.4f", avgMemory);
-        String memPercentFormatted = String.format(Locale.US, "%.4f", avgMemoryPercent);
-
+        String cpuFormatted = Float.isFinite(avgCpu) ? String.format(Locale.US, "%.4f", avgCpu) : "0.0000";
+        String memFormatted = Float.isFinite(avgMemory) ? String.format(Locale.US, "%.4f", avgMemory) : "0.0000";
+        String memPercentFormatted = Float.isFinite(avgMemoryPercent) ? String.format(Locale.US, "%.4f", avgMemoryPercent) : "0.0000";
         writer.write(String.join(";",
-            solution.getSolutionFeatures().toString(),
-            f1Formatted,
-            accFormatted,
-            precFormatted,
-            recFormatted,
-            String.valueOf(solution.getNeighborhood()),
-            String.valueOf(solution.getIterationNeighborhood()),
-            String.valueOf(solution.getLocalSearch()),
-            String.valueOf(solution.getIterationLocalSearch()),
-            timeFormatted,
-            cpuFormatted,
-            memFormatted,
-            memPercentFormatted,
-            solution.getClassfier(),
-            solution.getTrainingFileName(),
-            solution.getTestingFileName()
+                solution.getSolutionFeatures().toString(),
+                f1Formatted,
+                accFormatted,
+                precFormatted,
+                recFormatted,
+                String.valueOf(solution.getNeighborhood()),
+                String.valueOf(solution.getIterationNeighborhood()),
+                String.valueOf(solution.getLocalSearch()),
+                String.valueOf(solution.getIterationLocalSearch()),
+                timeFormatted,
+                cpuFormatted,
+                memFormatted,
+                memPercentFormatted,
+                solution.getClassfier(),
+                solution.getTrainingFileName(),
+                solution.getTestingFileName()
         ));
         writer.newLine();
 

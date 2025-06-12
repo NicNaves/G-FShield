@@ -44,14 +44,19 @@ public class SystemMetricsUtils {
         private float totalMemory = 0;
         private float totalMemoryPercent = 0;
     
-        public void run() {
+       public void run() {
             while (running) {
-                totalCpu += SystemMetricsUtils.getCpuUsage();
-                totalMemory += SystemMetricsUtils.getMemoryUsageMB();
-                totalMemoryPercent += SystemMetricsUtils.getMemoryUsagePercent();
+                float cpu = SystemMetricsUtils.getCpuUsage();
+                float mem = SystemMetricsUtils.getMemoryUsageMB();
+                float memPercent = SystemMetricsUtils.getMemoryUsagePercent();
+
+                if (!Float.isNaN(cpu) && !Float.isInfinite(cpu)) totalCpu += cpu;
+                if (!Float.isNaN(mem) && !Float.isInfinite(mem)) totalMemory += mem;
+                if (!Float.isNaN(memPercent) && !Float.isInfinite(memPercent)) totalMemoryPercent += memPercent;
+
                 samples++;
                 try {
-                    Thread.sleep(100); // coleta a cada 100ms
+                    Thread.sleep(100);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }

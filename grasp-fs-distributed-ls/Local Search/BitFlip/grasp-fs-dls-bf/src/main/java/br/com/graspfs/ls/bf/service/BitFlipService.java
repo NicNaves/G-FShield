@@ -39,9 +39,6 @@ public class BitFlipService {
     @Value("${bitflip.metrics.file:/metrics/BIT-FLIP_METRICS.csv}")
     private String metricsFileName;
 
-    /**
-     * Executa a busca local BitFlip sobre uma solução recebida.
-     */
     public void doBitFlip(DataSolution data) throws Exception {
         data.setLocalSearch(LocalSearch.BIT_FLIP);
 
@@ -49,7 +46,6 @@ public class BitFlipService {
             escreverCabecalhoCSV(writer);
             DataSolution bestSolution = flipFeatures(data, writer);
 
-            // Atualiza dados da melhor solução
             bestSolution.setIterationLocalSearch(data.getIterationLocalSearch() + 1);
             bestSolution.setNeighborhood(data.getNeighborhood());
             bestSolution.setIterationNeighborhood(data.getIterationNeighborhood());
@@ -85,12 +81,12 @@ public class BitFlipService {
             int valueIndex = random.nextInt(solution.getRclfeatures().size());
             int positionReplace = random.nextInt(solution.getSolutionFeatures().size());
 
-            // Executa bit flip
             solution.getSolutionFeatures().add(solution.getRclfeatures().remove(valueIndex));
             solution.getRclfeatures().add(solution.getSolutionFeatures().remove(positionReplace));
             solution.setIterationLocalSearch(solution.getIterationLocalSearch() + 1);
 
-                // ⏱️ Inicia coleta de métricas em paralelo
+            long startTime = System.currentTimeMillis();
+
             MetricsCollector collector = new MetricsCollector();
             Thread monitor = new Thread(collector);
             monitor.start();
@@ -102,7 +98,6 @@ public class BitFlipService {
                     classifier
             );
 
-            // 🚫 Para a coleta
             collector.stop();
             monitor.join();
 
@@ -110,11 +105,11 @@ public class BitFlipService {
             solution.setPrecision(Scores.getPrecision());
             solution.setAccuracy(Scores.getAccuracy());
             solution.setRecall(Scores.getRecall());
-            solution.setRunnigTime(System.currentTimeMillis());
+            solution.setRunnigTime(System.currentTimeMillis() - startTime); // ✅ Tempo de execução corrigido
 
             log.info("🌀 Iteração {}: F1={} Features={} ", i, Scores.getF1Score(), solution.getSolutionFeatures());
             PrintSolution.logSolution(solution);
-            
+
             escreverLinhaCSV(writer, solution, collector);
 
             if (Scores.getF1Score() > bestSolution.getF1Score()) {
@@ -124,7 +119,6 @@ public class BitFlipService {
             i++;
         }
 
-      
         return bestSolution;
     }
 
@@ -137,27 +131,27 @@ public class BitFlipService {
         String precFormatted = String.format(Locale.US, "%.4f", s.getPrecision());
         String recFormatted = String.format(Locale.US, "%.4f", s.getRecall());
         String timeFormatted = String.format(Locale.US, "%d", s.getRunnigTime());
-        String cpuFormatted = String.format(Locale.US, "%.4f", avgCpu);
-        String memFormatted = String.format(Locale.US, "%.4f", avgMemory);
-        String memPercentFormatted = String.format(Locale.US, "%.4f", avgMemoryPercent);
+        String cpuFormatted = Float.isFinite(avgCpu) ? String.format(Locale.US, "%.4f", avgCpu) : "0.0000";
+        String memFormatted = Float.isFinite(avgMemory) ? String.format(Locale.US, "%.4f", avgMemory) : "0.0000";
+        String memPercentFormatted = Float.isFinite(avgMemoryPercent) ? String.format(Locale.US, "%.4f", avgMemoryPercent) : "0.0000";
 
         writer.write(String.join(";",
-            s.getSolutionFeatures().toString(),
-            f1Formatted,
-            accFormatted,
-            precFormatted,
-            recFormatted,
-            String.valueOf(s.getNeighborhood()),
-            String.valueOf(s.getIterationNeighborhood()),
-            String.valueOf(s.getLocalSearch()),
-            String.valueOf(s.getIterationLocalSearch()),
-            timeFormatted,
-            cpuFormatted,
-            memFormatted,
-            memPercentFormatted,
-            s.getClassfier(),
-            s.getTrainingFileName(),
-            s.getTestingFileName()
+                s.getSolutionFeatures().toString(),
+                f1Formatted,
+                accFormatted,
+                precFormatted,
+                recFormatted,
+                String.valueOf(s.getNeighborhood()),
+                String.valueOf(s.getIterationNeighborhood()),
+                String.valueOf(s.getLocalSearch()),
+                String.valueOf(s.getIterationLocalSearch()),
+                timeFormatted,
+                cpuFormatted,
+                memFormatted,
+                memPercentFormatted,
+                s.getClassfier(),
+                s.getTrainingFileName(),
+                s.getTestingFileName()
         ));
         writer.newLine();
     }

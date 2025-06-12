@@ -34,6 +34,8 @@ services:
   grasp-fs-rcl-ig:
     build:
       context: ./grasp-fs-rcl-generator/Features Selection/InfoGain/grasp-fs-rcl-ig
+    environment:
+    - JAVA_OPTS=-Xms512m -Xmx4g
     ports:
       - "8089:8089"
     volumes:
