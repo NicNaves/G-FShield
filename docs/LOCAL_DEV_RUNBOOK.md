@@ -1,193 +1,257 @@
 # Local Development Runbook
 
-This runbook describes the recommended local workflow for GF-Shield on Windows.
+## PT-BR
 
-## What This Flow Starts
+### Objetivo
 
-- the main Docker stack from [`docker-compose.yml`](../docker-compose.yml)
-- the local PostgreSQL used by `webservice/api`
-- the Node.js API at `http://localhost:4000`
-- the React front-end at `http://localhost:3000`
+Este guia descreve o fluxo recomendado para subir o GF-Shield localmente com Docker, API Node.js e front React.
 
-## Prerequisites
+### Pre-requisitos
 
-- Docker Desktop running
-- Java 17 installed
-- Node.js installed
-- PowerShell available
+- Docker Desktop
+- Node.js com `npm.cmd`
+- Java 17 para execucoes locais fora do Docker, quando necessario
 
-Windows PowerShell note:
+### O que sobe no ambiente local
 
-- use `npm.cmd` if `npm` is blocked by script execution policy
-- or enable scripts with:
+- stack principal via [`docker-compose.yml`](../docker-compose.yml)
+- banco PostgreSQL da API via [`webservice/api/docker-compose.db.yml`](../webservice/api/docker-compose.db.yml)
+- API Express na porta `4000`
+- front React na porta `3000`
 
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-```
+### Fluxo recomendado
 
-## Recommended Startup
-
-### Real mode
-
-Use this when you want real login, Prisma, PostgreSQL, and the full monitor flow.
+#### 1. Iniciar tudo com o script
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-local-dev.ps1 -AuthMode Real
+.\scripts\start-local-dev.ps1
 ```
 
-### Mock mode
+Esse script:
 
-Use this when you want to open the UI quickly without depending on the real auth/database path.
+- sobe a stack principal do GF-Shield
+- sobe o banco da API
+- abre API e front em novas janelas
+- pode disparar uma execucao de exemplo se chamado com `-DispatchSampleRun`
+
+#### 2. Encerrar o ambiente
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-local-dev.ps1 -AuthMode Mock
+.\scripts\stop-local-dev.ps1
 ```
 
-### Real mode with sample execution
+Se quiser manter Docker de pe:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-local-dev.ps1 -AuthMode Real -DispatchSampleRun
+.\scripts\stop-local-dev.ps1 -KeepDocker
 ```
 
-## What The Startup Script Does
-
-1. Starts the main GF-Shield Docker stack.
-2. Starts the PostgreSQL used by `webservice/api`.
-3. Opens the API in a separate PowerShell window.
-4. Opens the front-end in a separate PowerShell window.
-5. Saves process IDs in [`.local-dev/processes.json`](../.local-dev/processes.json).
-6. Optionally dispatches a sample GRASP execution through the API.
-
-## Main URLs
-
-- Front-end: `http://localhost:3000`
-- API: `http://localhost:4000`
-- Swagger: `http://localhost:4000/api-docs`
-- Conduktor: `http://localhost:8080`
-
-## Default Real-Mode Login
-
-- Email: `admin@admin.com`
-- Password: `senhaSegura123`
-
-## Startup Options
-
-### Rebuild Java images before start
+Se quiser derrubar o banco da API e remover volumes:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-local-dev.ps1 -AuthMode Real -Rebuild
+.\scripts\stop-local-dev.ps1 -ResetDatabase
 ```
 
-### Dispatch a custom sample run
+### Fluxo manual
+
+#### Stack principal
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-local-dev.ps1 `
-  -AuthMode Real `
-  -DispatchSampleRun `
-  -MaxGenerations 10 `
-  -RclCutoff 20 `
-  -SampleSize 5 `
-  -TrainDataset "ereno1ktrain.arff" `
-  -TestDataset "ereno1ktest.arff" `
-  -Classifier "J48" `
-  -NeighborhoodStrategy "VND" `
-  -LocalSearches "BIT_FLIP","IWSS","IWSSR"
+docker compose up -d --build
 ```
 
-## Manual Startup
-
-### 1. Main stack
-
-```powershell
-docker compose up -d
-```
-
-### 2. Webservice database
+#### Banco da API
 
 ```powershell
 cd .\webservice\api
 docker compose -f .\docker-compose.db.yml up -d
 ```
 
-### 3. Prisma migration + seed
+#### Migracao e seed
 
 ```powershell
 cd .\webservice\api
 npm.cmd run migrate
 ```
 
-### 4. API
+#### API
 
 ```powershell
 cd .\webservice\api
 npm.cmd run dev
 ```
 
-### 5. Front-end
+#### Front
 
 ```powershell
 cd .\webservice\front
 npm.cmd start
 ```
 
-## Stop Everything
+### URLs principais
 
-### Normal stop
+- Front: `http://localhost:3000`
+- API: `http://localhost:4000`
+- Swagger: `http://localhost:4000/api-docs`
+- Conduktor: `http://localhost:8080`
+
+### Observacoes importantes
+
+- No PowerShell, prefira `npm.cmd` em vez de `npm` se a execution policy bloquear scripts.
+- O catalogo de datasets da API usa `GRASP_DATASETS_DIR="../../datasets"` por padrao.
+- O dashboard usa eventos persistidos da API, nao os CSVs de `metrics`.
+
+### Troubleshooting
+
+#### `npm` bloqueado no PowerShell
+
+Use:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\stop-local-dev.ps1
+npm.cmd run dev
 ```
 
-### Stop only API/front and keep Docker running
+ou:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\stop-local-dev.ps1 -KeepDocker
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
 
-### Stop and remove the local API database volume
+#### API nao enxerga mensagens antigas do Kafka
+
+Verifique em [`webservice/api/.env`](../webservice/api/.env):
+
+- `KAFKA_MONITOR_FROM_BEGINNING=true`
+- `KAFKA_MONITOR_GROUP_ID` com um grupo novo para replay
+
+#### Front com cache antigo
+
+Use `Ctrl + F5` no navegador.
+
+## EN-US
+
+### Goal
+
+This guide describes the recommended flow to start GF-Shield locally with Docker, the Node.js API, and the React front-end.
+
+### Prerequisites
+
+- Docker Desktop
+- Node.js with `npm.cmd`
+- Java 17 for local non-Docker Java runs when needed
+
+### What starts in the local environment
+
+- main stack via [`docker-compose.yml`](../docker-compose.yml)
+- API PostgreSQL database via [`webservice/api/docker-compose.db.yml`](../webservice/api/docker-compose.db.yml)
+- Express API on port `4000`
+- React front-end on port `3000`
+
+### Recommended flow
+
+#### 1. Start everything with the script
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\stop-local-dev.ps1 -ResetDatabase
+.\scripts\start-local-dev.ps1
 ```
 
-## Datasets
+This script:
 
-The Java services read `.arff` files from the shared [`datasets`](../datasets) folder.
+- starts the main GF-Shield stack
+- starts the API database
+- opens API and front-end in new windows
+- can dispatch a sample run if called with `-DispatchSampleRun`
 
-For the API to expose dataset names to the front, keep this value in `webservice/api/.env`:
+#### 2. Stop the environment
 
-```env
-GRASP_DATASETS_DIR="../../datasets"
+```powershell
+.\scripts\stop-local-dev.ps1
 ```
 
-## Notes About The Monitor
+If you want to keep Docker running:
 
-The web monitor is built around these stages:
+```powershell
+.\scripts\stop-local-dev.ps1 -KeepDocker
+```
 
-- `INITIAL_SOLUTION_TOPIC`
-- `SOLUTIONS_TOPIC`
-- `BEST_SOLUTION_TOPIC`
+If you want to stop the API database and remove volumes:
 
-`LOCAL_SEARCH_PROGRESS_TOPIC` is still available in Kafka, but it is hidden by default in the web monitor to avoid noisy dashboards.
+```powershell
+.\scripts\stop-local-dev.ps1 -ResetDatabase
+```
 
-## Troubleshooting
+### Manual flow
 
-- `npm : ... npm.ps1 cannot be loaded`
-  Use `npm.cmd` instead of `npm`.
+#### Main stack
 
-- `schema-engine-windows.exe spawn EPERM`
-  Run Prisma from a normal PowerShell session, outside a restricted sandbox, with PostgreSQL already started.
+```powershell
+docker compose up -d --build
+```
 
-- Front opens but the API does not respond
-  Test `http://localhost:4000/api/grasp/services`.
+#### API database
 
-- Login fails in real mode
-  Run:
+```powershell
+cd .\webservice\api
+docker compose -f .\docker-compose.db.yml up -d
+```
+
+#### Migration and seed
 
 ```powershell
 cd .\webservice\api
 npm.cmd run migrate
 ```
 
-- API started after Kafka already had messages
-  See [`OPERATIONS.md`](./OPERATIONS.md) for monitor replay instructions.
+#### API
+
+```powershell
+cd .\webservice\api
+npm.cmd run dev
+```
+
+#### Front-end
+
+```powershell
+cd .\webservice\front
+npm.cmd start
+```
+
+### Main URLs
+
+- Front-end: `http://localhost:3000`
+- API: `http://localhost:4000`
+- Swagger: `http://localhost:4000/api-docs`
+- Conduktor: `http://localhost:8080`
+
+### Important notes
+
+- In PowerShell, prefer `npm.cmd` instead of `npm` if execution policy blocks scripts.
+- The API dataset catalog uses `GRASP_DATASETS_DIR="../../datasets"` by default.
+- The dashboard uses API-persisted execution events, not the CSV files under `metrics`.
+
+### Troubleshooting
+
+#### `npm` blocked in PowerShell
+
+Use:
+
+```powershell
+npm.cmd run dev
+```
+
+or:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+#### API does not see older Kafka messages
+
+Check [`webservice/api/.env`](../webservice/api/.env):
+
+- `KAFKA_MONITOR_FROM_BEGINNING=true`
+- `KAFKA_MONITOR_GROUP_ID` set to a new group for replay
+
+#### Front-end shows stale cache
+
+Use `Ctrl + F5` in the browser.

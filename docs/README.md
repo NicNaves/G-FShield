@@ -1,17 +1,31 @@
 # Documentation Index
 
-This folder contains the operational documentation for local setup, resets, and day-to-day usage.
+## PT-BR
 
-## Available Guides
+Esta pasta concentra a documentacao operacional do GF-Shield para setup local, resets, replay e manutencao do ambiente.
 
-- [`LOCAL_DEV_RUNBOOK.md`](./LOCAL_DEV_RUNBOOK.md)
-  Local setup, startup, shutdown, and sample execution flow.
+### Guias disponiveis
 
-- [`OPERATIONS.md`](./OPERATIONS.md)
-  Cleanup commands, Kafka reset, metrics reset, front local storage notes, and monitor replay.
+- [`LOCAL_DEV_RUNBOOK.md`](./LOCAL_DEV_RUNBOOK.md): fluxo recomendado para subir o projeto localmente.
+- [`OPERATIONS.md`](./OPERATIONS.md): limpeza de Kafka, limpeza de metricas, replay do monitor e comandos de suporte.
 
-## Recommended Reading Order
+### Ordem recomendada
 
-1. Read the root [`README.md`](../README.md) for the architecture and service map.
-2. Use [`LOCAL_DEV_RUNBOOK.md`](./LOCAL_DEV_RUNBOOK.md) to start the project.
-3. Use [`OPERATIONS.md`](./OPERATIONS.md) when you need a clean state, log inspection, or maintenance.
+1. Leia o [`README.md`](../README.md) para entender arquitetura e servicos.
+2. Use [`LOCAL_DEV_RUNBOOK.md`](./LOCAL_DEV_RUNBOOK.md) para iniciar o ambiente.
+3. Use [`OPERATIONS.md`](./OPERATIONS.md) quando precisar resetar, inspecionar logs ou fazer manutencao.
+
+## EN-US
+
+This folder contains GF-Shield operational documentation for local setup, resets, replay, and day-to-day maintenance.
+
+### Available guides
+
+- [`LOCAL_DEV_RUNBOOK.md`](./LOCAL_DEV_RUNBOOK.md): recommended flow for starting the project locally.
+- [`OPERATIONS.md`](./OPERATIONS.md): Kafka cleanup, metrics cleanup, monitor replay, and support commands.
+
+### Recommended reading order
+
+1. Read the root [`README.md`](../README.md) for architecture and service mapping.
+2. Use [`LOCAL_DEV_RUNBOOK.md`](./LOCAL_DEV_RUNBOOK.md) to start the environment.
+3. Use [`OPERATIONS.md`](./OPERATIONS.md) whenever you need resets, log inspection, or maintenance.

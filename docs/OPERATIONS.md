@@ -1,126 +1,215 @@
 # Operations Guide
 
-This guide covers common maintenance tasks for GF-Shield.
+## PT-BR
 
-## Common Log Locations
+### Objetivo
 
-### DRG request and dataset loading
+Este guia concentra os comandos operacionais mais comuns para reset, limpeza, replay e verificacao do ambiente GF-Shield.
 
-Use the DRG containers when you want to confirm that a request was received and that dataset loading has started:
-
-```powershell
-docker logs -f gf-shield-main-grasp-fs-rcl-ig-1
-docker logs -f gf-shield-main-grasp-fs-rcl-gr-1
-docker logs -f gf-shield-main-grasp-fs-rcl-su-1
-docker logs -f gf-shield-main-grasp-fs-rcl-rf-1
-```
-
-Those services now log:
-
-- request receipt
-- dataset file path and size
-- training/testing dataset load time
-- classifier resolution
-- initial solution creation
-- generation publishing
-- total elapsed time
-
-### Local-search final decisions
-
-Use `verify` as the main source of truth for local-search outcomes:
+### Validacao rapida do ambiente
 
 ```powershell
-docker logs -f gf-shield-main-grasp-fs.dls.verify-1
+docker compose ps
 ```
-
-The verify service now logs:
-
-- incoming `SOLUTIONS_TOPIC` result
-- candidate vs current-best comparison
-- promotion to `BEST_SOLUTION_TOPIC`
-- best-solution confirmation
-
-## Reset Metrics CSV Files
 
 ```powershell
-cmd /c del /q metrics\*.csv
+docker compose logs --tail=100
 ```
 
-The folder should keep only [`.gitkeep`](../metrics/.gitkeep).
+### Logs uteis
 
-## Clear Kafka Application Topics
-
-Start the stack first, then delete the application topics:
+#### DRG
 
 ```powershell
-$topics = @(
-  'INITIAL_SOLUTION_TOPIC',
-  'LOCAL_SEARCH_PROGRESS_TOPIC',
-  'SOLUTIONS_TOPIC',
-  'BEST_SOLUTION_TOPIC',
-  'BIT_FLIP_TOPIC',
-  'IWSS_TOPIC',
-  'IWSSR_TOPIC'
-)
-
-foreach ($topic in $topics) {
-  docker compose exec -T kafka kafka-topics --bootstrap-server kafka:29092 --delete --topic $topic
-}
+docker logs -f gf-shield-grasp-fs-rcl-ig-1
+docker logs -f gf-shield-grasp-fs-rcl-gr-1
+docker logs -f gf-shield-grasp-fs-rcl-su-1
+docker logs -f gf-shield-grasp-fs-rcl-rf-1
 ```
 
-Important:
+#### Verify
 
-- keep `__consumer_offsets`; it is a Kafka internal topic
-- if the stack is still running, services may recreate and republish some topics automatically
-- for a clean shutdown after topic deletion, stop the stack right away
+```powershell
+docker logs -f gf-shield-grasp-fs.dls.verify-1
+```
 
-## Stop The Entire Docker Stack
+### Limpar metricas CSV
+
+```powershell
+Get-ChildItem .\metrics -File | Where-Object { $_.Name -ne '.gitkeep' } | Remove-Item -Force
+```
+
+### Limpar topicos Kafka da aplicacao
+
+Exemplo de topicos normalmente usados:
+
+- `INITIAL_SOLUTION_TOPIC`
+- `LOCAL_SEARCH_PROGRESS_TOPIC`
+- `SOLUTIONS_TOPIC`
+- `BEST_SOLUTION_TOPIC`
+- `BIT_FLIP_TOPIC`
+- `IWSS_TOPIC`
+- `IWSSR_TOPIC`
+
+Recrie ou apague conforme sua rotina operacional. Nao remova `__consumer_offsets`.
+
+### Parar toda a stack
 
 ```powershell
 docker compose down
 ```
 
-## Clean Shutdown After Topic Deletion
-
-If you want to leave the environment stopped and without application topics:
-
-1. Delete the application topics.
-2. Run:
+### Resetar o banco da API
 
 ```powershell
-docker compose down
+cd .\webservice\api
+docker compose -f .\docker-compose.db.yml down -v
+docker compose -f .\docker-compose.db.yml up -d
+npm.cmd run migrate
 ```
 
-## Replay Old Kafka Messages In The Web Monitor
+### Replay de dados antigos do Kafka para o monitor
 
-If the API starts after Kafka already received messages, enable replay in `webservice/api/.env`:
+Em [`webservice/api/.env`](../webservice/api/.env):
 
 ```env
 KAFKA_MONITOR_FROM_BEGINNING=true
 KAFKA_MONITOR_GROUP_ID=grasp-fs-monitor-group-replay
 ```
 
-Use a new `KAFKA_MONITOR_GROUP_ID` whenever you want a fresh replay.
+Depois reinicie a API. Para novo replay futuro, troque o `KAFKA_MONITOR_GROUP_ID`.
 
-Then restart the API:
+### Limpar o estado do monitor web
 
-```powershell
-cd .\webservice\api
-npm.cmd run dev
-```
-
-## Reset Web Monitor Database State
-
-The API monitor stores execution state in PostgreSQL. If you want a fresh dashboard state,
-truncate these tables in the `graspfs` database:
+O monitor persistido fica nas tabelas:
 
 - `GraspExecutionLaunch`
 - `GraspExecutionRun`
 - `GraspExecutionEvent`
 
-## Front-End Persisted State
+Se necessario, limpe essas tabelas no PostgreSQL da API para zerar o dashboard.
 
-The front-end does not persist CSV metrics, but it does persist some browser-side state in `localStorage`:
+### Limpar estado do navegador
+
+No console do browser:
+
+```js
+localStorage.clear()
+```
+
+Isso remove:
+
+- `token`
+- `role`
+- `userId`
+- `darkMode`
+- notificacoes do monitor
+
+### Rebuild seletivo
+
+```powershell
+docker compose build grasp-fs-rcl-ig grasp-fs-rcl-gr grasp-fs-rcl-su grasp-fs-rcl-rf
+docker compose build grasp-fs-dls-bf grasp-fs-dls-iw grasp-fs-dls-iwr grasp-fs-dls-vnd grasp-fs-dls-rvnd grasp-fs.dls.verify
+```
+
+## EN-US
+
+### Goal
+
+This guide gathers the most common operational commands for reset, cleanup, replay, and environment checks in GF-Shield.
+
+### Quick environment validation
+
+```powershell
+docker compose ps
+```
+
+```powershell
+docker compose logs --tail=100
+```
+
+### Useful logs
+
+#### DRG
+
+```powershell
+docker logs -f gf-shield-grasp-fs-rcl-ig-1
+docker logs -f gf-shield-grasp-fs-rcl-gr-1
+docker logs -f gf-shield-grasp-fs-rcl-su-1
+docker logs -f gf-shield-grasp-fs-rcl-rf-1
+```
+
+#### Verify
+
+```powershell
+docker logs -f gf-shield-grasp-fs.dls.verify-1
+```
+
+### Clear CSV metrics
+
+```powershell
+Get-ChildItem .\metrics -File | Where-Object { $_.Name -ne '.gitkeep' } | Remove-Item -Force
+```
+
+### Clear application Kafka topics
+
+Examples of commonly used topics:
+
+- `INITIAL_SOLUTION_TOPIC`
+- `LOCAL_SEARCH_PROGRESS_TOPIC`
+- `SOLUTIONS_TOPIC`
+- `BEST_SOLUTION_TOPIC`
+- `BIT_FLIP_TOPIC`
+- `IWSS_TOPIC`
+- `IWSSR_TOPIC`
+
+Recreate or delete them according to your operational workflow. Do not remove `__consumer_offsets`.
+
+### Stop the full stack
+
+```powershell
+docker compose down
+```
+
+### Reset the API database
+
+```powershell
+cd .\webservice\api
+docker compose -f .\docker-compose.db.yml down -v
+docker compose -f .\docker-compose.db.yml up -d
+npm.cmd run migrate
+```
+
+### Replay older Kafka data into the monitor
+
+In [`webservice/api/.env`](../webservice/api/.env):
+
+```env
+KAFKA_MONITOR_FROM_BEGINNING=true
+KAFKA_MONITOR_GROUP_ID=grasp-fs-monitor-group-replay
+```
+
+Then restart the API. For another replay later, change `KAFKA_MONITOR_GROUP_ID`.
+
+### Clear the web monitor state
+
+Persisted monitor data lives in these tables:
+
+- `GraspExecutionLaunch`
+- `GraspExecutionRun`
+- `GraspExecutionEvent`
+
+If needed, clear those tables in the API PostgreSQL database to reset the dashboard.
+
+### Clear browser state
+
+In the browser console:
+
+```js
+localStorage.clear()
+```
+
+This removes:
 
 - `token`
 - `role`
@@ -128,35 +217,9 @@ The front-end does not persist CSV metrics, but it does persist some browser-sid
 - `darkMode`
 - monitor notifications
 
-To clear that state in the browser:
-
-```js
-localStorage.clear()
-```
-
-## Useful Validation Commands
-
-### List running containers
-
-```powershell
-docker compose ps --format json
-```
-
-### List Kafka topics
-
-```powershell
-docker compose exec -T kafka kafka-topics --bootstrap-server kafka:29092 --list
-```
-
-### Inspect topic offsets
-
-```powershell
-docker compose exec -T kafka kafka-run-class kafka.tools.GetOffsetShell --broker-list kafka:29092 --topic BEST_SOLUTION_TOPIC --time -1
-```
-
-### Rebuild selected services
+### Selective rebuild
 
 ```powershell
 docker compose build grasp-fs-rcl-ig grasp-fs-rcl-gr grasp-fs-rcl-su grasp-fs-rcl-rf
-docker compose build grasp-fs.dls.verify
+docker compose build grasp-fs-dls-bf grasp-fs-dls-iw grasp-fs-dls-iwr grasp-fs-dls-vnd grasp-fs-dls-rvnd grasp-fs.dls.verify
 ```

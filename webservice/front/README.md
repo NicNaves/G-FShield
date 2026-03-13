@@ -1,15 +1,16 @@
 # GF-Shield Front-End
 
-This front-end is the operational dashboard for GF-Shield. It replaces most of the
-template-only Material Dashboard content with project-specific pages for:
+## PT-BR
 
-- authentication
-- execution monitoring
+Este front-end e o dashboard operacional do GF-Shield. Ele substitui grande parte do conteudo padrao do template por paginas especificas do projeto:
+
+- autenticacao
+- monitoramento de execucoes
 - datasets
-- user administration
-- execution dispatch
+- administracao de usuarios
+- disparo de execucao
 
-## Stack
+### Stack
 
 - React 18
 - Material UI 5
@@ -17,7 +18,7 @@ template-only Material Dashboard content with project-specific pages for:
 - React Router
 - React Toastify
 
-## Main Pages
+### Paginas principais
 
 - `/dashboard`
 - `/settings`
@@ -26,60 +27,69 @@ template-only Material Dashboard content with project-specific pages for:
 - `/authentication/sign-in`
 - `/authentication/sign-up`
 
-## Auth Modes
-
-The front can run in:
-
-- real mode: depends on the API and JWT login
-- mock mode: useful for local UI work without the real auth path
-
-Main variables from [`.env.example`](./.env.example):
-
-```env
-REACT_APP_API_URL="http://localhost:4000/api"
-REACT_APP_AUTH_DISABLED=false
-```
-
-## Local Start
+### Modo local
 
 ```powershell
 npm.cmd start
 ```
 
-## Production Build
+### Build
 
 ```powershell
 npm.cmd run build
 ```
 
-## Dashboard Notes
+### Persistencia no browser
 
-The dashboard is tuned to highlight:
+- `token`
+- `role`
+- `userId`
+- `darkMode`
+- notificacoes do monitor
 
-- initial solutions from `INITIAL_SOLUTION_TOPIC`
-- local-search final results from `SOLUTIONS_TOPIC`
-- best solutions from `BEST_SOLUTION_TOPIC`
+## EN-US
 
-Improvement notifications are emitted only when a run beats its previous best score.
+This front-end is the GF-Shield operational dashboard. It replaces most of the template-only content with project-specific pages for:
 
-## Persisted Browser State
+- authentication
+- execution monitoring
+- datasets
+- user administration
+- execution dispatch
 
-The front stores the following keys in `localStorage`:
+### Stack
+
+- React 18
+- Material UI 5
+- Chart.js
+- React Router
+- React Toastify
+
+### Main pages
+
+- `/dashboard`
+- `/settings`
+- `/datasets`
+- `/admin/users`
+- `/authentication/sign-in`
+- `/authentication/sign-up`
+
+### Local mode
+
+```powershell
+npm.cmd start
+```
+
+### Build
+
+```powershell
+npm.cmd run build
+```
+
+### Browser persistence
 
 - `token`
 - `role`
 - `userId`
 - `darkMode`
 - monitor notifications
-
-To clear everything in the browser:
-
-```js
-localStorage.clear()
-```
-
-## UI Notes
-
-- the configurator button in the bottom-right corner can toggle dark mode
-- dark mode is persisted in `localStorage`
-- dashboard tables are organized to avoid clipping and use horizontal scroll when needed
