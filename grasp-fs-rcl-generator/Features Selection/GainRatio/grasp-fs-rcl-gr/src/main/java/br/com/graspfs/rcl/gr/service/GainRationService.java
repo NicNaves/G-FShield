@@ -57,6 +57,7 @@ public class GainRationService {
     public DataSolution doGainRation(Instances trainingDataset, int rclCutoff, AbstractClassifier classifier, String trainingFileName, String testingFileName) throws Exception {
         String classifierName = classifier.getClass().getSimpleName();// pega nome do classificador
         DataSolution initialSolution = SelectionFeaturesUtils.createData(classifierName, trainingFileName, testingFileName); // criação da estrutura da solução
+        initialSolution.setRclAlgorithm("GR");
         rankFeatures(initialSolution, trainingDataset, rclCutoff); // calcula a RCL
         return initialSolution; // a avaliação será feita após a geração das soluções
     }
@@ -112,6 +113,9 @@ public class GainRationService {
         float avgCpu = collector.getAvgCpu();
         float avgMemory = collector.getAvgMemory();
         float avgMemoryPercent = collector.getAvgMemoryPercent();
+        rcl.setCpuUsage(Float.isFinite(avgCpu) ? avgCpu : 0.0F);
+        rcl.setMemoryUsage(Float.isFinite(avgMemory) ? avgMemory : 0.0F);
+        rcl.setMemoryUsagePercent(Float.isFinite(avgMemoryPercent) ? avgMemoryPercent : 0.0F);
         String f1Formatted = String.format(Locale.US, "%.4f", rcl.getF1Score());
         String accFormatted = String.format(Locale.US, "%.4f", rcl.getAccuracy());
         String precFormatted = String.format(Locale.US, "%.4f", rcl.getPrecision());

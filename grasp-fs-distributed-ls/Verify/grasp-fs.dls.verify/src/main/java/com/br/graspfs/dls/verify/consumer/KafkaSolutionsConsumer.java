@@ -21,21 +21,45 @@ public class KafkaSolutionsConsumer {
         containerFactory = "solutionListenerContainerFactory"
     )
     public void consume(ConsumerRecord<String, DataSolution> record) {
-        log.info("Received Message {}", record.value());
         long start = System.currentTimeMillis();
+        DataSolution data = record.value();
+
+        if (data == null) {
+            log.warn("verify received null message topic={} partition={} offset={}",
+                    record.topic(), record.partition(), record.offset());
+            return;
+        }
+
+        log.info(
+                "verify received local-search result seedId={} rcl={} localSearch={} neighborhood={} f1={} features={} classifier={} topic={} partition={} offset={}",
+                data.getSeedId(),
+                data.getRclAlgorithm(),
+                data.getLocalSearch(),
+                data.getNeighborhood(),
+                data.getF1Score(),
+                data.getSolutionFeatures() != null ? data.getSolutionFeatures().size() : 0,
+                data.getClassfier(),
+                record.topic(),
+                record.partition(),
+                record.offset()
+        );
 
         try {
-            DataSolution data = record.value();
-            if (data == null) {
-                log.warn("Mensagem nula recebida do Kafka.");
-                return;
-            }
-
             verifyService.doVerify(data);
-            log.info("Verificação concluída em {} ms", System.currentTimeMillis() - start);
-
+            log.info(
+                    "verify finished seedId={} localSearch={} elapsedMs={}",
+                    data.getSeedId(),
+                    data.getLocalSearch(),
+                    System.currentTimeMillis() - start
+            );
         } catch (IllegalArgumentException ex) {
-            log.error("Erro ao verificar solução: {}", ex.getMessage(), ex);
+            log.error(
+                    "verify failed seedId={} localSearch={} message={}",
+                    data.getSeedId(),
+                    data.getLocalSearch(),
+                    ex.getMessage(),
+                    ex
+            );
             throw ex;
         }
     }

@@ -8,9 +8,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/gr")
@@ -23,7 +27,7 @@ public class GainRationController {
     private final GainRationService gainRationService;
     private final GainRationAsyncService gainRationAsyncService;
 
-    private boolean isFirstTime = true;
+    private static volatile boolean isFirstTime = true;
 
     @PostMapping
     public ResponseEntity<Map<String, String>> processGainRation(
@@ -32,15 +36,26 @@ public class GainRationController {
         @RequestParam("sampleSize") int sampleSize,
         @RequestParam("datasetTrainingName") String trainingFileName,
         @RequestParam("datasetTestingName") String testingFileName,
-        @RequestParam(value = "classifier", defaultValue = "J48") String classifierName
+        @RequestParam(value = "classifier", defaultValue = "J48") String classifierName,
+        @RequestParam(value = "neighborhoodStrategy", required = false) String neighborhoodStrategy,
+        @RequestParam(value = "localSearches", required = false) String localSearches
     ) {
-        gainRationAsyncService.processAsync(
-            maxGenerations, rclCutoff, sampleSize,
-            trainingFileName, testingFileName, classifierName,
-            gainRationProducer, gainRationService, isFirstTime
+        String requestId = "GR-" + UUID.randomUUID();
+        logger.info(
+            "Received GR requestId={} train={} test={} classifier={} maxGenerations={} rclCutoff={} sampleSize={} neighborhood={} localSearches={}",
+            requestId, trainingFileName, testingFileName, classifierName, maxGenerations, rclCutoff, sampleSize,
+            neighborhoodStrategy, localSearches
         );
 
+        gainRationAsyncService.processAsync(
+            maxGenerations, rclCutoff, sampleSize,
+            trainingFileName, testingFileName, classifierName, neighborhoodStrategy, localSearches,
+            gainRationProducer, gainRationService, isFirstTime, requestId
+        );
+
+        isFirstTime = false;
+
         return ResponseEntity.status(HttpStatus.ACCEPTED)
-                .body(Map.of("message", "Processamento assíncrono iniciado."));
+                .body(Map.of("message", "Processamento assincrono iniciado.", "requestId", requestId));
     }
 }

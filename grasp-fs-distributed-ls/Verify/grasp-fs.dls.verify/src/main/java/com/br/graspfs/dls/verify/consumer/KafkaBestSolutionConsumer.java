@@ -24,25 +24,28 @@ public class KafkaBestSolutionConsumer {
     public void consume(ConsumerRecord<String, DataSolution> record) {
         DataSolution data = record.value();
         if (data == null) {
-            log.warn("⚠️ Mensagem nula recebida no tópico BEST_SOLUTION_TOPIC.");
+            log.warn("verify received null message from BEST_SOLUTION_TOPIC");
             return;
         }
 
-        log.info("📩 Received BEST_SOLUTION: {}", data);
+        log.info(
+                "verify confirmed best solution seedId={} rcl={} localSearch={} neighborhood={} f1={} features={} partition={} offset={}",
+                data.getSeedId(),
+                data.getRclAlgorithm(),
+                data.getLocalSearch(),
+                data.getNeighborhood(),
+                data.getF1Score(),
+                data.getSolutionFeatures() != null ? data.getSolutionFeatures().size() : 0,
+                record.partition(),
+                record.offset()
+        );
         responseQueue.offer(data);
     }
 
-    /**
-     * Aguarda até X segundos (configurado via verify.timeout.seconds) por uma resposta.
-     *
-     * @param timeoutSeconds tempo máximo para aguardar
-     * @return a melhor solução recebida ou null se o tempo esgotar
-     * @throws InterruptedException se a thread for interrompida
-     */
     public DataSolution waitForBestSolution(int timeoutSeconds) throws InterruptedException {
         DataSolution result = responseQueue.poll(timeoutSeconds, TimeUnit.SECONDS);
         if (result == null) {
-            log.warn("⏱ Timeout: nenhuma solução recebida em {} segundos.", timeoutSeconds);
+            log.warn("verify timeout waiting best solution timeoutSeconds={}", timeoutSeconds);
         }
         return result;
     }

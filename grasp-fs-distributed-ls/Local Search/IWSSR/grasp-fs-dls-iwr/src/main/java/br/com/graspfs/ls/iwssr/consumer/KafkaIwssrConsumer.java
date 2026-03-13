@@ -15,7 +15,7 @@ public class KafkaIwssrConsumer {
 
     private final IwssrService iwssrService;
 
-    @KafkaListener(topics = "IWSSR_TOPIC", groupId = "myGroup")
+    @KafkaListener(topics = "IWSSR_TOPIC", groupId = "myGroup", containerFactory = "jsonKafkaListenerContainer")
     public void consume(ConsumerRecord<String, DataSolution> record) {
         DataSolution data = record.value();
         log.info("📥 Mensagem recebida do tópico IWSSR_TOPIC: {}", data);

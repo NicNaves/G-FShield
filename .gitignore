@@ -38,3 +38,5 @@ Thumbs.db
 **/generated-sources/
 **/generated-test-sources/
 
+# Estado local dos scripts de desenvolvimento
+.local-dev/

@@ -9,41 +9,65 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class KafkaSolutionConsumer {
 
     private final VndService vndService;
-    private static DataSolution bestSolution;
+    private final ConcurrentMap<UUID, DataSolution> bestSolutions = new ConcurrentHashMap<>();
 
     @Value("${vnd.max.iterations:10}")
     private int maxIterations;
 
-    @KafkaListener(topics = "SOLUTIONS_TOPIC", groupId = "VND")
+    @KafkaListener(topics = "SOLUTIONS_TOPIC", groupId = "VND", containerFactory = "jsonKafkaListenerContainer")
     public void consume(ConsumerRecord<String, DataSolution> record) {
         DataSolution incoming = record.value();
         log.info("📥 Mensagem recebida do Kafka: {}", incoming);
 
-        if (incoming.getIterationNeighborhood() < maxIterations) {
+        if (incoming == null || incoming.getSeedId() == null) {
+            log.warn("⚠️ Solução recebida sem seedId. Ignorando.");
+            return;
+        }
+
+        if (incoming.getNeighborhood() != null
+                && !incoming.getNeighborhood().isBlank()
+                && !"VND".equalsIgnoreCase(incoming.getNeighborhood())) {
+            log.info("⏭ Solução da estratégia {} ignorada pelo ciclo VND.", incoming.getNeighborhood());
+            return;
+        }
+
+        int iterationNeighborhood = incoming.getIterationNeighborhood() != null
+                ? incoming.getIterationNeighborhood()
+                : 0;
+
+        if (iterationNeighborhood < maxIterations) {
             try {
-                if (bestSolution == null) {
-                    bestSolution = incoming;
-                    log.info("🟢 Primeira solução armazenada. Iniciando ciclo VND.");
-                } else {
-                    log.info("🔄 Comparando nova solução com a melhor até agora...");
-                }
+                bestSolutions.compute(incoming.getSeedId(), (seedId, currentBest) -> {
+                    DataSolution baseline = currentBest;
+                    if (baseline == null) {
+                        log.info("🟢 Primeira solução armazenada. Iniciando ciclo VND.");
+                        baseline = incoming;
+                    } else {
+                        log.info("🔄 Comparando nova solução com a melhor até agora...");
+                    }
 
-                bestSolution = vndService.callNextService(bestSolution, record);
-
-                log.info("🏁 Melhor solução atual: F1 = {}, Features = {}",
-                        bestSolution.getF1Score(), bestSolution.getSolutionFeatures());
+                    DataSolution updatedBest = vndService.callNextService(baseline, incoming);
+                    log.info("🏁 Melhor solução atual (seedId={}): F1 = {}, Features = {}",
+                            seedId, updatedBest.getF1Score(), updatedBest.getSolutionFeatures());
+                    return updatedBest;
+                });
 
             } catch (IllegalArgumentException ex) {
                 log.error("❌ Erro ao processar solução recebida: {}", ex.getMessage(), ex);
                 throw ex;
             }
         } else {
+            bestSolutions.remove(incoming.getSeedId());
             log.warn("⏹ Iteração de vizinhança máxima ({}) atingida. Ignorando solução.", maxIterations);
         }
     }

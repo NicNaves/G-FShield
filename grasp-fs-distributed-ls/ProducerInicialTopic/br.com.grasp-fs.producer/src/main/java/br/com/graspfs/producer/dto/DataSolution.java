@@ -31,6 +31,18 @@ public class DataSolution {
     @JsonProperty("f1Score")
     private Float f1Score;// 98%
 
+    @JsonProperty("rclAlgorithm")
+    private String rclAlgorithm;
+
+    @JsonProperty("cpuUsage")
+    private Float cpuUsage;
+
+    @JsonProperty("memoryUsage")
+    private Float memoryUsage;
+
+    @JsonProperty("memoryUsagePercent")
+    private Float memoryUsagePercent;
+
     @JsonProperty("localSearch")
     private String localSearch; // BF
 

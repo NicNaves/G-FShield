@@ -17,7 +17,7 @@ public class KafkaBitFlipProducer {
     private final KafkaTemplate<String, DataSolution> kafkaTemplate;
 
     public void send(DataSolution data) {
-        kafkaTemplate.send(TOPIC, data).addCallback(
+        kafkaTemplate.send(TOPIC, buildKey(data), data).addCallback(
             success -> {
                 var record = Optional.ofNullable(success)
                                      .map(s -> s.getProducerRecord().value())
@@ -27,5 +27,15 @@ public class KafkaBitFlipProducer {
             },
             failure -> log.error("❌ Falha ao enviar mensagem para [{}]: {}", TOPIC, failure.getMessage())
         );
+    }
+
+    private String buildKey(DataSolution data) {
+        if (data.getSeedId() != null) {
+            return data.getSeedId().toString();
+        }
+        return String.join("|",
+                String.valueOf(data.getClassfier()),
+                String.valueOf(data.getTrainingFileName()),
+                String.valueOf(data.getTestingFileName()));
     }
 }

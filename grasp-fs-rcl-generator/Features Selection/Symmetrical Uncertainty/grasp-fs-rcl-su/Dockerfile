@@ -1,11 +1,14 @@
-# Stage 1: Build
 FROM maven:3.9.4-eclipse-temurin-17 AS builder
 WORKDIR /app
-COPY . .
-RUN mvn clean package -DskipTests
 
-# Stage 2: Runtime
-FROM openjdk:17
-ARG JAR_FILE=target/*.jar
-COPY ${JAR_FILE} grasp-fs-rcl-su.jar
-ENTRYPOINT ["java", "-jar", "/grasp-fs-rcl-su.jar"]
+COPY pom.xml mvnw mvnw.cmd ./
+COPY .mvn .mvn
+RUN mvn -q -DskipTests dependency:go-offline
+
+COPY src src
+RUN mvn -q clean package -DskipTests
+
+FROM eclipse-temurin:17-jre
+WORKDIR /opt/app
+COPY --from=builder /app/target/*.jar app.jar
+ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS:--XX:+UseContainerSupport -XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -Djava.security.egd=file:/dev/./urandom} -jar /opt/app/app.jar"]

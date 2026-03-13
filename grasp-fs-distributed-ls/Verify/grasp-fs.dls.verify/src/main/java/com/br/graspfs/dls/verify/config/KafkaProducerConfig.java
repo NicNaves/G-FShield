@@ -17,6 +17,8 @@ import java.util.Map;
 @Configuration
 public class KafkaProducerConfig {
 
+    private static final int DEFAULT_BATCH_SIZE = 65_536;
+
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapserver;
     
@@ -26,6 +28,12 @@ public class KafkaProducerConfig {
         properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapserver);
         properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+        properties.put(ProducerConfig.ACKS_CONFIG, "all");
+        properties.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        properties.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "gzip");
+        properties.put(ProducerConfig.LINGER_MS_CONFIG, 5);
+        properties.put(ProducerConfig.BATCH_SIZE_CONFIG, DEFAULT_BATCH_SIZE);
+        properties.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
         return new DefaultKafkaProducerFactory<>(properties);
     }
     @Bean

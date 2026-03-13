@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  VIEWER
+}
+
+enum ExecutionStatus {
+  REQUESTED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  cpf       String?
+  telefone  String?
+  password  String
+  role      UserRole @default(ADMIN)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  executionLaunches GraspExecutionLaunch[] @relation("LaunchRequestedBy")
+}
+
+model GraspExecutionLaunch {
+  id                  Int             @id @default(autoincrement())
+  requestId           String          @unique @default(cuid())
+  status              ExecutionStatus @default(REQUESTED)
+  algorithms          String[]
+  maxGenerations      Int
+  rclCutoff           Int
+  sampleSize          Int
+  datasetTrainingName String
+  datasetTestingName  String
+  classifier          String
+  requestedAt         DateTime        @default(now())
+  requestedById       Int?
+  metadata            Json?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  requestedBy User?                  @relation("LaunchRequestedBy", fields: [requestedById], references: [id])
+  events      GraspExecutionEvent[]  @relation("LaunchEvents")
+
+  @@index([requestedAt])
+}
+
+model GraspExecutionRun {
+  id                    Int             @id @default(autoincrement())
+  seedId                String          @unique
+  status                ExecutionStatus @default(RUNNING)
+  stage                 String?
+  topic                 String?
+  rclAlgorithm          String?
+  classifier            String?
+  localSearch           String?
+  neighborhood          String?
+  trainingFileName      String?
+  testingFileName       String?
+  iterationNeighborhood Int?
+  iterationLocalSearch  Int?
+  currentF1Score        Float?
+  bestF1Score           Float?
+  accuracy              Float?
+  precision             Float?
+  recall                Float?
+  cpuUsage              Float?
+  memoryUsage           Float?
+  memoryUsagePercent    Float?
+  runningTime           String?
+  solutionFeatures      Json?
+  rclFeatures           Json?
+  updates               Int             @default(0)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  completedAt           DateTime?
+
+  events GraspExecutionEvent[] @relation("RunEvents")
+
+  @@index([updatedAt])
+  @@index([status])
+}
+
+model GraspExecutionEvent {
+  id              BigInt            @id @default(autoincrement())
+  fingerprint     String            @unique
+  eventType       String
+  topic           String?
+  stage           String?
+  status          ExecutionStatus?
+  seedId          String?
+  requestId       String?
+  sourcePartition Int?
+  sourceOffset    String?
+  payload         Json
+  createdAt       DateTime          @default(now())
+  launchId        Int?
+  runId           Int?
+
+  launch GraspExecutionLaunch? @relation("LaunchEvents", fields: [launchId], references: [id])
+  run    GraspExecutionRun?    @relation("RunEvents", fields: [runId], references: [id])
+
+  @@index([seedId])
+  @@index([requestId])
+  @@index([createdAt])
+}

@@ -1,0 +1,21 @@
+services:
+  webservice-postgres:
+    image: postgres:14
+    container_name: grasp-webservice-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: graspfs
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - webservice_api_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d graspfs"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  webservice_api_pg_data:

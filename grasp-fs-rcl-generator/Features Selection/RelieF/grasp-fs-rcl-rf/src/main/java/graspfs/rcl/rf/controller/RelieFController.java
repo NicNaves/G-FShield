@@ -8,9 +8,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/rf")
@@ -32,17 +36,26 @@ public class RelieFController {
         @RequestParam("sampleSize") int sampleSize,
         @RequestParam("datasetTrainingName") String trainingFileName,
         @RequestParam("datasetTestingName") String testingFileName,
-        @RequestParam(value = "classifier", defaultValue = "J48") String classifierName
+        @RequestParam(value = "classifier", defaultValue = "J48") String classifierName,
+        @RequestParam(value = "neighborhoodStrategy", required = false) String neighborhoodStrategy,
+        @RequestParam(value = "localSearches", required = false) String localSearches
     ) {
+        String requestId = "RF-" + UUID.randomUUID();
+        logger.info(
+            "Received RF requestId={} train={} test={} classifier={} maxGenerations={} rclCutoff={} sampleSize={} neighborhood={} localSearches={}",
+            requestId, trainingFileName, testingFileName, classifierName, maxGenerations, rclCutoff, sampleSize,
+            neighborhoodStrategy, localSearches
+        );
+
         relieFAsyncService.processAsync(
             maxGenerations, rclCutoff, sampleSize,
-            trainingFileName, testingFileName, classifierName,
-            reliefProducer, relieFService, isFirstTime
+            trainingFileName, testingFileName, classifierName, neighborhoodStrategy, localSearches,
+            reliefProducer, relieFService, isFirstTime, requestId
         );
 
         isFirstTime = false;
 
         return ResponseEntity.status(HttpStatus.ACCEPTED)
-                .body(Map.of("message", "Processamento assíncrono iniciado."));
+                .body(Map.of("message", "Processamento assincrono iniciado.", "requestId", requestId));
     }
 }

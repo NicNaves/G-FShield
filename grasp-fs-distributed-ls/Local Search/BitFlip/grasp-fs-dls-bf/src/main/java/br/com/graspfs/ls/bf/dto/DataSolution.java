@@ -24,6 +24,9 @@ public class DataSolution {
     @JsonProperty("neighborhood")
     private String neighborhood;// vnd
 
+    @JsonProperty("enabledLocalSearches")
+    private ArrayList<String> enabledLocalSearches;
+
     @JsonProperty("iterationNeighborhood")
     private Integer iterationNeighborhood; //01
 
@@ -32,6 +35,18 @@ public class DataSolution {
 
     @JsonProperty("f1Score")
     private Float f1Score;// 98%
+
+    @JsonProperty("rclAlgorithm")
+    private String rclAlgorithm;
+
+    @JsonProperty("cpuUsage")
+    private Float cpuUsage;
+
+    @JsonProperty("memoryUsage")
+    private Float memoryUsage;
+
+    @JsonProperty("memoryUsagePercent")
+    private Float memoryUsagePercent;
 
     @JsonProperty("accuracy")
     private Float accuracy;

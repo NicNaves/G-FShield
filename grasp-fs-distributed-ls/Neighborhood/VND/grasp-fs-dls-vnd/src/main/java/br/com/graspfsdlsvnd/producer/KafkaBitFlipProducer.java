@@ -23,7 +23,7 @@ public class KafkaBitFlipProducer {
     }
 
     public void send(DataSolution data){
-        kafkaTemplate.send(topic, data).addCallback(
+        kafkaTemplate.send(topic, buildKey(data), data).addCallback(
                 sucess -> {
                     assert sucess != null;
                     logg.info("Mensage send sucess " + sucess.getProducerRecord().value());
@@ -31,6 +31,16 @@ public class KafkaBitFlipProducer {
                 },
                 failure -> logg.info("Mensage Failure " + failure.getMessage())
         ); 
+    }
+
+    private String buildKey(DataSolution data) {
+        if (data.getSeedId() != null) {
+            return data.getSeedId().toString();
+        }
+        return String.join("|",
+                String.valueOf(data.getClassfier()),
+                String.valueOf(data.getTrainingFileName()),
+                String.valueOf(data.getTestingFileName()));
     }
 
 }

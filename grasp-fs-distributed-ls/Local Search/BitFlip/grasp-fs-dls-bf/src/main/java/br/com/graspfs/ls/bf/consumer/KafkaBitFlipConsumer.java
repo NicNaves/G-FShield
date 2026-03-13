@@ -14,7 +14,7 @@ public class KafkaBitFlipConsumer {
 
     private final BitFlipService bitFlipService;
 
-    @KafkaListener(topics = "BIT_FLIP_TOPIC", groupId = "myGroup")
+    @KafkaListener(topics = "BIT_FLIP_TOPIC", groupId = "myGroup", containerFactory = "jsonKafkaListenerContainer")
     public void consume(DataSolution record) {
         log.info("📥 [BIT_FLIP_TOPIC] Mensagem recebida: {}", record);
 

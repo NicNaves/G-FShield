@@ -4,6 +4,11 @@ services:
   grasp-fs-rcl-su:
     build:
       context: ./grasp-fs-rcl-generator/Features Selection/Symmetrical Uncertainty/grasp-fs-rcl-su
+    environment:
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=35 -XX:MaxRAMPercentage=82 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "3"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "6"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "150"
     ports:
       - "8087:8087"
     volumes:
@@ -19,6 +24,11 @@ services:
   grasp-fs-rcl-rf:
     build:
       context: ./grasp-fs-rcl-generator/Features Selection/RelieF/grasp-fs-rcl-rf
+    environment:
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=35 -XX:MaxRAMPercentage=82 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "3"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "6"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "150"
     ports:
       - "8086:8086"
     volumes:
@@ -35,7 +45,10 @@ services:
     build:
       context: ./grasp-fs-rcl-generator/Features Selection/InfoGain/grasp-fs-rcl-ig
     environment:
-    - JAVA_OPTS=-Xms512m -Xmx4g
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=35 -XX:MaxRAMPercentage=82 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "3"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "6"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "150"
     ports:
       - "8089:8089"
     volumes:
@@ -51,6 +64,11 @@ services:
   grasp-fs-rcl-gr:
     build:
       context: ./grasp-fs-rcl-generator/Features Selection/GainRatio/grasp-fs-rcl-gr
+    environment:
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=35 -XX:MaxRAMPercentage=82 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "3"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "6"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "150"
     ports:
       - "8088:8088"
     volumes:
@@ -66,6 +84,9 @@ services:
   grasp-fs.dls.verify:
     build:
       context: ./grasp-fs-distributed-ls/Verify/grasp-fs.dls.verify
+    environment:
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60 -Djava.security.egd=file:/dev/./urandom"
+      KAFKA_LISTENER_CONCURRENCY: "1"
     ports:
       - "8085:8085"
     volumes:
@@ -81,6 +102,9 @@ services:
   grasp-fs-dls-bf:
     build:
       context: ./grasp-fs-distributed-ls/Local Search/BitFlip/grasp-fs-dls-bf
+    environment:
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60 -Djava.security.egd=file:/dev/./urandom"
+      KAFKA_LISTENER_CONCURRENCY: "1"
     ports:
       - "8082:8082"
     volumes:
@@ -96,6 +120,9 @@ services:
   grasp-fs-dls-iw:
     build:
       context: ./grasp-fs-distributed-ls/Local Search/IWSS/grasp-fs-dls-iw
+    environment:
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60 -Djava.security.egd=file:/dev/./urandom"
+      KAFKA_LISTENER_CONCURRENCY: "1"
     ports:
       - "8083:8083"
     volumes:
@@ -111,6 +138,9 @@ services:
   grasp-fs-dls-iwr:
     build:
       context: ./grasp-fs-distributed-ls/Local Search/IWSSR/grasp-fs-dls-iwr
+    environment:
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60 -Djava.security.egd=file:/dev/./urandom"
+      KAFKA_LISTENER_CONCURRENCY: "1"
     ports:
       - "8084:8084"
     volumes:
@@ -126,6 +156,9 @@ services:
   grasp-fs-dls-rvnd:
     build:
       context: ./grasp-fs-distributed-ls/Neighborhood/RVND/grasp-fs-dls-rvnd
+    environment:
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60 -Djava.security.egd=file:/dev/./urandom"
+      KAFKA_LISTENER_CONCURRENCY: "1"
     ports:
       - "8090:8090"
     volumes:
@@ -141,6 +174,9 @@ services:
   grasp-fs-dls-vnd:
     build:
       context: ./grasp-fs-distributed-ls/Neighborhood/VND/grasp-fs-dls-vnd
+    environment:
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60 -Djava.security.egd=file:/dev/./urandom"
+      KAFKA_LISTENER_CONCURRENCY: "1"
     ports:
       - "8091:8091"
     volumes:
@@ -154,27 +190,31 @@ services:
       kafka:
         condition: service_started
   zookeeper:
-    image: 'bitnami/zookeeper:latest'
+    image: 'confluentinc/cp-zookeeper:7.4.0'
     ports:
       - '2181:2181'
     environment:
-      - ALLOW_ANONYMOUS_LOGIN=yes
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ZOOKEEPER_TICK_TIME=2000
 
   kafka:
-    image: 'bitnami/kafka:3.4'
+    image: 'confluentinc/cp-kafka:7.4.0'
     ports:
       - '9092:9092'
       - '29092:29092'
       - '9999:9999'
     environment:
       - KAFKA_BROKER_ID=1
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT_INTERNAL
-      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
-      - ALLOW_PLAINTEXT_LISTENER=yes
-      - JMX_PORT=9999
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT_INTERNAL
+      - KAFKA_NUM_PARTITIONS=6
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
       - KAFKA_JMX_PORT=9999
       - KAFKA_JMX_HOSTNAME=localhost
     depends_on:
@@ -192,7 +232,7 @@ services:
       POSTGRES_PASSWORD: "change_me"
       POSTGRES_HOST_AUTH_METHOD: "scram-sha-256"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready"]
+      test: ["CMD-SHELL", "pg_isready -U conduktor -d conduktor-console"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -209,7 +249,7 @@ services:
       POSTGRES_PASSWORD: "change_me"
       POSTGRES_HOST_AUTH_METHOD: "scram-sha-256"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready"]
+      test: ["CMD-SHELL", "pg_isready -U conduktor -d conduktor-sql"]
       interval: 10s
       timeout: 5s
       retries: 5

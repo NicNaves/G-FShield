@@ -50,6 +50,7 @@ public class RelieFService {
     public DataSolution doRelief(Instances trainingDataset, int rclCutoff, AbstractClassifier classifier, String trainingFileName, String testingFileName) throws Exception {
         String classifierName = classifier.getClass().getSimpleName();
         DataSolution initialSolution = SelectionFeaturesUtils.createData(classifierName, trainingFileName, testingFileName);
+        initialSolution.setRclAlgorithm("RF");
         rankFeatures(initialSolution, trainingDataset, rclCutoff);
         return initialSolution;
     }
@@ -99,6 +100,9 @@ public class RelieFService {
         float avgCpu = collector.getAvgCpu();
         float avgMemory = collector.getAvgMemory();
         float avgMemoryPercent = collector.getAvgMemoryPercent();
+        rcl.setCpuUsage(Float.isFinite(avgCpu) ? avgCpu : 0.0F);
+        rcl.setMemoryUsage(Float.isFinite(avgMemory) ? avgMemory : 0.0F);
+        rcl.setMemoryUsagePercent(Float.isFinite(avgMemoryPercent) ? avgMemoryPercent : 0.0F);
 
         String solutionStr = solutionFeatures.toString().replaceAll("[\\r\\n;]", ",");
         String f1 = String.format(Locale.US, "%.4f", rcl.getF1Score());

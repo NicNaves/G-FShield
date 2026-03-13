@@ -52,6 +52,7 @@ public class InformationGainService {
     public DataSolution doIG(Instances trainingDataset, int rclCutoff, AbstractClassifier classifier, String trainingFileName, String testingFileName) throws Exception {
         String classifierName = classifier.getClass().getSimpleName();
         DataSolution initialSolution = SelectionFeaturesUtils.createData(classifierName, trainingFileName, testingFileName);
+        initialSolution.setRclAlgorithm("IG");
         rankFeatures(initialSolution, trainingDataset, rclCutoff);
         return initialSolution;
     }
@@ -101,6 +102,9 @@ public class InformationGainService {
         float avgCpu = collector.getAvgCpu();
         float avgMemory = collector.getAvgMemory();
         float avgMemoryPercent = collector.getAvgMemoryPercent();
+        rcl.setCpuUsage(Float.isFinite(avgCpu) ? avgCpu : 0.0F);
+        rcl.setMemoryUsage(Float.isFinite(avgMemory) ? avgMemory : 0.0F);
+        rcl.setMemoryUsagePercent(Float.isFinite(avgMemoryPercent) ? avgMemoryPercent : 0.0F);
 
         // Formata todos os valores para escrita
         String solutionStr = solutionFeatures.toString().replaceAll("[\\r\\n;]", ",");

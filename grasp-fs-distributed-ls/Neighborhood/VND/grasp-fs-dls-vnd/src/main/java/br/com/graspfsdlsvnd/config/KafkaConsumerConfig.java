@@ -23,22 +23,37 @@ public class KafkaConsumerConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapserver;
 
+    @Value("${spring.kafka.consumer.group-id:VND}")
+    private String consumerGroupId;
+
+    @Value("${spring.kafka.consumer.auto-offset-reset:earliest}")
+    private String autoOffsetReset;
+
+    @Value("${kafka.listener.concurrency:1}")
+    private Integer listenerConcurrency;
+
     @Bean
-    public ConsumerFactory consumerConfig() {
+    public ConsumerFactory<String, DataSolution> consumerConfig() {
         Map<String, Object> properties = new HashMap<String, Object>();
+        JsonDeserializer<DataSolution> deserializer = new JsonDeserializer<>(DataSolution.class, false);
+        deserializer.addTrustedPackages("*");
+
         properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapserver);
+        properties.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
+        properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, autoOffsetReset);
         properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-        return new DefaultKafkaConsumerFactory<>(properties, new StringDeserializer(),new JsonDeserializer<>(DataSolution.class)
-                .trustedPackages("*")
-                .forKeys());
+        return new DefaultKafkaConsumerFactory<>(properties, new StringDeserializer(), deserializer);
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory jsonKafkaListenerContainer(){
-        var containerFactory = new ConcurrentKafkaListenerContainerFactory();
+    public ConcurrentKafkaListenerContainerFactory<String, DataSolution> jsonKafkaListenerContainer(){
+        ConcurrentKafkaListenerContainerFactory<String, DataSolution> containerFactory =
+                new ConcurrentKafkaListenerContainerFactory<>();
         containerFactory.setConsumerFactory(consumerConfig());
         containerFactory.setMessageConverter(new JsonMessageConverter());
+        containerFactory.setConcurrency(listenerConcurrency);
+        containerFactory.getContainerProperties().setMissingTopicsFatal(false);
         return containerFactory;
     }
 

@@ -29,11 +29,18 @@ public class KafkaInitialSolutionConsumer {
             return;
         }
 
+        if (data.getNeighborhood() != null
+                && !data.getNeighborhood().isBlank()
+                && !"VND".equalsIgnoreCase(data.getNeighborhood())) {
+            log.info("⏭ Estratégia {} ignorada pelo consumidor VND.", data.getNeighborhood());
+            return;
+        }
+
         log.info("📥 Recebida solução inicial (seedId={}, features={}, search=VND)", 
                  data.getSeedId(), data.getSolutionFeatures());
 
         try {
-            vndService.doVnd(data, LocalSearch.BIT_FLIP);
+            vndService.doVnd(data, null);
         } catch (Exception ex) {
             log.error("❌ Erro ao processar solução inicial (seedId={}): {}", 
                       data.getSeedId(), ex.getMessage(), ex);

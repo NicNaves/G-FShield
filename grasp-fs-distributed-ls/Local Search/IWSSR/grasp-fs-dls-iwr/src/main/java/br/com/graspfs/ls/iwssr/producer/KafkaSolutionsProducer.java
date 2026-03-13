@@ -12,21 +12,42 @@ public class KafkaSolutionsProducer {
 
     private final KafkaTemplate<String, DataSolution> kafkaTemplate;
     private final String topic;
+    private final String progressTopic;
 
     public KafkaSolutionsProducer(KafkaTemplate<String, DataSolution> kafkaTemplate,
-                                   @Value("${kafka.topics.solutions:SOLUTIONS_TOPIC}") String topic) {
+                                   @Value("${kafka.topics.solutions:SOLUTIONS_TOPIC}") String topic,
+                                   @Value("${kafka.topics.progress:LOCAL_SEARCH_PROGRESS_TOPIC}") String progressTopic) {
         this.kafkaTemplate = kafkaTemplate;
         this.topic = topic;
+        this.progressTopic = progressTopic;
     }
 
     public void send(DataSolution data) {
-        kafkaTemplate.send(topic, data).addCallback(
+        sendToTopic(topic, data);
+    }
+
+    public void sendProgress(DataSolution data) {
+        sendToTopic(progressTopic, data);
+    }
+
+    private void sendToTopic(String destinationTopic, DataSolution data) {
+        kafkaTemplate.send(destinationTopic, buildKey(data), data).addCallback(
             success -> {
                 if (success != null) {
-                    log.info("✅ Mensagem enviada com sucesso para [{}]: {}", topic, success.getProducerRecord().value());
+                    log.debug("Message sent to topic [{}] with key {}", destinationTopic, success.getProducerRecord().key());
                 }
             },
-            failure -> log.error("❌ Falha ao enviar mensagem para [{}]: {}", topic, failure.getMessage(), failure)
+            failure -> log.error("❌ Falha ao enviar mensagem para [{}]: {}", destinationTopic, failure.getMessage(), failure)
         );
+    }
+
+    private String buildKey(DataSolution data) {
+        if (data.getSeedId() != null) {
+            return data.getSeedId().toString();
+        }
+        return String.join("|",
+                String.valueOf(data.getClassfier()),
+                String.valueOf(data.getTrainingFileName()),
+                String.valueOf(data.getTestingFileName()));
     }
 }

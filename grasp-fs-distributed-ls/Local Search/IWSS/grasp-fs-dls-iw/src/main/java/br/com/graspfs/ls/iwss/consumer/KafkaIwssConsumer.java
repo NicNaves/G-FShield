@@ -14,7 +14,7 @@ public class KafkaIwssConsumer {
 
     private final IwssService iwssService;
 
-    @KafkaListener(topics = "IWSS_TOPIC", groupId = "myGroup")
+    @KafkaListener(topics = "IWSS_TOPIC", groupId = "myGroup", containerFactory = "jsonKafkaListenerContainer")
     public void consume(DataSolution record) {
         log.info("📥 [IWSS] Mensagem recebida: {}", record);
 

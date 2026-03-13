@@ -36,6 +36,12 @@ public class IwssrService {
     @Value("${iwssr.metrics.file:/metrics/IWSSR_METRICS.csv}")
     private String metricsFileName;
 
+    @Value("${local.search.progress.mode:improvement}")
+    private String progressMode;
+
+    @Value("${local.search.progress.every-n:10}")
+    private int progressEveryN;
+
     private BufferedWriter writer;
     private boolean firstTime = true;
 
@@ -43,6 +49,12 @@ public class IwssrService {
         DataSolution data = updateSolution(seed);
         data.setLocalSearch(LocalSearch.IWSSR);
         data.setIterationLocalSearch(data.getIterationLocalSearch() + 1);
+
+        Instances trainingDataset = MachineLearningUtils.lerDataset(
+                new FileInputStream(datasetsBasePath + data.getTrainingFileName()));
+        Instances testingDataset = MachineLearningUtils.lerDataset(
+                new FileInputStream(datasetsBasePath + data.getTestingFileName()));
+        AbstractClassifier classifier = getClassifier(data.getClassfier());
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(metricsFileName, true))) {
             this.writer = writer;
@@ -52,35 +64,55 @@ public class IwssrService {
                 firstTime = false;
             }
 
-            DataSolution bestSolution = incrementalWrapperSequencialSearch(data);
+            DataSolution bestSolution = incrementalWrapperSequencialSearch(
+                    data, trainingDataset, testingDataset, classifier);
             bestSolution = updateSolution(resetDataSolution(seed, bestSolution));
             kafkaSolutionsProducer.send(bestSolution);
         }
     }
 
-    public DataSolution incrementalWrapperSequencialSearch(DataSolution dataSolution) throws Exception {
+    public DataSolution incrementalWrapperSequencialSearch(
+            DataSolution dataSolution,
+            Instances trainingDataset,
+            Instances testingDataset,
+            AbstractClassifier classifier
+    ) throws Exception {
         dataSolution.setIterationLocalSearch(dataSolution.getIterationLocalSearch() + 1);
         DataSolution bestSolution = updateSolution(dataSolution);
         DataSolution localSolutionAdd = updateSolution(dataSolution);
         DataSolution localSolutionReplace = updateSolution(dataSolution);
+        double lastPublishedBestF1 = Double.NEGATIVE_INFINITY;
 
         int n = localSolutionAdd.getRclfeatures().size();
 
         for (int i = 0; i < n; i++) {
             localSolutionAdd.setIterationLocalSearch(i);
-            localSolutionAdd = updateSolution(addMovement(localSolutionAdd));
-            localSolutionReplace = updateSolution(replaceMovement(localSolutionAdd));
+            localSolutionAdd = updateSolution(addMovement(
+                    localSolutionAdd, trainingDataset, testingDataset, classifier));
+            localSolutionReplace = updateSolution(replaceMovement(
+                    localSolutionAdd, trainingDataset, testingDataset, classifier));
+            lastPublishedBestF1 = publishProgressIfNeeded(
+                    updateSolution(localSolutionReplace),
+                    i,
+                    n,
+                    lastPublishedBestF1
+            );
 
             if (localSolutionReplace.getF1Score() > bestSolution.getF1Score()) {
                 bestSolution = updateSolution(localSolutionReplace);
             }
         }
 
-        log.info("BESTSOLUTION FINAL: {}", bestSolution.getF1Score());
+        log.info("IWSSR final best solution scored {}", bestSolution.getF1Score());
         return bestSolution;
     }
 
-    private DataSolution addMovement(DataSolution solution) throws Exception {
+    private DataSolution addMovement(
+            DataSolution solution,
+            Instances trainingDataset,
+            Instances testingDataset,
+            AbstractClassifier classifier
+    ) throws Exception {
         MetricsCollector collector = new MetricsCollector();
         Thread monitor = new Thread(collector);
         monitor.start();
@@ -89,7 +121,7 @@ public class IwssrService {
 
         solution.getSolutionFeatures().add(solution.getRclfeatures().remove(0));
 
-        EvaluationResult Scores = evaluateWithDataset(solution);
+        EvaluationResult Scores = evaluateWithDataset(solution, trainingDataset, testingDataset, classifier);
 
         long endTime = System.currentTimeMillis();
 
@@ -106,7 +138,12 @@ public class IwssrService {
         return solution;
     }
 
-    private DataSolution replaceMovement(DataSolution solution) throws Exception {
+    private DataSolution replaceMovement(
+            DataSolution solution,
+            Instances trainingDataset,
+            Instances testingDataset,
+            AbstractClassifier classifier
+    ) throws Exception {
         DataSolution bestReplace = updateSolution(solution);
 
         for (int i = 0; i < solution.getSolutionFeatures().size(); i++) {
@@ -119,7 +156,7 @@ public class IwssrService {
             DataSolution replaced = updateSolution(solution);
             replaced.getSolutionFeatures().remove(i);
 
-            EvaluationResult Scores = evaluateWithDataset(replaced);
+            EvaluationResult Scores = evaluateWithDataset(replaced, trainingDataset, testingDataset, classifier);
 
             long endTime = System.currentTimeMillis();
 
@@ -136,18 +173,19 @@ public class IwssrService {
 
             if (Scores.getF1Score() > bestReplace.getF1Score()) {
                 bestReplace = updateSolution(replaced);
-                log.info("BESTSOLUTION : {} solution: {}", Scores.getF1Score(), bestReplace.getSolutionFeatures());
+                log.debug("IWSSR found a better replacement with score {}", Scores.getF1Score());
             }
         }
 
         return bestReplace;
     }
 
-    private EvaluationResult evaluateWithDataset(DataSolution solution) throws Exception {
-        Instances training = MachineLearningUtils.lerDataset(new FileInputStream(datasetsBasePath + solution.getTrainingFileName()));
-        Instances testing = MachineLearningUtils.lerDataset(new FileInputStream(datasetsBasePath + solution.getTestingFileName()));
-        AbstractClassifier classifier = getClassifier(solution.getClassfier());
-
+    private EvaluationResult evaluateWithDataset(
+            DataSolution solution,
+            Instances training,
+            Instances testing,
+            AbstractClassifier classifier
+    ) throws Exception {
         return MachineLearning.evaluateSolution(
                 new ArrayList<>(solution.getSolutionFeatures()),
                 new Instances(training),
@@ -182,6 +220,9 @@ public class IwssrService {
         String cpuFormatted = Float.isFinite(avgCpu) ? String.format(Locale.US, "%.4f", avgCpu) : "0.0000";
         String memFormatted = Float.isFinite(avgMemory) ? String.format(Locale.US, "%.4f", avgMemory) : "0.0000";
         String memPercentFormatted = Float.isFinite(avgMemoryPercent) ? String.format(Locale.US, "%.4f", avgMemoryPercent) : "0.0000";
+        solution.setCpuUsage(Float.isFinite(avgCpu) ? avgCpu : 0.0F);
+        solution.setMemoryUsage(Float.isFinite(avgMemory) ? avgMemory : 0.0F);
+        solution.setMemoryUsagePercent(Float.isFinite(avgMemoryPercent) ? avgMemoryPercent : 0.0F);
 
         writer.write(String.join(";",
             solution.getSolutionFeatures().toString(),
@@ -204,17 +245,55 @@ public class IwssrService {
         writer.newLine();
     }
 
+    private double publishProgressIfNeeded(
+            DataSolution snapshot,
+            int iteration,
+            int totalIterations,
+            double lastPublishedBestF1
+    ) {
+        return Math.max(lastPublishedBestF1, scoreOf(snapshot));
+    }
+
+    private boolean shouldPublishProgress(
+            DataSolution snapshot,
+            int iteration,
+            int totalIterations,
+            double lastPublishedBestF1
+    ) {
+        String mode = progressMode == null ? "improvement" : progressMode.trim().toLowerCase(Locale.ROOT);
+        boolean firstIteration = iteration == 0;
+        boolean lastIteration = iteration >= Math.max(totalIterations - 1, 0);
+        boolean improved = scoreOf(snapshot) > lastPublishedBestF1;
+        boolean sampledIteration = progressEveryN > 0 && ((iteration + 1) % progressEveryN == 0);
+
+        return switch (mode) {
+            case "off" -> false;
+            case "full" -> true;
+            case "sampled" -> firstIteration || lastIteration || improved || sampledIteration;
+            default -> firstIteration || lastIteration || improved;
+        };
+    }
+
+    private double scoreOf(DataSolution snapshot) {
+        return snapshot.getF1Score() == null ? Double.NEGATIVE_INFINITY : snapshot.getF1Score();
+    }
+
     private DataSolution updateSolution(DataSolution solution) {
         return DataSolution.builder()
                 .seedId(solution.getSeedId())
                 .rclfeatures(new ArrayList<>(solution.getRclfeatures()))
                 .solutionFeatures(new ArrayList<>(solution.getSolutionFeatures()))
                 .iterationNeighborhood(solution.getIterationNeighborhood())
+                .enabledLocalSearches(solution.getEnabledLocalSearches() != null ? new ArrayList<>(solution.getEnabledLocalSearches()) : new ArrayList<>())
                 .classfier(solution.getClassfier())
+                .rclAlgorithm(solution.getRclAlgorithm())
                 .trainingFileName(solution.getTrainingFileName())
                 .testingFileName(solution.getTestingFileName())
                 .neighborhood(solution.getNeighborhood())
                 .f1Score(solution.getF1Score())
+                .cpuUsage(solution.getCpuUsage())
+                .memoryUsage(solution.getMemoryUsage())
+                .memoryUsagePercent(solution.getMemoryUsagePercent())
                 .accuracy(solution.getAccuracy())
                 .recall(solution.getRecall())
                 .precision(solution.getPrecision())

@@ -6,7 +6,6 @@ import br.com.graspfs.ls.bf.enuns.LocalSearch;
 import br.com.graspfs.ls.bf.machinelearning.MachineLearning;
 import br.com.graspfs.ls.bf.producer.KafkaSolutionsProducer;
 import br.com.graspfs.ls.bf.util.MachineLearningUtils;
-import br.com.graspfs.ls.bf.util.PrintSolution;
 import br.com.graspfs.ls.bf.util.SystemMetricsUtils.MetricsCollector;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +38,12 @@ public class BitFlipService {
     @Value("${bitflip.metrics.file:/metrics/BIT-FLIP_METRICS.csv}")
     private String metricsFileName;
 
+    @Value("${local.search.progress.mode:improvement}")
+    private String progressMode;
+
+    @Value("${local.search.progress.every-n:10}")
+    private int progressEveryN;
+
     public void doBitFlip(DataSolution data) throws Exception {
         data.setLocalSearch(LocalSearch.BIT_FLIP);
 
@@ -68,6 +73,7 @@ public class BitFlipService {
     private DataSolution flipFeatures(DataSolution solution, BufferedWriter writer) throws Exception {
         Random random = new Random();
         int i = 0;
+        double lastPublishedBestF1 = Double.NEGATIVE_INFINITY;
 
         Instances trainingDataset = MachineLearningUtils.lerDataset(
                 new FileInputStream("/datasets/" + solution.getTrainingFileName()));
@@ -108,9 +114,11 @@ public class BitFlipService {
             solution.setRunnigTime(System.currentTimeMillis() - startTime); // ✅ Tempo de execução corrigido
 
             log.info("🌀 Iteração {}: F1={} Features={} ", i, Scores.getF1Score(), solution.getSolutionFeatures());
-            PrintSolution.logSolution(solution);
+            log.debug("BitFlip iteration {} scored {}", i, Scores.getF1Score());
 
             escreverLinhaCSV(writer, solution, collector);
+            DataSolution progressSnapshot = updateSolution(solution);
+            lastPublishedBestF1 = publishProgressIfNeeded(progressSnapshot, i, maxIterations, lastPublishedBestF1);
 
             if (Scores.getF1Score() > bestSolution.getF1Score()) {
                 bestSolution = updateSolution(solution);
@@ -134,6 +142,9 @@ public class BitFlipService {
         String cpuFormatted = Float.isFinite(avgCpu) ? String.format(Locale.US, "%.4f", avgCpu) : "0.0000";
         String memFormatted = Float.isFinite(avgMemory) ? String.format(Locale.US, "%.4f", avgMemory) : "0.0000";
         String memPercentFormatted = Float.isFinite(avgMemoryPercent) ? String.format(Locale.US, "%.4f", avgMemoryPercent) : "0.0000";
+        s.setCpuUsage(Float.isFinite(avgCpu) ? avgCpu : 0.0F);
+        s.setMemoryUsage(Float.isFinite(avgMemory) ? avgMemory : 0.0F);
+        s.setMemoryUsagePercent(Float.isFinite(avgMemoryPercent) ? avgMemoryPercent : 0.0F);
 
         writer.write(String.join(";",
                 s.getSolutionFeatures().toString(),
@@ -156,18 +167,56 @@ public class BitFlipService {
         writer.newLine();
     }
 
+    private double publishProgressIfNeeded(
+            DataSolution snapshot,
+            int iteration,
+            int totalIterations,
+            double lastPublishedBestF1
+    ) {
+        return Math.max(lastPublishedBestF1, scoreOf(snapshot));
+    }
+
+    private boolean shouldPublishProgress(
+            DataSolution snapshot,
+            int iteration,
+            int totalIterations,
+            double lastPublishedBestF1
+    ) {
+        String mode = progressMode == null ? "improvement" : progressMode.trim().toLowerCase(Locale.ROOT);
+        boolean firstIteration = iteration == 0;
+        boolean lastIteration = iteration >= Math.max(totalIterations - 1, 0);
+        boolean improved = scoreOf(snapshot) > lastPublishedBestF1;
+        boolean sampledIteration = progressEveryN > 0 && ((iteration + 1) % progressEveryN == 0);
+
+        return switch (mode) {
+            case "off" -> false;
+            case "full" -> true;
+            case "sampled" -> firstIteration || lastIteration || improved || sampledIteration;
+            default -> firstIteration || lastIteration || improved;
+        };
+    }
+
+    private double scoreOf(DataSolution snapshot) {
+        return snapshot.getF1Score() == null ? Double.NEGATIVE_INFINITY : snapshot.getF1Score();
+    }
+
     private DataSolution updateSolution(DataSolution s) {
         return DataSolution.builder()
                 .seedId(s.getSeedId())
                 .rclfeatures(new ArrayList<>(s.getRclfeatures()))
                 .solutionFeatures(new ArrayList<>(s.getSolutionFeatures()))
                 .neighborhood(s.getNeighborhood())
+                .enabledLocalSearches(s.getEnabledLocalSearches() != null ? new ArrayList<>(s.getEnabledLocalSearches()) : new ArrayList<>())
                 .iterationNeighborhood(s.getIterationNeighborhood())
                 .classfier(s.getClassfier())
+                .rclAlgorithm(s.getRclAlgorithm())
                 .trainingFileName(s.getTrainingFileName())
                 .testingFileName(s.getTestingFileName())
                 .localSearch(s.getLocalSearch())
                 .f1Score(s.getF1Score())
+                .cpuUsage(s.getCpuUsage())
+                .memoryUsage(s.getMemoryUsage())
+                .memoryUsagePercent(s.getMemoryUsagePercent())
                 .accuracy(s.getAccuracy())
                 .precision(s.getPrecision())
                 .recall(s.getRecall())

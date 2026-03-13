@@ -20,6 +20,15 @@ public class KafkaConsumerConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapserver;
 
+    @Value("${spring.kafka.consumer.group-id:myGroup}")
+    private String consumerGroupId;
+
+    @Value("${spring.kafka.consumer.auto-offset-reset:earliest}")
+    private String autoOffsetReset;
+
+    @Value("${kafka.listener.concurrency:1}")
+    private Integer listenerConcurrency;
+
 
     @Bean
     public ConsumerFactory<String, DataSolution> dataSolutionConsumerFactory() {
@@ -30,8 +39,9 @@ public class KafkaConsumerConfig {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapserver);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, deserializer);
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, "myGroup");
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, autoOffsetReset);
 
         return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), deserializer);
     }
@@ -41,6 +51,8 @@ public class KafkaConsumerConfig {
         ConcurrentKafkaListenerContainerFactory<String, DataSolution> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(dataSolutionConsumerFactory());
+        factory.setConcurrency(listenerConcurrency);
+        factory.getContainerProperties().setMissingTopicsFatal(false);
         return factory;
     }
 
@@ -49,6 +61,8 @@ public class KafkaConsumerConfig {
         ConcurrentKafkaListenerContainerFactory<String, DataSolution> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(dataSolutionConsumerFactory());
+        factory.setConcurrency(listenerConcurrency);
+        factory.getContainerProperties().setMissingTopicsFatal(false);
         return factory;
     }
 

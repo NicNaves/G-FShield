@@ -7,6 +7,8 @@ SAMPLE_SIZE=5
 TRAIN_FILE="ereno1ktrain.arff"
 TEST_FILE="ereno1ktest.arff"
 CLASSIFIER="J48"
+NEIGHBORHOOD="VND"
+LOCAL_SEARCHES="BIT_FLIP,IWSS,IWSSR"
 CONTENT_TYPE="application/x-www-form-urlencoded"
 
 echo "🔁 Enviando requisição para GR..."
@@ -17,8 +19,9 @@ curl -X POST http://localhost:8088/gr \
   -d "sampleSize=$SAMPLE_SIZE" \
   -d "datasetTrainingName=$TRAIN_FILE" \
   -d "datasetTestingName=$TEST_FILE" \
-  -d "classifier=$CLASSIFIER"
-echo -e "\n✅ GR finalizado\n"
+  -d "classifier=$CLASSIFIER" \
+  -d "neighborhoodStrategy=$NEIGHBORHOOD" \
+  -d "localSearches=$LOCAL_SEARCHES" &
 
 echo "🔁 Enviando requisição para IG..."
 curl -X POST http://localhost:8089/ig \
@@ -28,8 +31,9 @@ curl -X POST http://localhost:8089/ig \
   -d "sampleSize=$SAMPLE_SIZE" \
   -d "datasetTrainingName=$TRAIN_FILE" \
   -d "datasetTestingName=$TEST_FILE" \
-  -d "classifier=$CLASSIFIER"
-echo -e "\n✅ IG finalizado\n"
+  -d "classifier=$CLASSIFIER" \
+  -d "neighborhoodStrategy=$NEIGHBORHOOD" \
+  -d "localSearches=$LOCAL_SEARCHES" &
 
 echo "🔁 Enviando requisição para RF..."
 curl -X POST http://localhost:8086/rf \
@@ -39,8 +43,9 @@ curl -X POST http://localhost:8086/rf \
   -d "sampleSize=$SAMPLE_SIZE" \
   -d "datasetTrainingName=$TRAIN_FILE" \
   -d "datasetTestingName=$TEST_FILE" \
-  -d "classifier=$CLASSIFIER"
-echo -e "\n✅ RF finalizado\n"
+  -d "classifier=$CLASSIFIER" \
+  -d "neighborhoodStrategy=$NEIGHBORHOOD" \
+  -d "localSearches=$LOCAL_SEARCHES" &
 
 echo "🔁 Enviando requisição para SU..."
 curl -X POST http://localhost:8087/su \
@@ -50,8 +55,10 @@ curl -X POST http://localhost:8087/su \
   -d "sampleSize=$SAMPLE_SIZE" \
   -d "datasetTrainingName=$TRAIN_FILE" \
   -d "datasetTestingName=$TEST_FILE" \
-  -d "classifier=$CLASSIFIER"
-echo -e "\n✅ SU finalizado\n"
+  -d "classifier=$CLASSIFIER" \
+  -d "neighborhoodStrategy=$NEIGHBORHOOD" \
+  -d "localSearches=$LOCAL_SEARCHES" &
+
+wait
 
 echo "🚀 Todas as chamadas foram disparadas com sucesso."
-

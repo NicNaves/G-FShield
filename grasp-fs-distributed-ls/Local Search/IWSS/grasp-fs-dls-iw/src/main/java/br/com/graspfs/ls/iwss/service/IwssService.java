@@ -6,7 +6,6 @@ import br.com.graspfs.ls.iwss.enuns.LocalSearch;
 import br.com.graspfs.ls.iwss.machinelearning.MachineLearning;
 import br.com.graspfs.ls.iwss.producer.KafkaSolutionsProducer;
 import br.com.graspfs.ls.iwss.util.MachineLearningUtils;
-import br.com.graspfs.ls.iwss.util.PrintSolution;
 import br.com.graspfs.ls.iwss.util.SystemMetricsUtils.MetricsCollector;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,11 +36,23 @@ public class IwssService {
     @Value("${datasets.base.path:/datasets/}")
     private String datasetsBasePath;
 
+    @Value("${local.search.progress.mode:improvement}")
+    private String progressMode;
+
+    @Value("${local.search.progress.every-n:10}")
+    private int progressEveryN;
+
     private boolean firstTime = true;
 
     public void doIwss(DataSolution seed) throws Exception {
         DataSolution data = updateSolution(seed);
         data.setLocalSearch(LocalSearch.IWSS);
+
+        Instances trainingDataset = MachineLearningUtils.lerDataset(
+                new FileInputStream(datasetsBasePath + data.getTrainingFileName()));
+        Instances testingDataset = MachineLearningUtils.lerDataset(
+                new FileInputStream(datasetsBasePath + data.getTestingFileName()));
+        AbstractClassifier classifier = getClassifier(data.getClassfier());
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(metricsFileName, true))) {
             if (firstTime) {
@@ -50,22 +61,36 @@ public class IwssService {
                 firstTime = false;
             }
 
-            DataSolution bestSolution = incrementalWrapperSequencialSearch(data, writer);
+            DataSolution bestSolution = incrementalWrapperSequencialSearch(
+                    data, writer, trainingDataset, testingDataset, classifier);
             bestSolution = updateSolution(resetDataSolution(seed, bestSolution));
             kafkaSolutionsProducer.send(bestSolution);
         }
     }
 
-    public DataSolution incrementalWrapperSequencialSearch(DataSolution dataSolution, BufferedWriter writer) throws Exception {
+    public DataSolution incrementalWrapperSequencialSearch(
+            DataSolution dataSolution,
+            BufferedWriter writer,
+            Instances trainingDataset,
+            Instances testingDataset,
+            AbstractClassifier classifier
+    ) throws Exception {
         DataSolution bestSolution = updateSolution(dataSolution);
         DataSolution localSolutionAdd = updateSolution(dataSolution);
+        double lastPublishedBestF1 = Double.NEGATIVE_INFINITY;
 
         int n = localSolutionAdd.getRclfeatures().size();
 
         for (int i = 0; i < n; i++) {
             localSolutionAdd.setIterationLocalSearch(i);
-            localSolutionAdd = updateSolution(addMovement(localSolutionAdd, writer));
-            PrintSolution.logSolution(localSolutionAdd);
+            localSolutionAdd = updateSolution(addMovement(
+                    localSolutionAdd, writer, trainingDataset, testingDataset, classifier));
+            lastPublishedBestF1 = publishProgressIfNeeded(
+                    updateSolution(localSolutionAdd),
+                    i,
+                    n,
+                    lastPublishedBestF1
+            );
 
             if (localSolutionAdd.getF1Score() > bestSolution.getF1Score()) {
                 bestSolution = updateSolution(localSolutionAdd);
@@ -77,7 +102,13 @@ public class IwssService {
         return bestSolution;
     }
 
-    private DataSolution addMovement(DataSolution solution, BufferedWriter writer) throws Exception {
+    private DataSolution addMovement(
+            DataSolution solution,
+            BufferedWriter writer,
+            Instances trainingDataset,
+            Instances testingDataset,
+            AbstractClassifier classifier
+    ) throws Exception {
         long startTime = System.currentTimeMillis();
 
         MetricsCollector collector = new MetricsCollector();
@@ -85,13 +116,6 @@ public class IwssService {
         monitor.start();
 
         solution.getSolutionFeatures().add(solution.getRclfeatures().remove(0));
-
-        Instances trainingDataset = MachineLearningUtils.lerDataset(
-                new FileInputStream(datasetsBasePath + solution.getTrainingFileName()));
-        Instances testingDataset = MachineLearningUtils.lerDataset(
-                new FileInputStream(datasetsBasePath + solution.getTestingFileName()));
-
-        AbstractClassifier classifier = getClassifier(solution.getClassfier());
 
         EvaluationResult Scores = MachineLearning.evaluateSolution(
                 new ArrayList<>(solution.getSolutionFeatures()),
@@ -120,6 +144,9 @@ public class IwssService {
         String cpuFormatted = Float.isFinite(avgCpu) ? String.format(Locale.US, "%.4f", avgCpu) : "0.0000";
         String memFormatted = Float.isFinite(avgMemory) ? String.format(Locale.US, "%.4f", avgMemory) : "0.0000";
         String memPercentFormatted = Float.isFinite(avgMemoryPercent) ? String.format(Locale.US, "%.4f", avgMemoryPercent) : "0.0000";
+        solution.setCpuUsage(Float.isFinite(avgCpu) ? avgCpu : 0.0F);
+        solution.setMemoryUsage(Float.isFinite(avgMemory) ? avgMemory : 0.0F);
+        solution.setMemoryUsagePercent(Float.isFinite(avgMemoryPercent) ? avgMemoryPercent : 0.0F);
         writer.write(String.join(";",
                 solution.getSolutionFeatures().toString(),
                 f1Formatted,
@@ -143,6 +170,39 @@ public class IwssService {
         return solution;
     }
 
+    private double publishProgressIfNeeded(
+            DataSolution snapshot,
+            int iteration,
+            int totalIterations,
+            double lastPublishedBestF1
+    ) {
+        return Math.max(lastPublishedBestF1, scoreOf(snapshot));
+    }
+
+    private boolean shouldPublishProgress(
+            DataSolution snapshot,
+            int iteration,
+            int totalIterations,
+            double lastPublishedBestF1
+    ) {
+        String mode = progressMode == null ? "improvement" : progressMode.trim().toLowerCase(Locale.ROOT);
+        boolean firstIteration = iteration == 0;
+        boolean lastIteration = iteration >= Math.max(totalIterations - 1, 0);
+        boolean improved = scoreOf(snapshot) > lastPublishedBestF1;
+        boolean sampledIteration = progressEveryN > 0 && ((iteration + 1) % progressEveryN == 0);
+
+        return switch (mode) {
+            case "off" -> false;
+            case "full" -> true;
+            case "sampled" -> firstIteration || lastIteration || improved || sampledIteration;
+            default -> firstIteration || lastIteration || improved;
+        };
+    }
+
+    private double scoreOf(DataSolution snapshot) {
+        return snapshot.getF1Score() == null ? Double.NEGATIVE_INFINITY : snapshot.getF1Score();
+    }
+
     public DataSolution resetDataSolution(DataSolution seed, DataSolution data) {
         int k = seed.getRclfeatures().size() + seed.getSolutionFeatures().size();
         ArrayList<Integer> rclfeatures = new ArrayList<>();
@@ -163,11 +223,16 @@ public class IwssService {
                 .rclfeatures(new ArrayList<>(solution.getRclfeatures()))
                 .solutionFeatures(new ArrayList<>(solution.getSolutionFeatures()))
                 .iterationNeighborhood(solution.getIterationNeighborhood())
+                .enabledLocalSearches(solution.getEnabledLocalSearches() != null ? new ArrayList<>(solution.getEnabledLocalSearches()) : new ArrayList<>())
                 .classfier(solution.getClassfier())
+                .rclAlgorithm(solution.getRclAlgorithm())
                 .trainingFileName(solution.getTrainingFileName())
                 .testingFileName(solution.getTestingFileName())
                 .neighborhood(solution.getNeighborhood())
                 .f1Score(solution.getF1Score())
+                .cpuUsage(solution.getCpuUsage())
+                .memoryUsage(solution.getMemoryUsage())
+                .memoryUsagePercent(solution.getMemoryUsagePercent())
                 .accuracy(solution.getAccuracy())
                 .recall(solution.getRecall())
                 .precision(solution.getPrecision())

@@ -32,6 +32,13 @@ public class KafkaInitialSolutionConsumer {
             return;
         }
 
+        if (data.getNeighborhood() != null
+                && !data.getNeighborhood().isBlank()
+                && !"RVND".equalsIgnoreCase(data.getNeighborhood())) {
+            log.info("⏭ Estratégia {} ignorada pelo consumidor RVND.", data.getNeighborhood());
+            return;
+        }
+
         log.info("📥 Mensagem recebida: seedId={}, F1={}, Features={}",
                 data.getSeedId(), data.getF1Score(), data.getSolutionFeatures());
 
