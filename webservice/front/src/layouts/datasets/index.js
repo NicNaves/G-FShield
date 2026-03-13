@@ -159,7 +159,7 @@ function Datasets() {
         {!catalog.exists && !loading ? (
           <MDBox mb={3}>
             <Alert severity="warning">
-              A API nao encontrou a pasta compartilhada de datasets. Ajuste `GRASP_DATASETS_DIR` ou a montagem em `/datasets`.
+              The API could not find the shared datasets folder. Update `GRASP_DATASETS_DIR` or mount it at `/datasets`.
             </Alert>
           </MDBox>
         ) : null}
@@ -185,7 +185,7 @@ function Datasets() {
                     Shared Folder Inventory
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    Tamanho dos datasets disponiveis para selecao no servidor.
+                    Size of the datasets currently available to the server.
                   </MDTypography>
 
                   <MDBox mt={3} height="320px">
@@ -202,7 +202,7 @@ function Datasets() {
                     Shared path
                   </MDTypography>
                   <MDTypography variant="caption" display="block" color="text" mt={1}>
-                    {catalog.directory || "Pasta nao resolvida"}
+                    {catalog.directory || "Shared folder not resolved"}
                   </MDTypography>
 
                   <Divider sx={{ my: 2 }} />
@@ -215,7 +215,7 @@ function Datasets() {
                       <Chip key={pair.id} label={pair.label} size="small" variant="outlined" />
                     ))}
                     {!loading && catalog.suggestedPairs.length === 0 ? (
-                      <Chip label="Sem pares inferidos" size="small" variant="outlined" />
+                      <Chip label="No inferred pairs" size="small" variant="outlined" />
                     ) : null}
                   </Stack>
 
@@ -234,10 +234,10 @@ function Datasets() {
                       </MDTypography>
                     </>
                   ) : (
-                    <MDTypography variant="button" color="text">
+                      <MDTypography variant="button" color="text">
                       {loading
-                        ? "Carregando arquivos compartilhados..."
-                        : "Nenhum dataset encontrado na pasta compartilhada."}
+                        ? "Loading shared files..."
+                        : "No dataset was found in the shared folder."}
                     </MDTypography>
                   )}
                 </MDBox>

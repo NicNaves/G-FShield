@@ -12,6 +12,8 @@ import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
 
 import {
   Chart as ChartJS,
@@ -36,11 +38,10 @@ import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import Footer from "examples/Footer";
 import ComplexStatisticsCard from "examples/Cards/StatisticsCards/ComplexStatisticsCard";
 import DataTable from "examples/Tables/DataTable";
-import TimelineList from "examples/Timeline/TimelineList";
-import TimelineItem from "examples/Timeline/TimelineItem";
 
 import { getMonitorRun } from "api/grasp";
 import useGraspMonitor from "hooks/useGraspMonitor";
+import { useMaterialUIController } from "context";
 import {
   formatCompactPercent,
   formatDateTime,
@@ -143,6 +144,175 @@ const getNumericScore = (value, fallback = -1) => {
   const score = Number(value);
   return Number.isNaN(score) ? fallback : score;
 };
+
+const getFiniteMetric = (value) => {
+  const metric = Number(value);
+  return Number.isFinite(metric) ? metric : null;
+};
+
+const dashboardTabDescriptions = {
+  overview: "Realtime monitoring overview focused on the selected execution and the latest improvements.",
+  performance: "Pipeline performance indicators, from initial solutions to average CPU and memory costs.",
+  algorithms: "Consolidated view by RCL algorithm, including resource footprint and final outcomes.",
+  executions: "Per-seed breakdown with initial solutions, local-search outcomes, and best-solution workflows.",
+};
+
+const dashboardTabs = [
+  { value: "overview", label: "Overview", icon: "space_dashboard" },
+  { value: "performance", label: "Performance", icon: "monitoring" },
+  { value: "algorithms", label: "Algorithms", icon: "hub" },
+  { value: "executions", label: "Executions", icon: "lan" },
+];
+
+const stageLensOptions = [
+  { value: "all", label: "All stages" },
+  { value: "initial", label: "Initial solutions" },
+  { value: "local", label: "Local search finals" },
+  { value: "best", label: "Best solutions" },
+];
+
+const chartColorPalettes = {
+  algorithm: {
+    IG: "#4361ee",
+    INFORMATION_GAIN: "#4361ee",
+    GR: "#ff8c42",
+    GAIN_RATIO: "#ff8c42",
+    SU: "#11b5ae",
+    SYMMETRICAL_UNCERTAINTY: "#11b5ae",
+    RF: "#8b5cf6",
+    RELIEF: "#8b5cf6",
+    RELIEFF: "#8b5cf6",
+    UNKNOWN: "#94a3b8",
+  },
+  search: {
+    BIT_FLIP: "#36c56c",
+    IWSS: "#f59e0b",
+    IWSSR: "#ef476f",
+    VND: "#6366f1",
+    RVND: "#14b8a6",
+    UNKNOWN: "#94a3b8",
+  },
+};
+
+const fallbackBarColors = ["#4361ee", "#11b5ae", "#ff8c42", "#8b5cf6", "#ef476f", "#36c56c"];
+
+const formatWorkspaceLabel = (value = "") =>
+  String(value)
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+
+const formatScoreDelta = (currentValue, previousValue) => {
+  const current = Number(currentValue);
+  const previous = Number(previousValue);
+
+  if (Number.isNaN(current) || Number.isNaN(previous)) {
+    return "--";
+  }
+
+  const delta = current - previous;
+  const sign = delta > 0 ? "+" : "";
+  return `${sign}${formatMetric(delta, " pts")}`;
+};
+
+const normalizeChartKey = (value = "") =>
+  String(value)
+    .trim()
+    .toUpperCase()
+    .replace(/[^\w]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const hexToRgba = (hex, alpha) => {
+  const safeHex = String(hex || "").replace("#", "");
+  if (safeHex.length !== 6) {
+    return `rgba(148, 163, 184, ${alpha})`;
+  }
+
+  const red = Number.parseInt(safeHex.slice(0, 2), 16);
+  const green = Number.parseInt(safeHex.slice(2, 4), 16);
+  const blue = Number.parseInt(safeHex.slice(4, 6), 16);
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+};
+
+const pickFallbackColor = (label) => {
+  const normalized = normalizeChartKey(label);
+  if (!normalized) {
+    return fallbackBarColors[0];
+  }
+
+  const hash = [...normalized].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return fallbackBarColors[hash % fallbackBarColors.length];
+};
+
+const getBarPaletteForLabels = (labels = [], paletteName = "algorithm") => {
+  const palette = chartColorPalettes[paletteName] || {};
+
+  const borderColor = labels.map((label) => {
+    const normalized = normalizeChartKey(label);
+    return palette[normalized] || pickFallbackColor(label);
+  });
+
+  return {
+    borderColor,
+    backgroundColor: borderColor.map((color) => hexToRgba(color, 0.84)),
+    hoverBackgroundColor: borderColor.map((color) => hexToRgba(color, 0.96)),
+  };
+};
+
+const filterPanelSx = (darkMode) => ({
+  height: "100%",
+  p: 2.25,
+  borderRadius: 3,
+  color: darkMode ? "#f8fafc" : "#1f2937",
+  border: `1px solid ${darkMode ? "rgba(148, 163, 184, 0.22)" : "rgba(15, 23, 42, 0.08)"}`,
+  background: darkMode
+    ? "linear-gradient(180deg, rgba(15, 23, 42, 0.94) 0%, rgba(30, 41, 59, 0.94) 100%)"
+    : "linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(255, 255, 255, 0.92) 100%)",
+  boxShadow: darkMode
+    ? "0 18px 34px rgba(2, 6, 23, 0.34)"
+    : "0 14px 30px rgba(15, 23, 42, 0.06)",
+  "& .MuiFormControl-root": {
+    mb: 0,
+  },
+  "& .MuiInputLabel-root": {
+    color: darkMode ? "rgba(226, 232, 240, 0.78)" : "rgba(71, 85, 105, 0.82)",
+  },
+  "& .MuiInputLabel-root.Mui-focused": {
+    color: darkMode ? "#93c5fd" : "#4361ee",
+  },
+  "& .MuiOutlinedInput-root": {
+    color: darkMode ? "#f8fafc" : "#1f2937",
+    backgroundColor: darkMode ? "rgba(15, 23, 42, 0.34)" : "rgba(255, 255, 255, 0.82)",
+    borderRadius: 2.2,
+    transition: "border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease",
+  },
+  "& .MuiOutlinedInput-notchedOutline": {
+    borderColor: darkMode ? "rgba(148, 163, 184, 0.24)" : "rgba(15, 23, 42, 0.12)",
+  },
+  "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline": {
+    borderColor: darkMode ? "rgba(191, 219, 254, 0.48)" : "rgba(67, 97, 238, 0.28)",
+  },
+  "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+    borderColor: darkMode ? "#93c5fd" : "#4361ee",
+    borderWidth: "1px",
+  },
+  "& .MuiSelect-icon": {
+    color: darkMode ? "rgba(226, 232, 240, 0.84)" : "rgba(71, 85, 105, 0.82)",
+  },
+  "& .MuiDivider-root": {
+    borderColor: darkMode ? "rgba(148, 163, 184, 0.16)" : "rgba(15, 23, 42, 0.08)",
+  },
+});
+
+const filterPanelHeadingSx = (darkMode) => ({
+  color: darkMode ? "#f8fafc" : "#1f2937",
+});
+
+const filterPanelCaptionSx = (darkMode) => ({
+  color: darkMode ? "rgba(226, 232, 240, 0.72)" : "rgba(71, 85, 105, 0.9)",
+});
 
 const isBestSolutionRun = (run = {}) => run.topic === "BEST_SOLUTION_TOPIC";
 
@@ -298,10 +468,16 @@ const deriveWorkflowSteps = (run = {}, initialEvent = null) => {
 };
 
 function Dashboard() {
+  const [controller] = useMaterialUIController();
+  const { darkMode } = controller;
   const { runs, events, loading, error, connected } = useGraspMonitor(500);
+  const [activeTab, setActiveTab] = useState("overview");
   const [selectedSeedId, setSelectedSeedId] = useState("");
   const [selectedAlgorithm, setSelectedAlgorithm] = useState("all");
   const [selectedDataset, setSelectedDataset] = useState("all");
+  const [selectedStageLens, setSelectedStageLens] = useState("all");
+  const [selectedRunStatus, setSelectedRunStatus] = useState("all");
+  const [selectedSearch, setSelectedSearch] = useState("all");
   const [selectedRunDetails, setSelectedRunDetails] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
 
@@ -344,6 +520,45 @@ function Dashboard() {
     return [...values.values()].sort((left, right) => left.label.localeCompare(right.label));
   }, [runs, snapshotEvents]);
 
+  const searchOptions = useMemo(() => {
+    const values = new Set();
+
+    [...runs, ...snapshotEvents].forEach((entry) => {
+      if (entry.localSearch) {
+        values.add(String(entry.localSearch).toUpperCase());
+      }
+
+      if (entry.neighborhood) {
+        values.add(String(entry.neighborhood).toUpperCase());
+      }
+    });
+
+    return [...values].sort();
+  }, [runs, snapshotEvents]);
+
+  const runStatusOptions = useMemo(() => {
+    const values = new Set();
+
+    [...runs, ...snapshotEvents].forEach((entry) => {
+      const status = String(
+        entry?.status || (entry?.topic === "BEST_SOLUTION_TOPIC" ? "completed" : "")
+      )
+        .trim()
+        .toLowerCase();
+
+      if (status) {
+        values.add(status);
+      }
+    });
+
+    if (values.size === 0) {
+      values.add("running");
+      values.add("completed");
+    }
+
+    return [...values].sort();
+  }, [runs, snapshotEvents]);
+
   const matchesSelection = (entry) => {
     if (!entry) {
       return false;
@@ -353,15 +568,50 @@ function Dashboard() {
     const matchesDataset =
       selectedDataset === "all"
       || buildDatasetKey(entry.trainingFileName, entry.testingFileName) === selectedDataset;
+    const entryTopic = entry.topic || null;
+    const matchesStageLens =
+      selectedStageLens === "all"
+      || (selectedStageLens === "initial" && entryTopic === "INITIAL_SOLUTION_TOPIC")
+      || (selectedStageLens === "local" && entryTopic === "SOLUTIONS_TOPIC")
+      || (selectedStageLens === "best" && entryTopic === "BEST_SOLUTION_TOPIC");
+    const normalizedStatus = String(
+      entry.status || (entryTopic === "BEST_SOLUTION_TOPIC" ? "completed" : "running")
+    ).toLowerCase();
+    const matchesRunStatus = selectedRunStatus === "all" || normalizedStatus === selectedRunStatus;
+    const normalizedSearch = String(entry.localSearch || entry.neighborhood || "").toUpperCase();
+    const matchesSearch = selectedSearch === "all" || normalizedSearch === selectedSearch;
 
-    return matchesAlgorithm && matchesDataset;
+    return matchesAlgorithm && matchesDataset && matchesStageLens && matchesRunStatus && matchesSearch;
   };
 
-  const filteredRuns = useMemo(() => runs.filter(matchesSelection), [runs, selectedAlgorithm, selectedDataset]);
+  const filteredRuns = useMemo(
+    () => runs.filter(matchesSelection),
+    [runs, selectedAlgorithm, selectedDataset, selectedStageLens, selectedRunStatus, selectedSearch]
+  );
 
   const filteredSnapshotEvents = useMemo(
     () => snapshotEvents.filter(matchesSelection),
-    [snapshotEvents, selectedAlgorithm, selectedDataset]
+    [snapshotEvents, selectedAlgorithm, selectedDataset, selectedStageLens, selectedRunStatus, selectedSearch]
+  );
+
+  const activeFilterCount = useMemo(
+    () =>
+      [
+        selectedAlgorithm !== "all",
+        selectedDataset !== "all",
+        selectedStageLens !== "all",
+        selectedRunStatus !== "all",
+        selectedSearch !== "all",
+        Boolean(selectedSeedId),
+      ].filter(Boolean).length,
+    [
+      selectedAlgorithm,
+      selectedDataset,
+      selectedStageLens,
+      selectedRunStatus,
+      selectedSearch,
+      selectedSeedId,
+    ]
   );
 
   const historySnapshots = useMemo(
@@ -484,17 +734,90 @@ function Dashboard() {
     const bestBySeed = new Map();
 
     return [...monitorSnapshots]
-      .filter((event) => ["SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(event.topic))
+      .filter((event) =>
+        ["INITIAL_SOLUTION_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(event.topic)
+      )
       .sort((left, right) => getSortableDateValue(left.timestamp) - getSortableDateValue(right.timestamp))
-      .filter((event) => {
+      .reduce((nextEvents, event) => {
         const score = getNumericScore(event.bestF1Score ?? event.currentF1Score);
         const previous = bestBySeed.get(event.seedId);
-        const improved = previous !== undefined && score > previous;
         bestBySeed.set(event.seedId, Math.max(previous ?? Number.NEGATIVE_INFINITY, score));
-        return improved;
-      })
+
+        if (
+          ["INITIAL_SOLUTION_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(event.topic)
+          && previous !== undefined
+          && score > previous
+        ) {
+          nextEvents.push({
+            ...event,
+            previousBestScore: previous,
+          });
+        }
+
+        return nextEvents;
+      }, [])
       .reverse()
       .slice(0, 8);
+  }, [monitorSnapshots]);
+
+  const resourceAveragesByAlgorithm = useMemo(() => {
+    const grouped = new Map();
+
+    monitorSnapshots.forEach((event) => {
+      const algorithm = event.rclAlgorithm || "Unknown";
+      const cpuUsage = getFiniteMetric(event.cpuUsage);
+      const memoryUsage = getFiniteMetric(event.memoryUsage);
+      const memoryUsagePercent = getFiniteMetric(event.memoryUsagePercent);
+
+      if (cpuUsage === null && memoryUsage === null && memoryUsagePercent === null) {
+        return;
+      }
+
+      const current = grouped.get(algorithm) || {
+        algorithm,
+        sampleCount: 0,
+        cpuTotal: 0,
+        cpuCount: 0,
+        memoryTotal: 0,
+        memoryCount: 0,
+        memoryPercentTotal: 0,
+        memoryPercentCount: 0,
+      };
+
+      current.sampleCount += 1;
+
+      if (cpuUsage !== null) {
+        current.cpuTotal += cpuUsage;
+        current.cpuCount += 1;
+      }
+
+      if (memoryUsage !== null) {
+        current.memoryTotal += memoryUsage;
+        current.memoryCount += 1;
+      }
+
+      if (memoryUsagePercent !== null) {
+        current.memoryPercentTotal += memoryUsagePercent;
+        current.memoryPercentCount += 1;
+      }
+
+      grouped.set(algorithm, current);
+    });
+
+    return [...grouped.values()]
+      .map((entry) => ({
+        algorithm: entry.algorithm,
+        sampleCount: entry.sampleCount,
+        avgCpuUsage: entry.cpuCount > 0 ? entry.cpuTotal / entry.cpuCount : null,
+        avgMemoryUsage: entry.memoryCount > 0 ? entry.memoryTotal / entry.memoryCount : null,
+        avgMemoryUsagePercent:
+          entry.memoryPercentCount > 0 ? entry.memoryPercentTotal / entry.memoryPercentCount : null,
+      }))
+      .sort(
+        (left, right) =>
+          getNumericScore(right.avgCpuUsage, Number.NEGATIVE_INFINITY)
+          - getNumericScore(left.avgCpuUsage, Number.NEGATIVE_INFINITY)
+      );
   }, [monitorSnapshots]);
 
   const finalRunsByAlgorithm = useMemo(() => {
@@ -617,6 +940,48 @@ function Dashboard() {
     () => finalRunsByAlgorithm[0]?.bestRun || null,
     [finalRunsByAlgorithm]
   );
+
+  const improvementSummary = useMemo(() => {
+    if (!improvementEvents.length) {
+      return {
+        total: 0,
+        strongest: null,
+        latest: null,
+      };
+    }
+
+    const strongest = improvementEvents.reduce((currentBest, event) => {
+      if (!currentBest) {
+        return event;
+      }
+
+      const currentDelta = getNumericScore(
+        (event.bestF1Score ?? event.currentF1Score) - event.previousBestScore,
+        Number.NEGATIVE_INFINITY
+      );
+      const bestDelta = getNumericScore(
+        (currentBest.bestF1Score ?? currentBest.currentF1Score) - currentBest.previousBestScore,
+        Number.NEGATIVE_INFINITY
+      );
+
+      return currentDelta > bestDelta ? event : currentBest;
+    }, null);
+
+    return {
+      total: improvementEvents.length,
+      strongest,
+      latest: improvementEvents[0],
+    };
+  }, [improvementEvents]);
+
+  const resetWorkspaceFilters = () => {
+    setSelectedAlgorithm("all");
+    setSelectedDataset("all");
+    setSelectedStageLens("all");
+    setSelectedRunStatus("all");
+    setSelectedSearch("all");
+    setSelectedSeedId("");
+  };
 
   const featuredRun = useMemo(() => {
     const liveRun = filteredRuns.find((run) => run.seedId === selectedSeedId);
@@ -940,13 +1305,19 @@ function Dashboard() {
       return buildEmptyBarData("Initial solutions");
     }
 
+    const labels = initialSolutionsByAlgorithm.map((entry) => entry.algorithm);
+    const palette = getBarPaletteForLabels(labels, "algorithm");
+
     return {
-      labels: initialSolutionsByAlgorithm.map((entry) => entry.algorithm),
+      labels,
       datasets: [
         {
           label: "Initial solutions",
           data: initialSolutionsByAlgorithm.map((entry) => entry.count),
-          backgroundColor: "#4361ee",
+          backgroundColor: palette.backgroundColor,
+          hoverBackgroundColor: palette.hoverBackgroundColor,
+          borderColor: palette.borderColor,
+          borderWidth: 1,
           borderRadius: 8,
           borderSkipped: false,
         },
@@ -959,13 +1330,19 @@ function Dashboard() {
       return buildEmptyBarData("Local-search outcomes");
     }
 
+    const labels = localSearchOutcomesBySearch.map((entry) => entry.search);
+    const palette = getBarPaletteForLabels(labels, "search");
+
     return {
-      labels: localSearchOutcomesBySearch.map((entry) => entry.search),
+      labels,
       datasets: [
         {
           label: "Best local-search F1-Score",
           data: localSearchOutcomesBySearch.map((entry) => entry.bestF1Score),
-          backgroundColor: "#11b5ae",
+          backgroundColor: palette.backgroundColor,
+          hoverBackgroundColor: palette.hoverBackgroundColor,
+          borderColor: palette.borderColor,
+          borderWidth: 1,
           borderRadius: 8,
           borderSkipped: false,
         },
@@ -978,19 +1355,95 @@ function Dashboard() {
       return buildEmptyBarData("Final solutions");
     }
 
+    const labels = finalRunsByAlgorithm.map((entry) => entry.algorithm);
+    const palette = getBarPaletteForLabels(labels, "algorithm");
+
     return {
-      labels: finalRunsByAlgorithm.map((entry) => entry.algorithm),
+      labels,
       datasets: [
         {
           label: "Best F1-Score",
           data: finalRunsByAlgorithm.map((entry) => getNumericScore(entry.bestRun?.bestF1Score, 0)),
-          backgroundColor: "#8b5cf6",
+          backgroundColor: palette.backgroundColor,
+          hoverBackgroundColor: palette.hoverBackgroundColor,
+          borderColor: palette.borderColor,
+          borderWidth: 1,
           borderRadius: 8,
           borderSkipped: false,
         },
       ],
     };
   }, [finalRunsByAlgorithm]);
+
+  const averageCpuChartData = useMemo(() => {
+    if (!resourceAveragesByAlgorithm.length) {
+      return buildEmptyBarData("Average CPU");
+    }
+
+    const labels = resourceAveragesByAlgorithm.map((entry) => entry.algorithm);
+    const palette = getBarPaletteForLabels(labels, "algorithm");
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: "Average CPU (%)",
+          data: resourceAveragesByAlgorithm.map((entry) => entry.avgCpuUsage ?? 0),
+          backgroundColor: palette.backgroundColor,
+          hoverBackgroundColor: palette.hoverBackgroundColor,
+          borderColor: palette.borderColor,
+          borderWidth: 1,
+          borderRadius: 8,
+          borderSkipped: false,
+        },
+      ],
+    };
+  }, [resourceAveragesByAlgorithm]);
+
+  const averageMemoryChartData = useMemo(() => {
+    if (!resourceAveragesByAlgorithm.length) {
+      return buildEmptyBarData("Average memory");
+    }
+
+    const labels = resourceAveragesByAlgorithm.map((entry) => entry.algorithm);
+    const palette = getBarPaletteForLabels(labels, "algorithm");
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: "Average Memory (%)",
+          data: resourceAveragesByAlgorithm.map((entry) => entry.avgMemoryUsagePercent ?? 0),
+          backgroundColor: palette.backgroundColor,
+          hoverBackgroundColor: palette.hoverBackgroundColor,
+          borderColor: palette.borderColor,
+          borderWidth: 1,
+          borderRadius: 8,
+          borderSkipped: false,
+        },
+      ],
+    };
+  }, [resourceAveragesByAlgorithm]);
+
+  const resourceSummaryTableData = useMemo(
+    () => ({
+      columns: [
+        { Header: "Algorithm", accessor: "algorithm", align: "left" },
+        { Header: "Avg CPU", accessor: "avgCpu", align: "left" },
+        { Header: "Avg Memory", accessor: "avgMemory", align: "left" },
+        { Header: "Avg Memory %", accessor: "avgMemoryPercent", align: "left" },
+        { Header: "Samples", accessor: "samples", align: "left" },
+      ],
+      rows: resourceAveragesByAlgorithm.map((entry) => ({
+        algorithm: entry.algorithm,
+        avgCpu: formatMetric(entry.avgCpuUsage, "%"),
+        avgMemory: formatMetric(entry.avgMemoryUsage, " MB"),
+        avgMemoryPercent: formatMetric(entry.avgMemoryUsagePercent, "%"),
+        samples: entry.sampleCount,
+      })),
+    }),
+    [resourceAveragesByAlgorithm]
+  );
 
   const finalSolutionsChartOptions = useMemo(
     () => ({
@@ -1289,206 +1742,784 @@ function Dashboard() {
         </Grid>
 
         <MDBox mt={4}>
-          <Grid container spacing={3}>
-            <Grid item xs={12} xl={8}>
-              <Card>
-                <MDBox p={3}>
-                  <MDBox
-                    display="flex"
-                    flexDirection={{ xs: "column", md: "row" }}
-                    justifyContent="space-between"
-                    alignItems={{ xs: "flex-start", md: "center" }}
-                    gap={2}
-                    mb={3}
-                  >
-                    <MDBox>
-                      <MDTypography variant="h5" color="dark">
-                        Full Execution Timeline
-                      </MDTypography>
-                      <MDTypography variant="button" color="text">
-                        {featuredRun
-                          ? `${featuredRun.rclAlgorithm || "GRASP-FS"} / ${featuredRun.classifier || "--"} / ${fullHistory.length} marcos persistidos`
-                          : "Aguardando eventos do monitor"}
-                      </MDTypography>
+          <Card>
+            <MDBox p={3}>
+              <MDBox
+                display="flex"
+                justifyContent="space-between"
+                alignItems={{ xs: "flex-start", md: "center" }}
+                flexDirection={{ xs: "column", md: "row" }}
+                gap={2}
+                mb={3}
+              >
+                <MDBox>
+                  <MDTypography variant="h5" color="dark">
+                    Dashboard Workspace
+                  </MDTypography>
+                  <MDTypography variant="button" color="text">
+                    {dashboardTabDescriptions[activeTab]}
+                  </MDTypography>
+                </MDBox>
+
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap" useFlexGap>
+                  <Chip label={`${overview.datasetPairs} datasets`} color="info" size="small" variant="outlined" />
+                  <Chip label={`${overview.algorithms} algorithms`} color="secondary" size="small" variant="outlined" />
+                  <Chip
+                    label={`${filteredRuns.length}/${runs.length || filteredRuns.length} runs`}
+                    color="primary"
+                    size="small"
+                    variant="outlined"
+                  />
+                  <Chip
+                    label={`${filteredSnapshotEvents.length} monitor snapshots`}
+                    color="warning"
+                    size="small"
+                    variant="outlined"
+                  />
+                  <Chip
+                    label={
+                      activeFilterCount > 0
+                        ? `${activeFilterCount} active filters`
+                        : "Global workspace"
+                    }
+                    color={activeFilterCount > 0 ? "success" : "info"}
+                    size="small"
+                    variant="outlined"
+                    onClick={activeFilterCount > 0 ? resetWorkspaceFilters : undefined}
+                  />
+                  <Chip
+                    label={connected ? "Realtime connected" : "Offline snapshot"}
+                    color={connected ? "success" : "warning"}
+                    size="small"
+                    variant="outlined"
+                  />
+                  {loading || detailsLoading ? <CircularProgress size={18} /> : null}
+                </Stack>
+              </MDBox>
+
+              <Grid container spacing={2.5}>
+                <Grid item xs={12} lg={4}>
+                  <MDBox sx={filterPanelSx(darkMode)}>
+                    <MDBox display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                      <MDBox>
+                        <MDTypography variant="button" fontWeight="medium" sx={filterPanelHeadingSx(darkMode)}>
+                          Data Scope
+                        </MDTypography>
+                        <MDTypography variant="caption" display="block" sx={filterPanelCaptionSx(darkMode)}>
+                          Restrinja o painel por algoritmo e dataset.
+                        </MDTypography>
+                      </MDBox>
+                      <Chip label="Base" color="info" size="small" variant="outlined" />
                     </MDBox>
 
-                    <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ xs: "stretch", md: "center" }}>
-                      <FormControl size="small" sx={{ minWidth: 180 }}>
-                        <InputLabel id="selected-algorithm-label">Algorithm</InputLabel>
-                        <Select
-                          labelId="selected-algorithm-label"
-                          value={selectedAlgorithm}
-                          label="Algorithm"
-                          onChange={(event) => setSelectedAlgorithm(event.target.value)}
-                        >
-                          <MenuItem value="all">All algorithms</MenuItem>
-                          {algorithmOptions.map((algorithm) => (
-                            <MenuItem key={algorithm} value={algorithm}>
-                              {algorithm}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12}>
+                        <FormControl size="small" fullWidth>
+                          <InputLabel id="selected-algorithm-label">Algorithm</InputLabel>
+                          <Select
+                            labelId="selected-algorithm-label"
+                            value={selectedAlgorithm}
+                            label="Algorithm"
+                            onChange={(event) => setSelectedAlgorithm(event.target.value)}
+                          >
+                            <MenuItem value="all">All algorithms</MenuItem>
+                            {algorithmOptions.map((algorithm) => (
+                              <MenuItem key={algorithm} value={algorithm}>
+                                {algorithm}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
 
-                      <FormControl size="small" sx={{ minWidth: 240 }}>
-                        <InputLabel id="selected-dataset-label">Dataset</InputLabel>
-                        <Select
-                          labelId="selected-dataset-label"
-                          value={selectedDataset}
-                          label="Dataset"
-                          onChange={(event) => setSelectedDataset(event.target.value)}
-                        >
-                          <MenuItem value="all">All datasets</MenuItem>
-                          {datasetOptions.map((dataset) => (
-                            <MenuItem key={dataset.key} value={dataset.key}>
-                              {dataset.label}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
+                      <Grid item xs={12}>
+                        <FormControl size="small" fullWidth>
+                          <InputLabel id="selected-dataset-label">Dataset</InputLabel>
+                          <Select
+                            labelId="selected-dataset-label"
+                            value={selectedDataset}
+                            label="Dataset"
+                            onChange={(event) => setSelectedDataset(event.target.value)}
+                          >
+                            <MenuItem value="all">All datasets</MenuItem>
+                            {datasetOptions.map((dataset) => (
+                              <MenuItem key={dataset.key} value={dataset.key}>
+                                {dataset.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                    </Grid>
+                  </MDBox>
+                </Grid>
 
-                      <FormControl size="small" sx={{ minWidth: 260 }}>
-                        <InputLabel id="selected-run-label">Execution focus</InputLabel>
-                        <Select
-                          labelId="selected-run-label"
-                          value={selectedSeedId}
-                          label="Execution focus"
-                          onChange={(event) => setSelectedSeedId(event.target.value)}
-                        >
-                          {filteredRuns.slice(0, 50).map((run) => (
-                            <MenuItem key={run.seedId} value={run.seedId}>
-                              {`${run.rclAlgorithm || "Run"} / ${shortenSeed(run.seedId)} / ${formatCompactPercent(run.bestF1Score)}`}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
+                <Grid item xs={12} lg={5}>
+                  <MDBox sx={filterPanelSx(darkMode)}>
+                    <MDBox display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                      <MDBox>
+                        <MDTypography variant="button" fontWeight="medium" sx={filterPanelHeadingSx(darkMode)}>
+                          Pipeline Lens
+                        </MDTypography>
+                        <MDTypography variant="caption" display="block" sx={filterPanelCaptionSx(darkMode)}>
+                          Separe a leitura por etapa, status e estrategia usada.
+                        </MDTypography>
+                      </MDBox>
+                      <Chip label="Monitor" color="warning" size="small" variant="outlined" />
+                    </MDBox>
 
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={4}>
+                        <FormControl size="small" fullWidth>
+                          <InputLabel id="selected-stage-lens-label">Stage</InputLabel>
+                          <Select
+                            labelId="selected-stage-lens-label"
+                            value={selectedStageLens}
+                            label="Stage"
+                            onChange={(event) => setSelectedStageLens(event.target.value)}
+                          >
+                            {stageLensOptions.map((option) => (
+                              <MenuItem key={option.value} value={option.value}>
+                                {option.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+
+                      <Grid item xs={12} md={4}>
+                        <FormControl size="small" fullWidth>
+                          <InputLabel id="selected-run-status-label">Status</InputLabel>
+                          <Select
+                            labelId="selected-run-status-label"
+                            value={selectedRunStatus}
+                            label="Status"
+                            onChange={(event) => setSelectedRunStatus(event.target.value)}
+                          >
+                            <MenuItem value="all">All statuses</MenuItem>
+                            {runStatusOptions.map((status) => (
+                              <MenuItem key={status} value={status}>
+                                {formatWorkspaceLabel(status)}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+
+                      <Grid item xs={12} md={4}>
+                        <FormControl size="small" fullWidth>
+                          <InputLabel id="selected-search-label">Search / Neighborhood</InputLabel>
+                          <Select
+                            labelId="selected-search-label"
+                            value={selectedSearch}
+                            label="Search / Neighborhood"
+                            onChange={(event) => setSelectedSearch(event.target.value)}
+                          >
+                            <MenuItem value="all">All strategies</MenuItem>
+                            {searchOptions.map((search) => (
+                              <MenuItem key={search} value={search}>
+                                {search}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                    </Grid>
+                  </MDBox>
+                </Grid>
+
+                <Grid item xs={12} lg={3}>
+                  <MDBox sx={filterPanelSx(darkMode)}>
+                    <MDBox display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                      <MDBox>
+                        <MDTypography variant="button" fontWeight="medium" sx={filterPanelHeadingSx(darkMode)}>
+                          Execution Focus
+                        </MDTypography>
+                        <MDTypography variant="caption" display="block" sx={filterPanelCaptionSx(darkMode)}>
+                          Highlight a seed for the timeline and detail cards.
+                        </MDTypography>
+                      </MDBox>
+                      <Chip label="Focus" color="secondary" size="small" variant="outlined" />
+                    </MDBox>
+
+                    <FormControl size="small" fullWidth>
+                      <InputLabel id="selected-run-label">Execution focus</InputLabel>
+                      <Select
+                        labelId="selected-run-label"
+                        value={selectedSeedId}
+                        label="Execution focus"
+                        onChange={(event) => setSelectedSeedId(event.target.value)}
+                      >
+                        <MenuItem value="">Auto highlight latest run</MenuItem>
+                        {filteredRuns.slice(0, 50).map((run) => (
+                          <MenuItem key={run.seedId} value={run.seedId}>
+                            {`${run.rclAlgorithm || "Run"} / ${shortenSeed(run.seedId)} / ${formatCompactPercent(run.bestF1Score)}`}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                       <Chip
-                        label={connected ? "Realtime connected" : "Offline snapshot"}
-                        color={connected ? "success" : "warning"}
+                        label={
+                          selectedAlgorithm === "all"
+                            ? "All algorithms"
+                            : `Algorithm: ${selectedAlgorithm}`
+                        }
+                        color="info"
                         size="small"
                         variant="outlined"
                       />
-                      {loading || detailsLoading ? <CircularProgress size={18} /> : null}
+                      <Chip
+                        label={
+                          selectedStageLens === "all"
+                            ? "All stages"
+                            : `Stage: ${formatWorkspaceLabel(selectedStageLens)}`
+                        }
+                        color="warning"
+                        size="small"
+                        variant="outlined"
+                      />
                     </Stack>
                   </MDBox>
+                </Grid>
+              </Grid>
 
+              <MDBox
+                mt={2.5}
+                px={2}
+                py={1.5}
+                sx={{
+                  borderRadius: 3,
+                  background: "rgba(67, 97, 238, 0.06)",
+                  border: "1px dashed rgba(67, 97, 238, 0.18)",
+                }}
+              >
+                <MDBox
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems={{ xs: "flex-start", md: "center" }}
+                  flexDirection={{ xs: "column", md: "row" }}
+                  gap={1.5}
+                >
                   <MDTypography variant="button" color="text">
-                    {`${initialSolutionEvents.length} solucoes iniciais, ${localSearchOutcomeEvents.length} finais da busca local e ${bestSolutionRuns.length} best solutions com os filtros atuais`}
+                    {`${initialSolutionEvents.length} initial solutions, ${localSearchOutcomeEvents.length} local-search finals, and ${bestSolutionRuns.length} best solutions under the current filters`}
                   </MDTypography>
-
-                  <MDBox height="360px" mt={2}>
-                    <Line data={fullTimelineChartData} options={fullTimelineChartOptions} />
-                  </MDBox>
+                  {activeFilterCount > 0 ? (
+                    <Chip
+                      label="Clear all filters"
+                      color="primary"
+                      size="small"
+                      variant="outlined"
+                      onClick={resetWorkspaceFilters}
+                    />
+                  ) : null}
                 </MDBox>
-              </Card>
+              </MDBox>
+            </MDBox>
+          </Card>
+        </MDBox>
+
+        <MDBox mt={3}>
+          <Card>
+            <MDBox px={2} pt={1.5} pb={1}>
+              <Tabs
+                value={activeTab}
+                onChange={(_, value) => setActiveTab(value)}
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
+                sx={{
+                  minHeight: 56,
+                  "& .MuiTabs-indicator": {
+                    height: 3,
+                    borderRadius: 999,
+                  },
+                }}
+              >
+                {dashboardTabs.map((tab) => (
+                  <Tab
+                    key={tab.value}
+                    value={tab.value}
+                    label={tab.label}
+                    icon={<Icon fontSize="small">{tab.icon}</Icon>}
+                    iconPosition="start"
+                    sx={{
+                      minHeight: 52,
+                      minWidth: 140,
+                      borderRadius: 2,
+                      textTransform: "none",
+                      fontWeight: 500,
+                    }}
+                  />
+                ))}
+              </Tabs>
+            </MDBox>
+          </Card>
+        </MDBox>
+
+        {activeTab === "overview" ? (
+        <MDBox mt={4}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} xl={8}>
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <Card>
+                    <MDBox p={3}>
+                      <MDBox
+                        display="flex"
+                        flexDirection={{ xs: "column", md: "row" }}
+                        justifyContent="space-between"
+                        alignItems={{ xs: "flex-start", md: "center" }}
+                        gap={2}
+                        mb={3}
+                      >
+                        <MDBox>
+                          <MDTypography variant="h5" color="dark">
+                            Full Execution Timeline
+                          </MDTypography>
+                          <MDTypography variant="button" color="text">
+                            {featuredRun
+                          ? `${featuredRun.rclAlgorithm || "GRASP-FS"} / ${featuredRun.classifier || "--"} / ${fullHistory.length} persisted checkpoints`
+                          : "Waiting for monitor events"}
+                          </MDTypography>
+                        </MDBox>
+
+                        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ xs: "stretch", md: "center" }}>
+                          <Chip
+                            label={connected ? "Realtime connected" : "Offline snapshot"}
+                            color={connected ? "success" : "warning"}
+                            size="small"
+                            variant="outlined"
+                          />
+                          {loading || detailsLoading ? <CircularProgress size={18} /> : null}
+                        </Stack>
+                      </MDBox>
+
+                      <MDBox height="360px" mt={2}>
+                        <Line data={fullTimelineChartData} options={fullTimelineChartOptions} />
+                      </MDBox>
+                    </MDBox>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <Card sx={{ height: "100%" }}>
+                    <MDBox p={3}>
+                      <MDTypography variant="h6" color="dark">
+                        Resource Pressure
+                      </MDTypography>
+                      <MDTypography variant="button" color="text">
+                        CPU and memory across the persisted checkpoints of the selected execution.
+                      </MDTypography>
+                      <MDBox height="300px" mt={2}>
+                        <Line data={resourceChartData} options={resourceChartOptions} />
+                      </MDBox>
+                    </MDBox>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <Card sx={{ height: "100%" }}>
+                    <MDBox p={3}>
+                      <MDTypography variant="h6" color="dark">
+                        Feature Frequency
+                      </MDTypography>
+                      <MDTypography variant="button" color="text">
+                        Most frequent features across the currently visible best solutions.
+                      </MDTypography>
+                      <MDBox height="300px" mt={2}>
+                        <Bar data={featureFrequencyChartData} options={featureFrequencyChartOptions} />
+                      </MDBox>
+                    </MDBox>
+                  </Card>
+                </Grid>
+              </Grid>
             </Grid>
 
             <Grid item xs={12} xl={4}>
               <Card sx={{ height: "100%" }}>
-                <MDBox p={3}>
-                  <MDTypography variant="h6" color="dark" mb={0.5}>
-                    Live Run Details
-                  </MDTypography>
-                  <MDTypography variant="button" color="text">
-                    {featuredRun
-                      ? `${featuredRun.trainingFileName || "--"} -> ${featuredRun.testingFileName || "--"}`
-                      : "Nenhuma execucao selecionada"}
-                  </MDTypography>
-
-                  <Divider sx={{ my: 2 }} />
-
-                  {featuredRun ? (
-                    <Stack spacing={2.5}>
-                      <MDBox>
-                        <MDTypography variant="button" fontWeight="medium" color="dark">
-                          Seed / Stage
-                        </MDTypography>
-                        <MDTypography variant="caption" display="block" color="text">
-                          {shortenSeed(featuredRun.seedId)} / {getStageLabel(featuredRun.stage)}
-                        </MDTypography>
-                      </MDBox>
-
-                      <MDBox>
-                        <MDTypography variant="button" fontWeight="medium" color="dark">
-                          Current / Best F1
-                        </MDTypography>
-                        <MDTypography variant="caption" display="block" color="text">
-                          {formatCompactPercent(featuredRun.currentF1Score)} / {formatCompactPercent(featuredRun.bestF1Score)}
-                        </MDTypography>
-                      </MDBox>
-
-                      <MDBox>
-                        <MDTypography variant="button" fontWeight="medium" color="dark">
-                          History points loaded
-                        </MDTypography>
-                        <MDTypography variant="caption" display="block" color="text">
-                          {fullHistory.length} marcos
-                        </MDTypography>
-                      </MDBox>
-
-                      <MDBox>
-                        <MDTypography variant="button" fontWeight="medium" color="dark">
-                          CPU usage
-                        </MDTypography>
-                        <MDProgress
-                          value={Math.min(Math.max(Number(featuredRun.cpuUsage || 0), 0), 100)}
-                          color="info"
-                          variant="gradient"
-                        />
-                        <MDTypography variant="caption" color="text">
-                          {formatMetric(featuredRun.cpuUsage, "%")}
-                        </MDTypography>
-                      </MDBox>
-
-                      <MDBox>
-                        <MDTypography variant="button" fontWeight="medium" color="dark">
-                          Memory usage
-                        </MDTypography>
-                        <MDProgress
-                          value={Math.min(Math.max(Number(featuredRun.memoryUsagePercent || 0), 0), 100)}
-                          color="success"
-                          variant="gradient"
-                        />
-                        <MDTypography variant="caption" color="text">
-                          {formatMetric(featuredRun.memoryUsage, " MB")} / {formatMetric(featuredRun.memoryUsagePercent, "%")}
-                        </MDTypography>
-                      </MDBox>
-
-                      <MDBox>
-                        <MDTypography variant="button" fontWeight="medium" color="dark">
-                          Updated at
-                        </MDTypography>
-                        <MDTypography variant="caption" display="block" color="text">
-                          {formatDateTime(featuredRun.updatedAt)}
-                        </MDTypography>
-                      </MDBox>
-
-                      <MDBox>
-                        <MDTypography variant="button" fontWeight="medium" color="dark">
-                          Feature subset
-                        </MDTypography>
-                        <MDTypography variant="caption" display="block" color="text">
-                          {formatFeatureSubset(featuredRun.solutionFeatures, 12)}
-                        </MDTypography>
-                      </MDBox>
-                    </Stack>
-                  ) : (
-                    <MDBox py={6} textAlign="center">
-                      <Icon color="disabled" sx={{ fontSize: 40 }}>
-                        play_circle
-                      </Icon>
-                      <MDTypography variant="button" display="block" color="text">
-                        Inicie uma execucao na tela de Settings para acompanhar os resultados aqui.
+                    <MDBox p={3}>
+                      <MDTypography variant="h6" color="dark" mb={0.5}>
+                        Live Run Details
                       </MDTypography>
+                      <MDTypography variant="button" color="text">
+                        {featuredRun
+                          ? `${featuredRun.trainingFileName || "--"} -> ${featuredRun.testingFileName || "--"}`
+                          : "No execution selected"}
+                      </MDTypography>
+
+                      <Divider sx={{ my: 2 }} />
+
+                      {featuredRun ? (
+                        <Stack spacing={2}>
+                          <Grid container spacing={1.5}>
+                            <Grid item xs={12} sm={6}>
+                              <MDBox
+                                p={2}
+                                sx={{
+                                  borderRadius: 2.5,
+                                  border: "1px solid rgba(148, 163, 184, 0.18)",
+                                  background: darkMode
+                                    ? "rgba(15, 23, 42, 0.28)"
+                                    : "rgba(248, 250, 252, 0.9)",
+                                }}
+                              >
+                                <MDTypography variant="caption" color="text" fontWeight="medium">
+                                  Seed / Stage
+                                </MDTypography>
+                                <MDTypography variant="button" display="block" color="dark" fontWeight="medium">
+                                  {shortenSeed(featuredRun.seedId)}
+                                </MDTypography>
+                                <MDTypography variant="caption" color="text">
+                                  {getStageLabel(featuredRun.stage)}
+                                </MDTypography>
+                              </MDBox>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6}>
+                              <MDBox
+                                p={2}
+                                sx={{
+                                  borderRadius: 2.5,
+                                  border: "1px solid rgba(148, 163, 184, 0.18)",
+                                  background: darkMode
+                                    ? "rgba(15, 23, 42, 0.28)"
+                                    : "rgba(248, 250, 252, 0.9)",
+                                }}
+                              >
+                                <MDTypography variant="caption" color="text" fontWeight="medium">
+                                  Current / Best F1
+                                </MDTypography>
+                                <MDTypography variant="button" display="block" color="dark" fontWeight="medium">
+                                  {formatCompactPercent(featuredRun.bestF1Score)}
+                                </MDTypography>
+                                <MDTypography variant="caption" color="text">
+                                  Atual {formatCompactPercent(featuredRun.currentF1Score)}
+                                </MDTypography>
+                              </MDBox>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6}>
+                              <MDBox
+                                p={2}
+                                sx={{
+                                  borderRadius: 2.5,
+                                  border: "1px solid rgba(148, 163, 184, 0.18)",
+                                  background: darkMode
+                                    ? "rgba(15, 23, 42, 0.28)"
+                                    : "rgba(248, 250, 252, 0.9)",
+                                }}
+                              >
+                                <MDTypography variant="caption" color="text" fontWeight="medium">
+                                  History loaded
+                                </MDTypography>
+                                <MDTypography variant="button" display="block" color="dark" fontWeight="medium">
+                                  {fullHistory.length} checkpoints
+                                </MDTypography>
+                                <MDTypography variant="caption" color="text">
+                                  Persistidos no monitor
+                                </MDTypography>
+                              </MDBox>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6}>
+                              <MDBox
+                                p={2}
+                                sx={{
+                                  borderRadius: 2.5,
+                                  border: "1px solid rgba(148, 163, 184, 0.18)",
+                                  background: darkMode
+                                    ? "rgba(15, 23, 42, 0.28)"
+                                    : "rgba(248, 250, 252, 0.9)",
+                                }}
+                              >
+                                <MDTypography variant="caption" color="text" fontWeight="medium">
+                                  Updated at
+                                </MDTypography>
+                                <MDTypography variant="button" display="block" color="dark" fontWeight="medium">
+                                  {formatDateTime(featuredRun.updatedAt)}
+                                </MDTypography>
+                                <MDTypography variant="caption" color="text">
+                                  {formatRelativeTime(featuredRun.updatedAt)}
+                                </MDTypography>
+                              </MDBox>
+                            </Grid>
+                          </Grid>
+
+                          <MDBox
+                            p={2}
+                            sx={{
+                              borderRadius: 2.5,
+                              border: "1px solid rgba(148, 163, 184, 0.18)",
+                              background: darkMode
+                                ? "rgba(15, 23, 42, 0.28)"
+                                : "rgba(248, 250, 252, 0.9)",
+                            }}
+                          >
+                            <MDTypography variant="button" fontWeight="medium" color="dark" mb={1}>
+                              Resource Snapshot
+                            </MDTypography>
+
+                            <MDBox mb={2}>
+                              <MDTypography variant="caption" color="text" fontWeight="medium">
+                                CPU usage
+                              </MDTypography>
+                              <MDProgress
+                                value={Math.min(Math.max(Number(featuredRun.cpuUsage || 0), 0), 100)}
+                                color="info"
+                                variant="gradient"
+                              />
+                              <MDTypography variant="caption" color="text">
+                                {formatMetric(featuredRun.cpuUsage, "%")}
+                              </MDTypography>
+                            </MDBox>
+
+                            <MDBox>
+                              <MDTypography variant="caption" color="text" fontWeight="medium">
+                                Memory usage
+                              </MDTypography>
+                              <MDProgress
+                                value={Math.min(Math.max(Number(featuredRun.memoryUsagePercent || 0), 0), 100)}
+                                color="success"
+                                variant="gradient"
+                              />
+                              <MDTypography variant="caption" color="text">
+                                {formatMetric(featuredRun.memoryUsage, " MB")} / {formatMetric(featuredRun.memoryUsagePercent, "%")}
+                              </MDTypography>
+                            </MDBox>
+                          </MDBox>
+
+                          <MDBox
+                            p={2}
+                            sx={{
+                              borderRadius: 2.5,
+                              border: "1px solid rgba(148, 163, 184, 0.18)",
+                              background: darkMode
+                                ? "rgba(15, 23, 42, 0.28)"
+                                : "rgba(248, 250, 252, 0.9)",
+                            }}
+                          >
+                            <MDTypography variant="caption" color="text" fontWeight="medium">
+                              Feature subset
+                            </MDTypography>
+                            <MDTypography variant="button" display="block" color="dark" fontWeight="medium">
+                              {formatFeatureSubset(featuredRun.solutionFeatures, 12)}
+                            </MDTypography>
+                          </MDBox>
+                        </Stack>
+                      ) : (
+                        <MDBox py={6} textAlign="center">
+                          <Icon color="disabled" sx={{ fontSize: 40 }}>
+                            play_circle
+                          </Icon>
+                          <MDTypography variant="button" display="block" color="text">
+                            Start an execution from the Settings page to follow the results here.
+                          </MDTypography>
+                        </MDBox>
+                      )}
                     </MDBox>
-                  )}
-                </MDBox>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                    <MDBox p={3} pb={2}>
+                      <MDBox
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems={{ xs: "flex-start", md: "center" }}
+                        flexDirection={{ xs: "column", md: "row" }}
+                        gap={1.5}
+                      >
+                        <MDBox>
+                          <MDTypography variant="h6" color="dark">
+                            Best Improvement Alerts
+                          </MDTypography>
+                          <MDTypography variant="button" color="text">
+                            Shows only the moments when a seed beats its previous best value.
+                          </MDTypography>
+                        </MDBox>
+
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                          <Chip
+                            label={`${improvementSummary.total} improvements`}
+                            color="success"
+                            size="small"
+                            variant="outlined"
+                          />
+                          {improvementSummary.strongest ? (
+                            <Chip
+                              label={`Top jump ${formatScoreDelta(
+                                improvementSummary.strongest.bestF1Score ?? improvementSummary.strongest.currentF1Score,
+                                improvementSummary.strongest.previousBestScore
+                              )}`}
+                              color="info"
+                              size="small"
+                              variant="outlined"
+                            />
+                          ) : null}
+                        </Stack>
+                      </MDBox>
+                    </MDBox>
+
+                    {improvementSummary.latest ? (
+                      <MDBox px={3} pb={2}>
+                        <MDBox
+                          p={2}
+                          sx={{
+                            borderRadius: 2.5,
+                            border: "1px solid rgba(54, 197, 108, 0.24)",
+                            background: darkMode
+                              ? "linear-gradient(180deg, rgba(22, 101, 52, 0.28) 0%, rgba(15, 23, 42, 0.2) 100%)"
+                              : "linear-gradient(180deg, rgba(240, 253, 244, 0.96) 0%, rgba(236, 253, 245, 0.9) 100%)",
+                          }}
+                        >
+                          <MDTypography variant="caption" color="text" fontWeight="medium">
+                            Latest improvement
+                          </MDTypography>
+                          <MDBox
+                            display="flex"
+                            justifyContent="space-between"
+                            alignItems={{ xs: "flex-start", md: "center" }}
+                            flexDirection={{ xs: "column", md: "row" }}
+                            gap={1}
+                            mt={0.5}
+                          >
+                            <MDTypography variant="button" color="dark" fontWeight="medium">
+                              {`${improvementSummary.latest.rclAlgorithm || "Run"} via ${
+                                improvementSummary.latest.localSearch
+                                || improvementSummary.latest.neighborhood
+                                || getStageLabel(improvementSummary.latest.stage)
+                              }`}
+                            </MDTypography>
+                            <Chip
+                              label={formatScoreDelta(
+                                improvementSummary.latest.bestF1Score ?? improvementSummary.latest.currentF1Score,
+                                improvementSummary.latest.previousBestScore
+                              )}
+                              color="success"
+                              size="small"
+                            />
+                          </MDBox>
+                          <MDTypography variant="caption" display="block" color="text" mt={0.75}>
+                            {`${shortenSeed(improvementSummary.latest.seedId)} improved from ${formatCompactPercent(
+                              improvementSummary.latest.previousBestScore
+                            )} to ${formatCompactPercent(
+                              improvementSummary.latest.bestF1Score ?? improvementSummary.latest.currentF1Score
+                            )} | ${formatRelativeTime(improvementSummary.latest.timestamp)}`}
+                          </MDTypography>
+                        </MDBox>
+                      </MDBox>
+                    ) : null}
+
+                    <MDBox px={3} pb={3}>
+                      {improvementEvents.length === 0 ? (
+                        <MDBox
+                          p={2.5}
+                          sx={{
+                            borderRadius: 2.5,
+                            border: "1px dashed rgba(148, 163, 184, 0.24)",
+                            background: darkMode
+                              ? "rgba(15, 23, 42, 0.22)"
+                              : "rgba(248, 250, 252, 0.9)",
+                          }}
+                        >
+                          <MDTypography variant="button" color="text">
+                            No real improvement has been recorded yet.
+                          </MDTypography>
+                        </MDBox>
+                      ) : (
+                        <Grid container spacing={1.5}>
+                          {improvementEvents.map((event, index) => (
+                            <Grid item xs={12} md={6} xl={3} key={`${event.seedId}-${event.timestamp}-${index}`}>
+                              <MDBox
+                                p={2}
+                                height="100%"
+                                sx={{
+                                  borderRadius: 2.5,
+                                  border: "1px solid rgba(148, 163, 184, 0.18)",
+                                  background: darkMode
+                                    ? "rgba(15, 23, 42, 0.22)"
+                                    : "rgba(248, 250, 252, 0.92)",
+                                }}
+                              >
+                                <MDBox
+                                  display="flex"
+                                  justifyContent="space-between"
+                                  alignItems={{ xs: "flex-start", md: "center" }}
+                                  flexDirection={{ xs: "column", md: "row" }}
+                                  gap={1}
+                                >
+                                  <MDBox display="flex" alignItems="center" gap={1.25}>
+                                    <MDBox
+                                      width="2rem"
+                                      height="2rem"
+                                      display="grid"
+                                      placeItems="center"
+                                      sx={{
+                                        borderRadius: "50%",
+                                        background: "linear-gradient(135deg, rgba(54, 197, 108, 0.92) 0%, rgba(17, 181, 174, 0.92) 100%)",
+                                        color: "#fff",
+                                        fontSize: "0.95rem",
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      <Icon fontSize="inherit">trending_up</Icon>
+                                    </MDBox>
+
+                                    <MDBox>
+                                      <MDTypography variant="button" color="dark" fontWeight="medium">
+                                        {event.rclAlgorithm || "Run"}
+                                      </MDTypography>
+                                      <MDTypography variant="caption" display="block" color="text">
+                                        {event.localSearch || event.neighborhood || getStageLabel(event.stage)}
+                                      </MDTypography>
+                                    </MDBox>
+                                  </MDBox>
+
+                                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                    <Chip
+                                      label={formatScoreDelta(
+                                        event.bestF1Score ?? event.currentF1Score,
+                                        event.previousBestScore
+                                      )}
+                                      color="success"
+                                      size="small"
+                                    />
+                                    <Chip
+                                      label={formatRelativeTime(event.timestamp)}
+                                      color="secondary"
+                                      size="small"
+                                      variant="outlined"
+                                    />
+                                  </Stack>
+                                </MDBox>
+
+                                <MDBox mt={1.25}>
+                                  <MDTypography variant="caption" display="block" color="text">
+                                    {`${shortenSeed(event.seedId)} improved from ${formatCompactPercent(
+                                      event.previousBestScore
+                                    )} to ${formatCompactPercent(
+                                      event.bestF1Score ?? event.currentF1Score
+                                    )}`}
+                                  </MDTypography>
+                                </MDBox>
+                              </MDBox>
+                            </Grid>
+                          ))}
+                        </Grid>
+                      )}
+                    </MDBox>
               </Card>
             </Grid>
           </Grid>
         </MDBox>
+        ) : null}
 
+        {activeTab === "performance" ? (
         <MDBox mt={4}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6} xl={3}>
@@ -1514,7 +2545,7 @@ function Dashboard() {
                     Local Search Performance
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    Melhor desempenho final atingido por cada busca local.
+                    Best final score achieved by each local-search service.
                   </MDTypography>
                   <MDBox height="300px" mt={2}>
                     <Bar data={localSearchPerformanceChartData} options={finalSolutionsChartOptions} />
@@ -1546,7 +2577,7 @@ function Dashboard() {
                     Stage Distribution
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    Distribuicao entre solucao inicial, busca local e best solution.
+                    Distribution across initial solution, local-search final, and best solution stages.
                   </MDTypography>
                   <MDBox height="300px" mt={2}>
                     <Doughnut data={stageDistributionChartData} options={stageDistributionOptions} />
@@ -1554,79 +2585,81 @@ function Dashboard() {
                 </MDBox>
               </Card>
             </Grid>
+
+            <Grid item xs={12} md={6} xl={3}>
+              <Card sx={{ height: "100%" }}>
+                <MDBox p={3}>
+                  <MDTypography variant="h6" color="dark">
+                    Average CPU by Algorithm
+                  </MDTypography>
+                  <MDTypography variant="button" color="text">
+                    Average CPU usage across persisted snapshots for each RCL algorithm.
+                  </MDTypography>
+                  <MDBox height="300px" mt={2}>
+                    <Bar data={averageCpuChartData} options={finalSolutionsChartOptions} />
+                  </MDBox>
+                </MDBox>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12} md={6} xl={3}>
+              <Card sx={{ height: "100%" }}>
+                <MDBox p={3}>
+                  <MDTypography variant="h6" color="dark">
+                    Average Memory by Algorithm
+                  </MDTypography>
+                  <MDTypography variant="button" color="text">
+                    Average memory percentage observed across persisted snapshots.
+                  </MDTypography>
+                  <MDBox height="300px" mt={2}>
+                    <Bar data={averageMemoryChartData} options={finalSolutionsChartOptions} />
+                  </MDBox>
+                </MDBox>
+              </Card>
+            </Grid>
           </Grid>
         </MDBox>
+        ) : null}
 
+        {activeTab === "algorithms" ? (
         <MDBox mt={4}>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6} xl={4}>
-              <Card sx={{ height: "100%" }}>
-                <MDBox p={3}>
-                  <MDTypography variant="h6" color="dark">
-                    Resource Pressure
-                  </MDTypography>
-                  <MDTypography variant="button" color="text">
-                    CPU e memoria nos marcos persistidos da execucao selecionada.
-                  </MDTypography>
-                  <MDBox height="300px" mt={2}>
-                    <Line data={resourceChartData} options={resourceChartOptions} />
+            <Grid item xs={12}>
+              <Card>
+                <MDBox
+                  p={3}
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems={{ xs: "flex-start", md: "center" }}
+                  flexDirection={{ xs: "column", md: "row" }}
+                  gap={1.5}
+                >
+                  <MDBox>
+                    <MDTypography variant="h6" color="dark">
+                      Resource Footprint by Algorithm
+                    </MDTypography>
+                    <MDTypography variant="button" color="text">
+                      Consolidated CPU and memory averages from persisted snapshots by algorithm.
+                    </MDTypography>
                   </MDBox>
+                  <Chip label={`${resourceAveragesByAlgorithm.length} algorithms`} color="info" size="small" variant="outlined" />
                 </MDBox>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12} md={6} xl={4}>
-              <Card sx={{ height: "100%" }}>
-                <MDBox p={3}>
-                  <MDTypography variant="h6" color="dark">
-                    Feature Frequency
-                  </MDTypography>
-                  <MDTypography variant="button" color="text">
-                    Features mais recorrentes entre as best solutions visiveis.
-                  </MDTypography>
-                  <MDBox height="300px" mt={2}>
-                    <Bar data={featureFrequencyChartData} options={featureFrequencyChartOptions} />
-                  </MDBox>
+                <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 860 } }}>
+                  <DataTable
+                    table={resourceSummaryTableData}
+                    entriesPerPage={{ defaultValue: 8, entries: [8, 12, 20] }}
+                    canSearch
+                    showTotalEntries
+                    noEndBorder
+                  />
                 </MDBox>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12} md={12} xl={4}>
-              <Card sx={{ height: "100%" }}>
-                <MDBox p={3}>
-                  <MDTypography variant="h6" color="dark">
-                    Best Improvement Alerts
-                  </MDTypography>
-                  <MDTypography variant="button" color="text">
-                    Notificacoes e timeline so quando alguma execucao supera seu melhor valor anterior.
-                  </MDTypography>
-                </MDBox>
-                <TimelineList title="Recent Improvements">
-                  {improvementEvents.length === 0 ? (
-                    <MDBox px={2} py={3}>
-                      <MDTypography variant="button" color="text">
-                        Nenhuma melhoria real registrada ainda.
-                      </MDTypography>
-                    </MDBox>
-                  ) : (
-                    improvementEvents.map((event, index) => (
-                      <TimelineItem
-                        key={`${event.seedId}-${event.timestamp}-${index}`}
-                        color="success"
-                        icon="trending_up"
-                        title={`${event.rclAlgorithm || "Run"} via ${event.localSearch || event.neighborhood || getStageLabel(event.stage)}`}
-                        dateTime={formatRelativeTime(event.timestamp)}
-                        description={`${shortenSeed(event.seedId)} alcancou ${formatCompactPercent(event.bestF1Score ?? event.currentF1Score)}`}
-                        lastItem={index === improvementEvents.length - 1}
-                      />
-                    ))
-                  )}
-                </TimelineList>
               </Card>
             </Grid>
           </Grid>
         </MDBox>
+        ) : null}
 
+        {activeTab === "executions" ? (
         <MDBox mt={4}>
           <Grid container spacing={3}>
             <Grid item xs={12} lg={6}>
@@ -1644,7 +2677,7 @@ function Dashboard() {
                       Initial Solutions
                     </MDTypography>
                     <MDTypography variant="button" color="text">
-                      Solucoes iniciais produzidas pelo RCL e o melhor desempenho obtido depois.
+                      Initial solutions produced by the RCL stage and the best score achieved afterward.
                     </MDTypography>
                   </MDBox>
                   <Chip label={`${initialSolutionEvents.length} rows`} color="info" size="small" variant="outlined" />
@@ -1676,7 +2709,7 @@ function Dashboard() {
                       Local Search Outcomes
                     </MDTypography>
                     <MDTypography variant="button" color="text">
-                      Melhor resultado final encontrado por cada busca local em cada seed.
+                      Best final result found by each local-search service for each seed.
                     </MDTypography>
                   </MDBox>
                   <Chip label={`${localSearchOutcomeEvents.length} rows`} color="success" size="small" variant="outlined" />
@@ -1726,7 +2759,9 @@ function Dashboard() {
             </Grid>
           </Grid>
         </MDBox>
+        ) : null}
 
+        {activeTab === "algorithms" ? (
         <MDBox mt={4}>
           <Grid container spacing={3}>
             <Grid item xs={12}>
@@ -1744,7 +2779,7 @@ function Dashboard() {
                       Best Solutions by Algorithm
                     </MDTypography>
                     <MDTypography variant="button" color="text">
-                      {`Cada linha abaixo vem diretamente da BEST_SOLUTION_TOPIC. Total de solucoes finais visiveis: ${bestSolutionRuns.length}`}
+                      {`Each row below comes directly from BEST_SOLUTION_TOPIC. Total visible final solutions: ${bestSolutionRuns.length}`}
                     </MDTypography>
                   </MDBox>
                   <Chip label={`${bestSolutionRuns.length} finals`} color="warning" size="small" variant="outlined" />
@@ -1776,7 +2811,7 @@ function Dashboard() {
                       Best Outcome by Algorithm
                     </MDTypography>
                     <MDTypography variant="button" color="text">
-                      Tabela consolidada com o melhor resultado final visivel por algoritmo.
+                      Consolidated table with the best visible final result per algorithm.
                     </MDTypography>
                   </MDBox>
                   <Chip label={`${finalRunsByAlgorithm.length} algorithms`} color="secondary" size="small" variant="outlined" />
@@ -1794,6 +2829,7 @@ function Dashboard() {
             </Grid>
           </Grid>
         </MDBox>
+        ) : null}
       </MDBox>
       <Footer />
     </DashboardLayout>

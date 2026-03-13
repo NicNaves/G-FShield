@@ -43,6 +43,10 @@ public class InformationGainAsyncService {
             String classifierName,
             String neighborhoodStrategy,
             String localSearches,
+            Integer neighborhoodMaxIterations,
+            Integer bitFlipMaxIterations,
+            Integer iwssMaxIterations,
+            Integer iwssrMaxIterations,
             KafkaSolutionsProducer informationGainProducer,
             InformationGainService informationGainService,
             boolean isFirstRun,
@@ -93,6 +97,10 @@ public class InformationGainAsyncService {
             );
             dataSolution.setNeighborhood(resolveNeighborhoodStrategy(neighborhoodStrategy));
             dataSolution.setEnabledLocalSearches(resolveLocalSearches(localSearches));
+            dataSolution.setNeighborhoodMaxIterations(neighborhoodMaxIterations);
+            dataSolution.setBitFlipMaxIterations(bitFlipMaxIterations);
+            dataSolution.setIwssMaxIterations(iwssMaxIterations);
+            dataSolution.setIwssrMaxIterations(iwssrMaxIterations);
             logger.info(
                     "requestId={} Initial IG solution ready featureCount={} neighborhood={} localSearchCount={}",
                     requestId,

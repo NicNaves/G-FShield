@@ -94,7 +94,7 @@ function DashboardNavbar({ absolute, light, isMini }) {
       sx={{ mt: 2 }}
     >
       <MenuItem onClick={handleLogout}>
-        <Icon fontSize="small" sx={{ mr: 1 }}>logout</Icon> Sair
+        <Icon fontSize="small" sx={{ mr: 1 }}>logout</Icon> Sign out
       </MenuItem>
     </Menu>
   );
@@ -117,7 +117,7 @@ function DashboardNavbar({ absolute, light, isMini }) {
       {notifications.length === 0 ? (
         <MenuItem onClick={handleCloseNotifications}>
           <Icon fontSize="small" sx={{ mr: 1 }}>notifications_none</Icon>
-          Sem melhorias recentes
+          No recent improvements
         </MenuItem>
       ) : (
         notifications.slice(0, 6).map((notification) => (

@@ -8,7 +8,7 @@ const login = async (email, password) => {
     });
     return response.data;
   } catch (error) {
-    throw error.response ? error.response.data : new Error("Erro no servidor");
+    throw error.response ? error.response.data : new Error("Server error");
   }
 };
 
@@ -17,7 +17,7 @@ const register = async (payload) => {
     const response = await api.post("/register", payload);
     return response.data;
   } catch (error) {
-    throw error.response ? error.response.data : new Error("Erro no servidor");
+    throw error.response ? error.response.data : new Error("Server error");
   }
 };
 
@@ -26,7 +26,7 @@ const me = async () => {
     const response = await api.get("/me");
     return response.data;
   } catch (error) {
-    throw error.response ? error.response.data : new Error("Erro no servidor");
+    throw error.response ? error.response.data : new Error("Server error");
   }
 };
 

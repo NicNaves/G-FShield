@@ -18,6 +18,16 @@ import Footer from "examples/Footer";
 
 import userService from "api/users";
 import { toast } from "react-toastify";
+import {
+  buildUserPayload,
+  formatCpf,
+  formatPhone,
+  formatUserFormValues,
+  isValidCpf,
+  isValidEmail,
+  isValidPhone,
+  normalizeEmail,
+} from "utils/userInputFormatters";
 
 function UserEdit() {
   const navigate = useNavigate();
@@ -33,7 +43,7 @@ function UserEdit() {
       try {
         const data = await userService.getUserById(id);
         setUser(data);
-        setForm({
+        setForm(formatUserFormValues({
           name: data.name,
           email: data.email,
           cpf: data.cpf || "",
@@ -41,9 +51,9 @@ function UserEdit() {
           role: data.role,
           active: Boolean(data.active),
           password: "",
-        });
+        }));
       } catch (requestError) {
-        setError(requestError.response?.data?.error || requestError.message || "Nao foi possivel carregar o usuario.");
+        setError(requestError.response?.data?.error || requestError.message || "Unable to load the user.");
       } finally {
         setLoading(false);
       }
@@ -53,7 +63,14 @@ function UserEdit() {
   }, [id]);
 
   const handleChange = (field) => (event) => {
-    const value = field === "active" ? event.target.value === "true" : event.target.value;
+    const valueMap = {
+      email: normalizeEmail,
+      cpf: formatCpf,
+      telefone: formatPhone,
+    };
+    const rawValue = field === "active" ? event.target.value === "true" : event.target.value;
+    const value = valueMap[field] ? valueMap[field](rawValue) : rawValue;
+
     setForm((current) => ({
       ...current,
       [field]: value,
@@ -61,11 +78,39 @@ function UserEdit() {
   };
 
   const handleSave = async () => {
+    setError("");
+
+    if (!isValidEmail(form.email)) {
+      const message = "Enter a valid email address.";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (form.cpf && !isValidCpf(form.cpf)) {
+      const message = "Enter CPF in the 000.000.000-00 format.";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (form.telefone && !isValidPhone(form.telefone)) {
+      const message = "Enter a phone number as (11) 99999-9999 or (11) 3333-4444.";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (form.password && form.password.length < 6) {
+      const message = "The new password must be at least 6 characters long.";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
     try {
       setSaving(true);
-      const payload = {
-        ...form,
-      };
+      const payload = buildUserPayload(form);
 
       if (!payload.password) {
         delete payload.password;
@@ -77,9 +122,9 @@ function UserEdit() {
         ...current,
         password: "",
       }));
-      toast.success("Usuario atualizado com sucesso.");
+      toast.success("User updated successfully.");
     } catch (requestError) {
-      const message = requestError.response?.data?.error || requestError.message || "Nao foi possivel salvar o usuario.";
+      const message = requestError.response?.data?.error || requestError.message || "Unable to save the user.";
       setError(message);
       toast.error(message);
     } finally {
@@ -93,9 +138,9 @@ function UserEdit() {
       <MDBox py={3}>
         <Card>
           <MDBox p={3}>
-            <MDTypography variant="h4">Editar usuario</MDTypography>
+            <MDTypography variant="h4">Edit user</MDTypography>
             <MDTypography variant="button" color="text">
-              Ajuste perfil de acesso, status e dados cadastrais do usuario selecionado.
+              Update access role, status, and profile details for the selected user.
             </MDTypography>
 
             {error ? (
@@ -107,61 +152,78 @@ function UserEdit() {
             {loading || !form ? (
               <MDBox mt={3}>
                 <MDTypography variant="button" color="text">
-                  Carregando usuario...
+                  Loading user...
                 </MDTypography>
               </MDBox>
             ) : (
               <>
                 <Grid container spacing={2} mt={1}>
                   <Grid item xs={12} md={6}>
-                    <TextField fullWidth label="Nome" value={form.name} onChange={handleChange("name")} />
+                    <TextField fullWidth label="Name" value={form.name} onChange={handleChange("name")} autoComplete="name" />
                   </Grid>
                   <Grid item xs={12} md={6}>
-                    <TextField fullWidth label="Email" value={form.email} onChange={handleChange("email")} />
+                    <TextField fullWidth label="Email" type="email" value={form.email} onChange={handleChange("email")} autoComplete="email" />
                   </Grid>
                   <Grid item xs={12} md={6}>
-                    <TextField fullWidth label="CPF" value={form.cpf} onChange={handleChange("cpf")} />
+                    <TextField
+                      fullWidth
+                      label="CPF"
+                      value={form.cpf}
+                      onChange={handleChange("cpf")}
+                      placeholder="000.000.000-00"
+                      inputProps={{ inputMode: "numeric", maxLength: 14 }}
+                      autoComplete="off"
+                    />
                   </Grid>
                   <Grid item xs={12} md={6}>
-                    <TextField fullWidth label="Telefone" value={form.telefone} onChange={handleChange("telefone")} />
+                    <TextField
+                      fullWidth
+                      label="Phone"
+                      value={form.telefone}
+                      onChange={handleChange("telefone")}
+                      placeholder="(11) 99999-9999"
+                      inputProps={{ inputMode: "tel", maxLength: 15 }}
+                      autoComplete="tel-national"
+                    />
                   </Grid>
                   <Grid item xs={12} md={6}>
-                    <TextField select fullWidth label="Perfil" value={form.role} onChange={handleChange("role")}>
-                      <MenuItem value="ADMIN">Administrador</MenuItem>
-                      <MenuItem value="VIEWER">Visualizador</MenuItem>
+                    <TextField select fullWidth label="Role" value={form.role} onChange={handleChange("role")}>
+                      <MenuItem value="ADMIN">Administrator</MenuItem>
+                      <MenuItem value="VIEWER">Viewer</MenuItem>
                     </TextField>
                   </Grid>
                   <Grid item xs={12} md={6}>
                     <TextField select fullWidth label="Status" value={String(form.active)} onChange={handleChange("active")}>
-                      <MenuItem value="true">Ativo</MenuItem>
-                      <MenuItem value="false">Inativo</MenuItem>
+                      <MenuItem value="true">Active</MenuItem>
+                      <MenuItem value="false">Inactive</MenuItem>
                     </TextField>
                   </Grid>
                   <Grid item xs={12}>
                     <TextField
                       fullWidth
-                      label="Nova senha"
+                      label="New password"
                       type="password"
                       value={form.password}
                       onChange={handleChange("password")}
-                      helperText="Preencha apenas se quiser redefinir a senha."
+                      autoComplete="new-password"
+                      helperText="Fill this only if you want to reset the password."
                     />
                   </Grid>
                 </Grid>
 
                 <Stack direction="row" spacing={1.5} mt={3}>
                   <MDButton variant="gradient" color="info" onClick={handleSave} disabled={saving}>
-                    {saving ? "Salvando..." : "Salvar alteracoes"}
+                    {saving ? "Saving..." : "Save changes"}
                   </MDButton>
                   <MDButton variant="outlined" color="secondary" onClick={() => navigate("/admin/users")}>
-                    Voltar
+                    Back
                   </MDButton>
                 </Stack>
 
                 {user ? (
                   <MDBox mt={3}>
                     <MDTypography variant="caption" color="text">
-                      Usuario criado em {new Date(user.createdAt).toLocaleString()}.
+                      User created on {new Date(user.createdAt).toLocaleString()}.
                     </MDTypography>
                   </MDBox>
                 ) : null}

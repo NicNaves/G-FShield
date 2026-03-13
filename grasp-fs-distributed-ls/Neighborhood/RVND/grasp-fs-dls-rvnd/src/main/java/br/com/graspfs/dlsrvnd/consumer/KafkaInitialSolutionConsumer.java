@@ -28,30 +28,39 @@ public class KafkaInitialSolutionConsumer {
         DataSolution data = record.value();
 
         if (data == null) {
-            log.warn("🚫 Mensagem nula recebida do tópico INITIAL_SOLUTION_TOPIC.");
+            log.warn("Null message received from INITIAL_SOLUTION_TOPIC.");
             return;
         }
 
         if (data.getNeighborhood() != null
                 && !data.getNeighborhood().isBlank()
                 && !"RVND".equalsIgnoreCase(data.getNeighborhood())) {
-            log.info("⏭ Estratégia {} ignorada pelo consumidor RVND.", data.getNeighborhood());
+            log.info("Strategy {} ignored by the RVND consumer.", data.getNeighborhood());
             return;
         }
 
-        log.info("📥 Mensagem recebida: seedId={}, F1={}, Features={}",
-                data.getSeedId(), data.getF1Score(), data.getSolutionFeatures());
+        log.info(
+                "Message received: seedId={}, F1={}, Features={}",
+                data.getSeedId(),
+                data.getF1Score(),
+                data.getSolutionFeatures()
+        );
 
-        for (int i = 0; i < maxIterations; i++) {
+        int configuredMaxIterations = data.getNeighborhoodMaxIterations() != null
+                && data.getNeighborhoodMaxIterations() > 0
+                ? data.getNeighborhoodMaxIterations()
+                : maxIterations;
+
+        for (int i = 0; i < configuredMaxIterations; i++) {
             try {
-                log.info("🔁 Iteração RVND {}/{}", i + 1, maxIterations);
+                log.info("RVND iteration {}/{}", i + 1, configuredMaxIterations);
                 rvndService.doRvnd(data);
             } catch (Exception ex) {
-                log.error("❌ Erro durante execução da iteração {}: {}", i + 1, ex.getMessage(), ex);
+                log.error("Unexpected error during RVND iteration {}: {}", i + 1, ex.getMessage(), ex);
                 throw ex;
             }
         }
 
-        log.info("✅ RVND concluído para seedId={}", data.getSeedId());
+        log.info("RVND finished for seedId={}", data.getSeedId());
     }
 }

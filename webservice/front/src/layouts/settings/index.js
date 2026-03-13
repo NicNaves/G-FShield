@@ -82,7 +82,7 @@ function Settings() {
         }
       } catch (loadError) {
         if (active) {
-          setError(loadError.message || "Nao foi possivel carregar os servicos locais.");
+          setError(loadError.message || "Unable to load local services.");
         }
       } finally {
         if (active) {
@@ -199,17 +199,17 @@ function Settings() {
     event.preventDefault();
 
     if (form.algorithms.length === 0) {
-      setError("Selecione pelo menos um algoritmo RCL.");
+      setError("Select at least one RCL algorithm.");
       return;
     }
 
     if (!form.datasetTrainingName || !form.datasetTestingName) {
-      setError("Selecione os arquivos de treino e teste a partir da pasta compartilhada.");
+      setError("Select the training and testing files from the shared folder.");
       return;
     }
 
     if (form.localSearches.length === 0) {
-      setError("Selecione pelo menos uma busca local para o DLS.");
+      setError("Select at least one local-search service for the DLS.");
       return;
     }
 
@@ -222,6 +222,10 @@ function Settings() {
         maxGenerations: Number(form.maxGenerations),
         rclCutoff: Number(form.rclCutoff),
         sampleSize: Number(form.sampleSize),
+        neighborhoodMaxIterations: Number(form.neighborhoodMaxIterations),
+        bitFlipMaxIterations: Number(form.bitFlipMaxIterations),
+        iwssMaxIterations: Number(form.iwssMaxIterations),
+        iwssrMaxIterations: Number(form.iwssrMaxIterations),
       };
 
       const response = await startGraspExecution(payload);
@@ -230,8 +234,8 @@ function Settings() {
       navigate("/dashboard");
     } catch (submitError) {
       const message = submitError.response?.data?.error || submitError.message;
-      setError(message || "Nao foi possivel iniciar a execucao.");
-      toast.error(message || "Nao foi possivel iniciar a execucao.");
+      setError(message || "Unable to start the execution.");
+      toast.error(message || "Unable to start the execution.");
     } finally {
       setSubmitting(false);
     }
@@ -249,7 +253,7 @@ function Settings() {
                   Settings
                 </MDTypography>
                 <MDTypography variant="button" color="text">
-                  Configure a execucao do pipeline GRASP-FS usando os arquivos presentes na pasta compartilhada de datasets.
+                  Configure a GRASP-FS pipeline run using the files available in the shared datasets folder.
                 </MDTypography>
 
                 {error ? (
@@ -261,7 +265,7 @@ function Settings() {
                 {!catalog.exists && !loadingDatasets ? (
                   <MDBox mt={2}>
                     <Alert severity="warning">
-                      A pasta de datasets nao foi encontrada pela API. Defina `GRASP_DATASETS_DIR` no servidor ou monte a pasta em `/datasets`.
+                      The datasets folder was not found by the API. Set `GRASP_DATASETS_DIR` on the server or mount the folder at `/datasets`.
                     </Alert>
                   </MDBox>
                 ) : null}
@@ -277,7 +281,7 @@ function Settings() {
                     <Grid item xs={12} md={6}>
                       <SettingsSection
                         title="Execution budget"
-                        description="Parametros centrais que controlam o tamanho e o custo da construcao inicial."
+                        description="Core parameters that control the size and cost of the initial construction."
                       >
                         <Stack spacing={2}>
                           <TextField
@@ -301,6 +305,13 @@ function Settings() {
                             value={form.sampleSize}
                             onChange={handleChange("sampleSize")}
                           />
+                          <TextField
+                            fullWidth
+                            label="Neighborhood Max Iterations"
+                            type="number"
+                            value={form.neighborhoodMaxIterations}
+                            onChange={handleChange("neighborhoodMaxIterations")}
+                          />
                         </Stack>
                       </SettingsSection>
                     </Grid>
@@ -308,7 +319,7 @@ function Settings() {
                     <Grid item xs={12} md={6}>
                       <SettingsSection
                         title="Classifier and orchestration"
-                        description="Define o classificador e como a fase de busca local distribuida sera conduzida."
+                        description="Choose the classifier and how the distributed local-search stage should be orchestrated."
                       >
                         <Stack spacing={2}>
                           <TextField
@@ -346,7 +357,7 @@ function Settings() {
                     <Grid item xs={12}>
                       <SettingsSection
                         title="Dataset selection"
-                        description="Escolha manualmente os arquivos da pasta compartilhada ou use um par sugerido pela API."
+                        description="Choose files manually from the shared folder or use an API-suggested pair."
                       >
                         <Grid container spacing={2}>
                           <Grid item xs={12} md={6}>
@@ -361,7 +372,7 @@ function Settings() {
                                 <TextField
                                   {...params}
                                   label="Training Dataset"
-                                  helperText={selectedTraining ? `${selectedTraining.sizeLabel} · ${getDatasetRoleLabel(selectedTraining.roleSuggestion)}` : "Escolha um arquivo da pasta compartilhada"}
+                                  helperText={selectedTraining ? `${selectedTraining.sizeLabel} · ${getDatasetRoleLabel(selectedTraining.roleSuggestion)}` : "Choose a file from the shared folder"}
                                   fullWidth
                                 />
                               )}
@@ -379,7 +390,7 @@ function Settings() {
                                 <TextField
                                   {...params}
                                   label="Testing Dataset"
-                                  helperText={selectedTesting ? `${selectedTesting.sizeLabel} · ${getDatasetRoleLabel(selectedTesting.roleSuggestion)}` : "Escolha um arquivo da pasta compartilhada"}
+                                  helperText={selectedTesting ? `${selectedTesting.sizeLabel} · ${getDatasetRoleLabel(selectedTesting.roleSuggestion)}` : "Choose a file from the shared folder"}
                                   fullWidth
                                 />
                               )}
@@ -411,9 +422,9 @@ function Settings() {
                     <Grid item xs={12} md={6}>
                       <SettingsSection
                         title="Distributed local search"
-                        description="Escolha quais buscas locais o DLS pode usar durante a orquestracao."
+                        description="Choose which local-search services the DLS can use and set their per-run iteration budgets."
                       >
-                        <Grid container spacing={1}>
+                        <Grid container spacing={1.5}>
                           {localSearchCatalog.map((localSearch) => (
                             <Grid item xs={12} key={localSearch.key}>
                               <Card variant="outlined" sx={{ p: 1.5 }}>
@@ -429,6 +440,29 @@ function Settings() {
                                 <MDTypography variant="caption" color="text">
                                   {localSearch.shortDescription}
                                 </MDTypography>
+                                <MDBox mt={1.5}>
+                                  <TextField
+                                    fullWidth
+                                    type="number"
+                                    size="small"
+                                    label={`${localSearch.label} Max Iterations`}
+                                    value={
+                                      localSearch.key === "BIT_FLIP"
+                                        ? form.bitFlipMaxIterations
+                                        : localSearch.key === "IWSS"
+                                          ? form.iwssMaxIterations
+                                          : form.iwssrMaxIterations
+                                    }
+                                    onChange={
+                                      localSearch.key === "BIT_FLIP"
+                                        ? handleChange("bitFlipMaxIterations")
+                                        : localSearch.key === "IWSS"
+                                          ? handleChange("iwssMaxIterations")
+                                          : handleChange("iwssrMaxIterations")
+                                    }
+                                    disabled={!form.localSearches.includes(localSearch.key)}
+                                  />
+                                </MDBox>
                               </Card>
                             </Grid>
                           ))}
@@ -439,7 +473,7 @@ function Settings() {
                     <Grid item xs={12} md={6}>
                       <SettingsSection
                         title="RCL algorithms"
-                        description="Selecione os geradores de solucao inicial que serao disparados pelo gateway."
+                        description="Select the initial-solution generators that should be dispatched by the gateway."
                       >
                         <Grid container spacing={1}>
                           {algorithmCatalog.map((algorithm) => (
@@ -486,7 +520,7 @@ function Settings() {
                     Shared dataset catalog
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    {catalog.directory || "Aguardando leitura da pasta compartilhada..."}
+                    {catalog.directory || "Waiting for the shared folder scan..."}
                   </MDTypography>
 
                   <Divider sx={{ my: 2 }} />
@@ -496,7 +530,7 @@ function Settings() {
                       Available files
                     </MDTypography>
                     <MDTypography variant="caption" color="text">
-                      {loadingDatasets ? "Carregando..." : `${catalog.datasets.length} arquivo(s) encontrados`}
+                      {loadingDatasets ? "Loading..." : `${catalog.datasets.length} file(s) found`}
                     </MDTypography>
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                       {catalog.datasets.slice(0, 6).map((dataset) => (
@@ -513,7 +547,7 @@ function Settings() {
                     Execution summary
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    A estrategia de vizinhanca e as buscas locais abaixo sao enviadas junto com a execucao para o pipeline distribuido.
+                    The neighborhood strategy and local-search services below are submitted together with the execution to the distributed pipeline.
                   </MDTypography>
 
                   <Divider sx={{ my: 2 }} />
@@ -533,11 +567,23 @@ function Settings() {
                     <MDTypography variant="caption" color="text">
                       Neighborhood: {form.neighborhoodStrategy}
                     </MDTypography>
+                    <MDTypography variant="caption" color="text">
+                      Neighborhood max iterations: {form.neighborhoodMaxIterations}
+                    </MDTypography>
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                       {form.localSearches.map((localSearch) => (
                         <Chip key={localSearch} label={localSearch} size="small" variant="outlined" />
                       ))}
                     </Stack>
+                    <MDTypography variant="caption" color="text">
+                      BitFlip max iterations: {form.bitFlipMaxIterations}
+                    </MDTypography>
+                    <MDTypography variant="caption" color="text">
+                      IWSS max iterations: {form.iwssMaxIterations}
+                    </MDTypography>
+                    <MDTypography variant="caption" color="text">
+                      IWSSR max iterations: {form.iwssrMaxIterations}
+                    </MDTypography>
                     <MDTypography variant="caption" color="text">
                       Training: {form.datasetTrainingName || "--"}
                     </MDTypography>
@@ -554,7 +600,7 @@ function Settings() {
                     Local services
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    Endpoints expostos pela API gateway para disparo local.
+                    Endpoints exposed by the API gateway for local dispatch.
                   </MDTypography>
 
                   <Divider sx={{ my: 2 }} />
@@ -573,7 +619,7 @@ function Settings() {
 
                     {loadingServices ? (
                       <MDTypography variant="caption" color="text">
-                        Carregando servicos locais...
+                        Loading local services...
                       </MDTypography>
                     ) : null}
                   </Stack>
@@ -600,7 +646,13 @@ function Settings() {
                         Neighborhood: {lastDispatch.params?.neighborhoodStrategy || "--"}
                       </MDTypography>
                       <MDTypography variant="caption" color="text">
+                        Neighborhood max iterations: {lastDispatch.params?.neighborhoodMaxIterations || "--"}
+                      </MDTypography>
+                      <MDTypography variant="caption" color="text">
                         Local searches: {lastDispatch.params?.localSearches || "--"}
+                      </MDTypography>
+                      <MDTypography variant="caption" color="text">
+                        BitFlip / IWSS / IWSSR max iterations: {lastDispatch.params?.bitFlipMaxIterations || "--"} / {lastDispatch.params?.iwssMaxIterations || "--"} / {lastDispatch.params?.iwssrMaxIterations || "--"}
                       </MDTypography>
                     </Stack>
                   ) : loadingDatasets ? (
@@ -609,7 +661,7 @@ function Settings() {
                     </MDBox>
                   ) : (
                     <MDTypography variant="button" color="text">
-                      Nenhuma execucao disparada nesta sessao ainda.
+                      No execution has been started in this session yet.
                     </MDTypography>
                   )}
                 </MDBox>

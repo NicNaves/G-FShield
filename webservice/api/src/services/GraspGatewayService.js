@@ -45,8 +45,14 @@ class GraspGatewayService {
   buildParams(payload) {
     const neighborhoodStrategy = this.normalizeNeighborhoodStrategy(payload.neighborhoodStrategy);
     const localSearches = this.normalizeLocalSearches(payload.localSearches);
+    const optionalIntegerParams = [
+      "neighborhoodMaxIterations",
+      "bitFlipMaxIterations",
+      "iwssMaxIterations",
+      "iwssrMaxIterations",
+    ];
 
-    return {
+    const params = {
       maxGenerations: Number(payload.maxGenerations),
       rclCutoff: Number(payload.rclCutoff),
       sampleSize: Number(payload.sampleSize),
@@ -56,6 +62,14 @@ class GraspGatewayService {
       ...(neighborhoodStrategy ? { neighborhoodStrategy } : {}),
       ...(localSearches.length > 0 ? { localSearches: localSearches.join(",") } : {}),
     };
+
+    optionalIntegerParams.forEach((field) => {
+      if (payload[field] !== undefined && payload[field] !== null && payload[field] !== "") {
+        params[field] = Number(payload[field]);
+      }
+    });
+
+    return params;
   }
 
   validatePayload(payload) {
@@ -79,6 +93,25 @@ class GraspGatewayService {
     if (payload.localSearches && this.normalizeLocalSearches(payload.localSearches).length === 0) {
       throw new Error("Nenhuma busca local valida foi informada. Use BIT_FLIP, IWSS ou IWSSR.");
     }
+
+    [
+      "maxGenerations",
+      "rclCutoff",
+      "sampleSize",
+      "neighborhoodMaxIterations",
+      "bitFlipMaxIterations",
+      "iwssMaxIterations",
+      "iwssrMaxIterations",
+    ].forEach((field) => {
+      if (payload[field] === undefined || payload[field] === null || payload[field] === "") {
+        return;
+      }
+
+      const parsed = Number(payload[field]);
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        throw new Error(`Parametro invalido para ${field}. Use um inteiro positivo.`);
+      }
+    });
   }
 
   async startExecution(payload) {

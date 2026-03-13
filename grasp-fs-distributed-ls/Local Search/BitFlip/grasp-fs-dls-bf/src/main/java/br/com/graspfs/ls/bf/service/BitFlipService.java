@@ -74,6 +74,7 @@ public class BitFlipService {
         Random random = new Random();
         int i = 0;
         double lastPublishedBestF1 = Double.NEGATIVE_INFINITY;
+        int configuredMaxIterations = resolveMaxIterations(solution);
 
         Instances trainingDataset = MachineLearningUtils.lerDataset(
                 new FileInputStream("/datasets/" + solution.getTrainingFileName()));
@@ -83,7 +84,7 @@ public class BitFlipService {
         AbstractClassifier classifier = getClassifier(solution.getClassfier());
         DataSolution bestSolution = updateSolution(solution);
 
-        while (i < maxIterations) {
+        while (i < configuredMaxIterations) {
             int valueIndex = random.nextInt(solution.getRclfeatures().size());
             int positionReplace = random.nextInt(solution.getSolutionFeatures().size());
 
@@ -118,7 +119,7 @@ public class BitFlipService {
 
             escreverLinhaCSV(writer, solution, collector);
             DataSolution progressSnapshot = updateSolution(solution);
-            lastPublishedBestF1 = publishProgressIfNeeded(progressSnapshot, i, maxIterations, lastPublishedBestF1);
+            lastPublishedBestF1 = publishProgressIfNeeded(progressSnapshot, i, configuredMaxIterations, lastPublishedBestF1);
 
             if (Scores.getF1Score() > bestSolution.getF1Score()) {
                 bestSolution = updateSolution(solution);
@@ -207,6 +208,10 @@ public class BitFlipService {
                 .solutionFeatures(new ArrayList<>(s.getSolutionFeatures()))
                 .neighborhood(s.getNeighborhood())
                 .enabledLocalSearches(s.getEnabledLocalSearches() != null ? new ArrayList<>(s.getEnabledLocalSearches()) : new ArrayList<>())
+                .neighborhoodMaxIterations(s.getNeighborhoodMaxIterations())
+                .bitFlipMaxIterations(s.getBitFlipMaxIterations())
+                .iwssMaxIterations(s.getIwssMaxIterations())
+                .iwssrMaxIterations(s.getIwssrMaxIterations())
                 .iterationNeighborhood(s.getIterationNeighborhood())
                 .classfier(s.getClassfier())
                 .rclAlgorithm(s.getRclAlgorithm())
@@ -223,6 +228,11 @@ public class BitFlipService {
                 .runnigTime(s.getRunnigTime())
                 .iterationLocalSearch(s.getIterationLocalSearch())
                 .build();
+    }
+
+    private int resolveMaxIterations(DataSolution solution) {
+        Integer override = solution.getBitFlipMaxIterations();
+        return override != null && override > 0 ? override : maxIterations;
     }
 
     private AbstractClassifier getClassifier(String name) {

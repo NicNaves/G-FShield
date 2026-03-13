@@ -77,6 +77,9 @@ router.get("/datasets", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), 
  *               classifier:
  *                 type: string
  *                 example: "J48"
+ *               neighborhoodMaxIterations:
+ *                 type: integer
+ *                 example: 10
  *               neighborhoodStrategy:
  *                 type: string
  *                 example: "VND"
@@ -85,6 +88,15 @@ router.get("/datasets", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), 
  *                 items:
  *                   type: string
  *                 example: ["BIT_FLIP", "IWSS", "IWSSR"]
+ *               bitFlipMaxIterations:
+ *                 type: integer
+ *                 example: 100
+ *               iwssMaxIterations:
+ *                 type: integer
+ *                 example: 20
+ *               iwssrMaxIterations:
+ *                 type: integer
+ *                 example: 20
  *     responses:
  *       202:
  *         description: Execucao aceita para processamento.

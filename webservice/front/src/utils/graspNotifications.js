@@ -1,5 +1,16 @@
 export const GRASP_NOTIFICATION_STORAGE_KEY = "grasp-monitor-notifications";
 export const GRASP_NOTIFICATION_EVENT_NAME = "grasp-monitor-notifications-updated";
+const GRASP_NOTIFICATION_STORAGE_VERSION_KEY = "grasp-monitor-notifications-version";
+const GRASP_NOTIFICATION_STORAGE_VERSION = "2";
+
+const isLegacyNotification = (notification) => {
+  if (!notification) {
+    return true;
+  }
+
+  const title = String(notification.title || "");
+  return title.includes("melhorou para");
+};
 
 const readRawNotifications = () => {
   if (typeof window === "undefined") {
@@ -7,9 +18,30 @@ const readRawNotifications = () => {
   }
 
   try {
+    const storedVersion = window.localStorage.getItem(GRASP_NOTIFICATION_STORAGE_VERSION_KEY);
+    if (storedVersion !== GRASP_NOTIFICATION_STORAGE_VERSION) {
+      window.localStorage.removeItem(GRASP_NOTIFICATION_STORAGE_KEY);
+      window.localStorage.setItem(
+        GRASP_NOTIFICATION_STORAGE_VERSION_KEY,
+        GRASP_NOTIFICATION_STORAGE_VERSION
+      );
+      return [];
+    }
+
     const value = window.localStorage.getItem(GRASP_NOTIFICATION_STORAGE_KEY);
     const parsed = value ? JSON.parse(value) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    const normalized = Array.isArray(parsed)
+      ? parsed.filter((notification) => !isLegacyNotification(notification))
+      : [];
+
+    if (normalized.length !== (Array.isArray(parsed) ? parsed.length : 0)) {
+      window.localStorage.setItem(
+        GRASP_NOTIFICATION_STORAGE_KEY,
+        JSON.stringify(normalized)
+      );
+    }
+
+    return normalized;
   } catch (error) {
     return [];
   }

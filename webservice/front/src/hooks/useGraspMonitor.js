@@ -112,12 +112,32 @@ export default function useGraspMonitor(limit = 100) {
     bestScoreBySeedRef.current = nextScores;
   };
 
+  const rememberObservedScore = (incomingRun) => {
+    if (!incomingRun?.seedId) {
+      return;
+    }
+
+    const observedScore = Number(
+      incomingRun.bestF1Score ?? incomingRun.currentF1Score ?? Number.NEGATIVE_INFINITY
+    );
+
+    if (!Number.isFinite(observedScore)) {
+      return;
+    }
+
+    const previousScore = bestScoreBySeedRef.current.get(incomingRun.seedId);
+    bestScoreBySeedRef.current.set(
+      incomingRun.seedId,
+      Math.max(previousScore ?? Number.NEGATIVE_INFINITY, observedScore)
+    );
+  };
+
   const notifyIfImproved = (incomingRun) => {
     if (!incomingRun?.seedId) {
       return;
     }
 
-    if (!["SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(incomingRun.topic)) {
+    if (!["INITIAL_SOLUTION_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(incomingRun.topic)) {
       return;
     }
 
@@ -136,7 +156,7 @@ export default function useGraspMonitor(limit = 100) {
 
     const searchLabel = incomingRun.localSearch || incomingRun.neighborhood || incomingRun.stage || "pipeline";
     const algorithmLabel = incomingRun.rclAlgorithm || "Unknown";
-    const message = `${algorithmLabel} melhorou para ${incomingScore}% via ${searchLabel}`;
+    const message = `${algorithmLabel} improved to ${incomingScore}% via ${searchLabel}`;
 
     pushGraspNotification({
       id: `${incomingRun.seedId}:${incomingRun.updatedAt || incomingRun.topic}:${incomingScore}`,
@@ -176,7 +196,7 @@ export default function useGraspMonitor(limit = 100) {
         registerCurrentRuns(initialRuns);
       } catch (loadError) {
         if (!cancelled) {
-          setError(loadError.message || "Nao foi possivel carregar os dados do monitor.");
+          setError(loadError.message || "Unable to load monitor data.");
         }
       } finally {
         if (!cancelled) {
@@ -219,12 +239,16 @@ export default function useGraspMonitor(limit = 100) {
         if ((payload.type === "kafka.update" || payload.type === "kafka.progress")
           && payload.payload?.seedId
           && !cancelled) {
-          notifyIfImproved(payload.payload);
+          if (["INITIAL_SOLUTION_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(payload.payload.topic)) {
+            notifyIfImproved(payload.payload);
+          } else {
+            rememberObservedScore(payload.payload);
+          }
           setRuns((currentRuns) => mergeRuns(currentRuns, payload.payload));
         }
       } catch (streamError) {
         if (!cancelled) {
-          setError(streamError.message || "Falha ao ler stream em tempo real.");
+          setError(streamError.message || "Unable to read the realtime stream.");
         }
       }
     };

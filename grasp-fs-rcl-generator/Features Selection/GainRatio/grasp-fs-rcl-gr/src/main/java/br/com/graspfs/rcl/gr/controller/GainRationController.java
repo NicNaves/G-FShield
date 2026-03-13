@@ -38,7 +38,11 @@ public class GainRationController {
         @RequestParam("datasetTestingName") String testingFileName,
         @RequestParam(value = "classifier", defaultValue = "J48") String classifierName,
         @RequestParam(value = "neighborhoodStrategy", required = false) String neighborhoodStrategy,
-        @RequestParam(value = "localSearches", required = false) String localSearches
+        @RequestParam(value = "localSearches", required = false) String localSearches,
+        @RequestParam(value = "neighborhoodMaxIterations", required = false) Integer neighborhoodMaxIterations,
+        @RequestParam(value = "bitFlipMaxIterations", required = false) Integer bitFlipMaxIterations,
+        @RequestParam(value = "iwssMaxIterations", required = false) Integer iwssMaxIterations,
+        @RequestParam(value = "iwssrMaxIterations", required = false) Integer iwssrMaxIterations
     ) {
         String requestId = "GR-" + UUID.randomUUID();
         logger.info(
@@ -50,6 +54,7 @@ public class GainRationController {
         gainRationAsyncService.processAsync(
             maxGenerations, rclCutoff, sampleSize,
             trainingFileName, testingFileName, classifierName, neighborhoodStrategy, localSearches,
+            neighborhoodMaxIterations, bitFlipMaxIterations, iwssMaxIterations, iwssrMaxIterations,
             gainRationProducer, gainRationService, isFirstTime, requestId
         );
 

@@ -11,16 +11,34 @@ class UserService {
     return "VIEWER";
   }
 
+  #normalizeEmail(email) {
+    return typeof email === "string" ? email.trim().toLowerCase() : email;
+  }
+
+  #digitsOnly(value) {
+    return typeof value === "string" ? value.replace(/\D/g, "") : value;
+  }
+
+  #normalizeUserData(userData = {}) {
+    return {
+      ...userData,
+      name: typeof userData.name === "string" ? userData.name.trim() : userData.name,
+      email: this.#normalizeEmail(userData.email),
+      cpf: this.#digitsOnly(userData.cpf),
+      telefone: this.#digitsOnly(userData.telefone),
+    };
+  }
+
   /**
    * Cria um novo usuário no banco de dados com validações e senha criptografada.
    * @param {Object} userData - Dados do usuário.
    * @returns {Promise<User>} - Usuário criado.
    */
   async criarUsuario(userData, currentUser = null) {
-    const normalizedUserData = {
+    const normalizedUserData = this.#normalizeUserData({
       ...userData,
       role: this.sanitizeRole(userData.role, currentUser),
-    };
+    });
 
     this.#validarDadosUsuario(normalizedUserData); 
 
@@ -50,11 +68,13 @@ class UserService {
    * @returns {Promise<User|null>} - Usuário encontrado ou null.
    */
   async encontrarUsuarioPorEmail(email) {
-    if (!email || typeof email !== "string") {
+    const normalizedEmail = this.#normalizeEmail(email);
+
+    if (!normalizedEmail || typeof normalizedEmail !== "string") {
       throw new Error("E-mail inválido.");
     }
 
-    const prismaUser = await prisma.user.findUnique({ where: { email } });
+    const prismaUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (prismaUser) {
       return User.fromPrisma(prismaUser);
     }
@@ -111,11 +131,13 @@ class UserService {
       throw new Error("ID inválido.");
     }
 
-    this.#validarDadosUsuario(userData, true); 
+    const normalizedUserData = this.#normalizeUserData(userData);
+
+    this.#validarDadosUsuario(normalizedUserData, true); 
 
     try {
       
-      const { id: _, createdAt, updatedAt, ...dataToUpdate } = userData;
+      const { id: _, createdAt, updatedAt, ...dataToUpdate } = normalizedUserData;
 
       
       if (dataToUpdate.password) {
@@ -156,6 +178,24 @@ class UserService {
       }
       if (!password || typeof password !== "string" || password.length < 6) {
         throw new Error("Senha é obrigatória e deve ter pelo menos 6 caracteres.");
+      }
+    }
+
+    if (parcial && Object.prototype.hasOwnProperty.call(userData, "name")) {
+      if (!name || typeof name !== "string") {
+        throw new Error("Nome deve ser uma string válida.");
+      }
+    }
+
+    if (parcial && Object.prototype.hasOwnProperty.call(userData, "email")) {
+      if (!email || typeof email !== "string" || !email.includes("@")) {
+        throw new Error("E-mail deve ser válido.");
+      }
+    }
+
+    if (parcial && Object.prototype.hasOwnProperty.call(userData, "password") && password) {
+      if (typeof password !== "string" || password.length < 6) {
+        throw new Error("Senha deve ter pelo menos 6 caracteres.");
       }
     }
 

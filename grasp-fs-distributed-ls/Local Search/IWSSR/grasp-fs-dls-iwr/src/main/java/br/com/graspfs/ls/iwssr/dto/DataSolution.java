@@ -28,6 +28,18 @@ public class DataSolution {
     @JsonProperty("enabledLocalSearches")
     private ArrayList<String> enabledLocalSearches;
 
+    @JsonProperty("neighborhoodMaxIterations")
+    private Integer neighborhoodMaxIterations;
+
+    @JsonProperty("bitFlipMaxIterations")
+    private Integer bitFlipMaxIterations;
+
+    @JsonProperty("iwssMaxIterations")
+    private Integer iwssMaxIterations;
+
+    @JsonProperty("iwssrMaxIterations")
+    private Integer iwssrMaxIterations;
+
     @JsonProperty("iterationNeighborhood")
     private Integer iterationNeighborhood; //01
 

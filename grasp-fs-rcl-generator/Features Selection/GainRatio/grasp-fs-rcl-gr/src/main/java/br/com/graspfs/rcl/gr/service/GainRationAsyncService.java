@@ -43,6 +43,10 @@ public class GainRationAsyncService {
             String classifierName,
             String neighborhoodStrategy,
             String localSearches,
+            Integer neighborhoodMaxIterations,
+            Integer bitFlipMaxIterations,
+            Integer iwssMaxIterations,
+            Integer iwssrMaxIterations,
             KafkaSolutionsProducer gainRationProducer,
             GainRationService gainRationService,
             boolean isFirstTime,
@@ -93,6 +97,10 @@ public class GainRationAsyncService {
             );
             dataSolution.setNeighborhood(resolveNeighborhoodStrategy(neighborhoodStrategy));
             dataSolution.setEnabledLocalSearches(resolveLocalSearches(localSearches));
+            dataSolution.setNeighborhoodMaxIterations(neighborhoodMaxIterations);
+            dataSolution.setBitFlipMaxIterations(bitFlipMaxIterations);
+            dataSolution.setIwssMaxIterations(iwssMaxIterations);
+            dataSolution.setIwssrMaxIterations(iwssrMaxIterations);
             logger.info(
                     "requestId={} Initial GR solution ready featureCount={} neighborhood={} localSearchCount={}",
                     requestId,

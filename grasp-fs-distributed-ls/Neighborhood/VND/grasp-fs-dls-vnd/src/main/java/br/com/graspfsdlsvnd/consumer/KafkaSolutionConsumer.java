@@ -27,48 +27,56 @@ public class KafkaSolutionConsumer {
     @KafkaListener(topics = "SOLUTIONS_TOPIC", groupId = "VND", containerFactory = "jsonKafkaListenerContainer")
     public void consume(ConsumerRecord<String, DataSolution> record) {
         DataSolution incoming = record.value();
-        log.info("📥 Mensagem recebida do Kafka: {}", incoming);
+        log.info("Message received from Kafka: {}", incoming);
 
         if (incoming == null || incoming.getSeedId() == null) {
-            log.warn("⚠️ Solução recebida sem seedId. Ignorando.");
+            log.warn("Solution received without seedId. Ignoring.");
             return;
         }
 
         if (incoming.getNeighborhood() != null
                 && !incoming.getNeighborhood().isBlank()
                 && !"VND".equalsIgnoreCase(incoming.getNeighborhood())) {
-            log.info("⏭ Solução da estratégia {} ignorada pelo ciclo VND.", incoming.getNeighborhood());
+            log.info("Strategy {} ignored by the VND cycle.", incoming.getNeighborhood());
             return;
         }
 
         int iterationNeighborhood = incoming.getIterationNeighborhood() != null
                 ? incoming.getIterationNeighborhood()
                 : 0;
+        int configuredMaxIterations = incoming.getNeighborhoodMaxIterations() != null
+                && incoming.getNeighborhoodMaxIterations() > 0
+                ? incoming.getNeighborhoodMaxIterations()
+                : maxIterations;
 
-        if (iterationNeighborhood < maxIterations) {
+        if (iterationNeighborhood < configuredMaxIterations) {
             try {
                 bestSolutions.compute(incoming.getSeedId(), (seedId, currentBest) -> {
                     DataSolution baseline = currentBest;
                     if (baseline == null) {
-                        log.info("🟢 Primeira solução armazenada. Iniciando ciclo VND.");
+                        log.info("First solution stored. Starting the VND cycle.");
                         baseline = incoming;
                     } else {
-                        log.info("🔄 Comparando nova solução com a melhor até agora...");
+                        log.info("Comparing the new solution against the current best one.");
                     }
 
                     DataSolution updatedBest = vndService.callNextService(baseline, incoming);
-                    log.info("🏁 Melhor solução atual (seedId={}): F1 = {}, Features = {}",
-                            seedId, updatedBest.getF1Score(), updatedBest.getSolutionFeatures());
+                    log.info(
+                            "Current best solution (seedId={}): F1 = {}, Features = {}",
+                            seedId,
+                            updatedBest.getF1Score(),
+                            updatedBest.getSolutionFeatures()
+                    );
                     return updatedBest;
                 });
 
             } catch (IllegalArgumentException ex) {
-                log.error("❌ Erro ao processar solução recebida: {}", ex.getMessage(), ex);
+                log.error("Error while processing the received solution: {}", ex.getMessage(), ex);
                 throw ex;
             }
         } else {
             bestSolutions.remove(incoming.getSeedId());
-            log.warn("⏹ Iteração de vizinhança máxima ({}) atingida. Ignorando solução.", maxIterations);
+            log.warn("Maximum neighborhood iterations ({}) reached. Ignoring solution.", configuredMaxIterations);
         }
     }
 }

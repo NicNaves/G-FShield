@@ -79,7 +79,7 @@ public class IwssService {
         DataSolution localSolutionAdd = updateSolution(dataSolution);
         double lastPublishedBestF1 = Double.NEGATIVE_INFINITY;
 
-        int n = localSolutionAdd.getRclfeatures().size();
+        int n = resolveMaxIterations(localSolutionAdd);
 
         for (int i = 0; i < n; i++) {
             localSolutionAdd.setIterationLocalSearch(i);
@@ -224,6 +224,10 @@ public class IwssService {
                 .solutionFeatures(new ArrayList<>(solution.getSolutionFeatures()))
                 .iterationNeighborhood(solution.getIterationNeighborhood())
                 .enabledLocalSearches(solution.getEnabledLocalSearches() != null ? new ArrayList<>(solution.getEnabledLocalSearches()) : new ArrayList<>())
+                .neighborhoodMaxIterations(solution.getNeighborhoodMaxIterations())
+                .bitFlipMaxIterations(solution.getBitFlipMaxIterations())
+                .iwssMaxIterations(solution.getIwssMaxIterations())
+                .iwssrMaxIterations(solution.getIwssrMaxIterations())
                 .classfier(solution.getClassfier())
                 .rclAlgorithm(solution.getRclAlgorithm())
                 .trainingFileName(solution.getTrainingFileName())
@@ -240,6 +244,16 @@ public class IwssService {
                 .iterationLocalSearch(solution.getIterationLocalSearch())
                 .localSearch(solution.getLocalSearch())
                 .build();
+    }
+
+    private int resolveMaxIterations(DataSolution solution) {
+        int availableIterations = solution.getRclfeatures() != null ? solution.getRclfeatures().size() : 0;
+        Integer override = solution.getIwssMaxIterations();
+        if (override != null && override > 0) {
+            return Math.min(override, availableIterations);
+        }
+
+        return availableIterations;
     }
 
     private AbstractClassifier getClassifier(String name) {

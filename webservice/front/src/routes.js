@@ -36,7 +36,7 @@ const routes = [
   },
   {
     type: "collapse",
-    name: "Usuarios",
+    name: "Users",
     key: "users",
     icon: <Icon fontSize="small">manage_accounts</Icon>,
     route: "/admin/users",

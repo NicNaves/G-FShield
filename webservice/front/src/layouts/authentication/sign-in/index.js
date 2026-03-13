@@ -45,7 +45,7 @@ function Login() {
       
       navigate("/dashboard");
     } catch (err) {
-      setError(err.message || "Erro ao fazer login.");
+      setError(err.message || "Unable to sign in.");
     }
   };
 
@@ -64,7 +64,7 @@ function Login() {
           textAlign="center"
         >
           <MDTypography variant="h4" fontWeight="medium" color="white" mt={1}>
-            {AUTH_DISABLED ? "Modo local" : "Login"}
+            {AUTH_DISABLED ? "Local mode" : "Sign in"}
           </MDTypography>
           <Grid container spacing={3} justifyContent="center" sx={{ mt: 1, mb: 2 }}></Grid>
         </MDBox>
@@ -72,7 +72,7 @@ function Login() {
           <MDBox component="form" role="form" onSubmit={handleSubmit}>
             {AUTH_DISABLED && (
               <MDTypography variant="button" color="text" fontWeight="regular">
-                O login esta desabilitado neste ambiente. Entre direto como usuario guest.
+                Authentication is disabled in this environment. Continue directly as a guest user.
               </MDTypography>
             )}
             {error && (
@@ -110,13 +110,13 @@ function Login() {
                 type={AUTH_DISABLED ? "button" : "submit"}
                 onClick={AUTH_DISABLED ? handleGuestAccess : undefined}
               >
-                {AUTH_DISABLED ? "Entrar sem login" : "Entrar"}
+                {AUTH_DISABLED ? "Continue without sign-in" : "Sign in"}
               </MDButton>
             </MDBox>
             {!AUTH_DISABLED && (
               <MDBox mt={3} textAlign="center">
                 <MDTypography variant="button" color="text">
-                  Ainda nao tem conta?{" "}
+                  Don&apos;t have an account yet?{" "}
                   <MDTypography
                     component={Link}
                     to="/authentication/sign-up"
@@ -125,7 +125,7 @@ function Login() {
                     fontWeight="medium"
                     textGradient
                   >
-                    Cadastrar usuario
+                    Create account
                   </MDTypography>
                 </MDTypography>
               </MDBox>

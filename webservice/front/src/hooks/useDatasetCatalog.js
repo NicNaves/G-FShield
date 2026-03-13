@@ -25,7 +25,7 @@ export default function useDatasetCatalog() {
         }
       } catch (loadError) {
         if (!cancelled) {
-          setError(loadError.message || "Nao foi possivel carregar o catalogo de datasets.");
+          setError(loadError.message || "Unable to load the dataset catalog.");
         }
       } finally {
         if (!cancelled) {

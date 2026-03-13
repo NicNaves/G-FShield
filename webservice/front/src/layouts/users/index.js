@@ -19,6 +19,15 @@ import DataTable from "examples/Tables/DataTable";
 
 import userService from "api/users";
 import { toast } from "react-toastify";
+import {
+  buildUserPayload,
+  formatCpf,
+  formatPhone,
+  isValidCpf,
+  isValidEmail,
+  isValidPhone,
+  normalizeEmail,
+} from "utils/userInputFormatters";
 
 const defaultForm = {
   name: "",
@@ -44,7 +53,7 @@ function Users() {
       setUsers(response);
       setError("");
     } catch (requestError) {
-      setError(requestError.response?.data?.error || requestError.message || "Nao foi possivel carregar usuarios.");
+      setError(requestError.response?.data?.error || requestError.message || "Unable to load users.");
     } finally {
       setLoading(false);
     }
@@ -55,23 +64,50 @@ function Users() {
   }, []);
 
   const handleChange = (field) => (event) => {
+    const valueMap = {
+      email: normalizeEmail,
+      cpf: formatCpf,
+      telefone: formatPhone,
+    };
+    const nextValue = valueMap[field] ? valueMap[field](event.target.value) : event.target.value;
+
     setForm((current) => ({
       ...current,
-      [field]: event.target.value,
+      [field]: nextValue,
     }));
   };
 
   const handleCreate = async (event) => {
     event.preventDefault();
 
+    if (!isValidEmail(form.email)) {
+      toast.error("Enter a valid email address.");
+      return;
+    }
+
+    if (form.cpf && !isValidCpf(form.cpf)) {
+      toast.error("Enter CPF in the 000.000.000-00 format.");
+      return;
+    }
+
+    if (form.telefone && !isValidPhone(form.telefone)) {
+      toast.error("Enter a phone number as (11) 99999-9999 or (11) 3333-4444.");
+      return;
+    }
+
+    if (!form.password || form.password.length < 6) {
+      toast.error("Password must be at least 6 characters long.");
+      return;
+    }
+
     try {
       setCreating(true);
-      await userService.createUser(form);
-      toast.success("Usuario criado com sucesso.");
+      await userService.createUser(buildUserPayload(form));
+      toast.success("User created successfully.");
       setForm(defaultForm);
       await loadUsers();
     } catch (requestError) {
-      const message = requestError.response?.data?.error || requestError.message || "Nao foi possivel criar o usuario.";
+      const message = requestError.response?.data?.error || requestError.message || "Unable to create the user.";
       toast.error(message);
     } finally {
       setCreating(false);
@@ -80,20 +116,20 @@ function Users() {
 
   const table = {
     columns: [
-      { Header: "Nome", accessor: "name", align: "left" },
+      { Header: "Name", accessor: "name", align: "left" },
       { Header: "Email", accessor: "email", align: "left" },
-      { Header: "Perfil", accessor: "role", align: "center" },
+      { Header: "Role", accessor: "role", align: "center" },
       { Header: "Status", accessor: "active", align: "center" },
-      { Header: "Acoes", accessor: "actions", align: "center" },
+      { Header: "Actions", accessor: "actions", align: "center" },
     ],
     rows: users.map((user) => ({
       name: user.name,
       email: user.email,
       role: user.role,
-      active: user.active ? "Ativo" : "Inativo",
+      active: user.active ? "Active" : "Inactive",
       actions: (
         <MDButton variant="outlined" color="info" size="small" onClick={() => navigate(`/admin/users/${user.id}`)}>
-          Editar
+          Edit
         </MDButton>
       ),
     })),
@@ -107,26 +143,56 @@ function Users() {
           <Grid item xs={12} lg={5}>
             <Card component="form" onSubmit={handleCreate}>
               <MDBox p={3}>
-                <MDTypography variant="h5">Administracao de usuarios</MDTypography>
+                <MDTypography variant="h5">User administration</MDTypography>
                 <MDTypography variant="button" color="text">
-                  Crie usuarios e defina quem pode executar consultas ou apenas acompanhar o dashboard.
+                  Create users and define who can run pipeline requests or only monitor the dashboard.
                 </MDTypography>
 
                 <Stack spacing={2} mt={3}>
-                  <TextField label="Nome" value={form.name} onChange={handleChange("name")} fullWidth />
-                  <TextField label="Email" value={form.email} onChange={handleChange("email")} fullWidth />
-                  <TextField label="CPF" value={form.cpf} onChange={handleChange("cpf")} fullWidth />
-                  <TextField label="Telefone" value={form.telefone} onChange={handleChange("telefone")} fullWidth />
-                  <TextField label="Senha" type="password" value={form.password} onChange={handleChange("password")} fullWidth />
-                  <TextField select label="Perfil" value={form.role} onChange={handleChange("role")} fullWidth>
-                    <MenuItem value="ADMIN">Administrador</MenuItem>
-                    <MenuItem value="VIEWER">Visualizador</MenuItem>
+                  <TextField label="Name" value={form.name} onChange={handleChange("name")} autoComplete="name" fullWidth />
+                  <TextField
+                    label="Email"
+                    type="email"
+                    value={form.email}
+                    onChange={handleChange("email")}
+                    autoComplete="email"
+                    fullWidth
+                  />
+                  <TextField
+                    label="CPF"
+                    value={form.cpf}
+                    onChange={handleChange("cpf")}
+                    placeholder="000.000.000-00"
+                    inputProps={{ inputMode: "numeric", maxLength: 14 }}
+                    autoComplete="off"
+                    fullWidth
+                  />
+                  <TextField
+                    label="Phone"
+                    value={form.telefone}
+                    onChange={handleChange("telefone")}
+                    placeholder="(11) 99999-9999"
+                    inputProps={{ inputMode: "tel", maxLength: 15 }}
+                    autoComplete="tel-national"
+                    fullWidth
+                  />
+                  <TextField
+                    label="Password"
+                    type="password"
+                    value={form.password}
+                    onChange={handleChange("password")}
+                    autoComplete="new-password"
+                    fullWidth
+                  />
+                  <TextField select label="Role" value={form.role} onChange={handleChange("role")} fullWidth>
+                    <MenuItem value="ADMIN">Administrator</MenuItem>
+                    <MenuItem value="VIEWER">Viewer</MenuItem>
                   </TextField>
                 </Stack>
 
                 <MDBox mt={3}>
                   <MDButton type="submit" variant="gradient" color="info" disabled={creating}>
-                    {creating ? "Criando..." : "Criar usuario"}
+                    {creating ? "Creating..." : "Create user"}
                   </MDButton>
                 </MDBox>
               </MDBox>
@@ -136,9 +202,9 @@ function Users() {
           <Grid item xs={12} lg={7}>
             <Card>
               <MDBox p={3}>
-                <MDTypography variant="h5">Usuarios cadastrados</MDTypography>
+                <MDTypography variant="h5">Registered users</MDTypography>
                 <MDTypography variant="button" color="text">
-                  Administradores podem executar o pipeline. Visualizadores ficam restritos ao dashboard e catalogo.
+                  Administrators can run the pipeline. Viewers are limited to the dashboard and dataset catalog.
                 </MDTypography>
               </MDBox>
 
@@ -160,7 +226,7 @@ function Users() {
               {loading ? (
                 <MDBox px={3} pb={3}>
                   <MDTypography variant="button" color="text">
-                    Carregando usuarios...
+                    Loading users...
                   </MDTypography>
                 </MDBox>
               ) : null}

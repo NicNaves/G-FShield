@@ -46,6 +46,10 @@ public class SymmetricalUncertaintyAsyncService {
             String classifierName,
             String neighborhoodStrategy,
             String localSearches,
+            Integer neighborhoodMaxIterations,
+            Integer bitFlipMaxIterations,
+            Integer iwssMaxIterations,
+            Integer iwssrMaxIterations,
             boolean isFirstTime,
             String requestId
     ) {
@@ -92,6 +96,10 @@ public class SymmetricalUncertaintyAsyncService {
             DataSolution dataSolution = suService.doRelief(trainingDataset, rclCutoff, classifier, trainingFileName, testingFileName);
             dataSolution.setNeighborhood(resolveNeighborhoodStrategy(neighborhoodStrategy));
             dataSolution.setEnabledLocalSearches(resolveLocalSearches(localSearches));
+            dataSolution.setNeighborhoodMaxIterations(neighborhoodMaxIterations);
+            dataSolution.setBitFlipMaxIterations(bitFlipMaxIterations);
+            dataSolution.setIwssMaxIterations(iwssMaxIterations);
+            dataSolution.setIwssrMaxIterations(iwssrMaxIterations);
             logger.info(
                     "requestId={} Initial SU solution ready featureCount={} neighborhood={} localSearchCount={}",
                     requestId,

@@ -2,22 +2,22 @@ export const algorithmCatalog = [
   {
     key: "IG",
     label: "Information Gain",
-    shortDescription: "Seleciona features pelo ganho de informacao.",
+    shortDescription: "Selects features by information gain.",
   },
   {
     key: "GR",
     label: "Gain Ratio",
-    shortDescription: "Reduz o vies do Information Gain em atributos amplos.",
+    shortDescription: "Reduces Information Gain bias on broader attributes.",
   },
   {
     key: "RF",
     label: "RelieF",
-    shortDescription: "Avalia relevancia pela vizinhanca das instancias.",
+    shortDescription: "Evaluates relevance through instance neighborhoods.",
   },
   {
     key: "SU",
     label: "Symmetrical Uncertainty",
-    shortDescription: "Normaliza dependencia entre feature e classe.",
+    shortDescription: "Normalizes dependency between feature and class.",
   },
 ];
 
@@ -27,12 +27,12 @@ export const neighborhoodOptions = [
   {
     key: "VND",
     label: "VND",
-    shortDescription: "Ciclo sequencial entre as buscas locais selecionadas.",
+    shortDescription: "Sequential cycle across the selected local-search services.",
   },
   {
     key: "RVND",
     label: "RVND",
-    shortDescription: "Escolha aleatoria entre as buscas locais selecionadas.",
+    shortDescription: "Random choice among the selected local-search services.",
   },
 ];
 
@@ -40,17 +40,17 @@ export const localSearchCatalog = [
   {
     key: "BIT_FLIP",
     label: "BitFlip",
-    shortDescription: "Troca atributos entre a solucao corrente e a RCL.",
+    shortDescription: "Swaps attributes between the current solution and the RCL.",
   },
   {
     key: "IWSS",
     label: "IWSS",
-    shortDescription: "Adiciona features sequencialmente pela melhora observada.",
+    shortDescription: "Adds features sequentially based on the observed gain.",
   },
   {
     key: "IWSSR",
     label: "IWSSR",
-    shortDescription: "Refina a adicao com remocao e substituicao.",
+    shortDescription: "Refines the addition step with removal and replacement.",
   },
 ];
 
@@ -61,6 +61,10 @@ export const defaultExecutionForm = {
   maxGenerations: 10,
   rclCutoff: 20,
   sampleSize: 5,
+  neighborhoodMaxIterations: 10,
+  bitFlipMaxIterations: 100,
+  iwssMaxIterations: 20,
+  iwssrMaxIterations: 20,
   classifier: "J48",
   datasetTrainingName: "",
   datasetTestingName: "",
