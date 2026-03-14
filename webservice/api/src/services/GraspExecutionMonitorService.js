@@ -1,6 +1,7 @@
 const { Kafka } = require("kafkajs");
 const { kafkaBrokers, monitorTopics } = require("../config/graspFsConfig");
 const graspExecutionStoreService = require("./GraspExecutionStoreService");
+const { MONITOR_SCHEMA_VERSION, graspMonitorSummaryService } = require("./GraspMonitorSummaryService");
 const logger = require("../utils/jsonLogger");
 
 class GraspExecutionMonitorService {
@@ -299,6 +300,7 @@ class GraspExecutionMonitorService {
     const { history, ...runWithoutHistory } = run;
 
     const event = {
+      schemaVersion: MONITOR_SCHEMA_VERSION,
       type: eventType,
       fingerprint: `${topic}:${source.partition ?? "na"}:${source.offset ?? now}`,
       seedId,
@@ -363,6 +365,7 @@ class GraspExecutionMonitorService {
   pushEvent(event) {
     const enriched = {
       timestamp: new Date().toISOString(),
+      schemaVersion: MONITOR_SCHEMA_VERSION,
       ...event,
     };
 
@@ -412,10 +415,12 @@ class GraspExecutionMonitorService {
     ]);
 
     const snapshot = {
+      schemaVersion: MONITOR_SCHEMA_VERSION,
       type: "snapshot",
       runs: this.mergeRuns(storedRuns, this.getRuns()),
       events: this.mergeEvents(storedEvents, this.getEvents(eventLimit), eventLimit),
     };
+    snapshot.summary = graspMonitorSummaryService.summarize(snapshot.runs, snapshot.events);
 
     res.write(`data: ${JSON.stringify(snapshot)}\n\n`);
   }
@@ -430,6 +435,18 @@ class GraspExecutionMonitorService {
 
   getEvents(limit = 100) {
     return this.events.slice(0, limit);
+  }
+
+  reset() {
+    this.runs.clear();
+    this.events = [];
+    this.broadcast({
+      schemaVersion: MONITOR_SCHEMA_VERSION,
+      type: "snapshot",
+      runs: [],
+      events: [],
+      summary: graspMonitorSummaryService.summarize([], []),
+    });
   }
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 import Grid from "@mui/material/Grid";
 import Card from "@mui/material/Card";
@@ -30,6 +31,7 @@ import {
 import { Bar, Doughnut, Line } from "react-chartjs-2";
 
 import MDBox from "components/MDBox";
+import MDButton from "components/MDButton";
 import MDTypography from "components/MDTypography";
 import MDProgress from "components/MDProgress";
 
@@ -38,8 +40,10 @@ import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import Footer from "examples/Footer";
 import ComplexStatisticsCard from "examples/Cards/StatisticsCards/ComplexStatisticsCard";
 import DataTable from "examples/Tables/DataTable";
+import ExecutionComparison from "./execution-comparison";
 
 import { getMonitorRun } from "api/grasp";
+import useI18n from "hooks/useI18n";
 import useGraspMonitor from "hooks/useGraspMonitor";
 import { useMaterialUIController } from "context";
 import {
@@ -314,6 +318,26 @@ const filterPanelCaptionSx = (darkMode) => ({
   color: darkMode ? "rgba(226, 232, 240, 0.72)" : "rgba(71, 85, 105, 0.9)",
 });
 
+const dashboardContentSx = (darkMode) => ({
+  "& .MuiCard-root": {
+    borderRadius: 3,
+    border: darkMode ? "1px solid rgba(148, 163, 184, 0.16)" : undefined,
+    background: darkMode
+      ? "linear-gradient(180deg, rgba(21, 33, 61, 0.96) 0%, rgba(17, 26, 49, 0.94) 100%)"
+      : undefined,
+    boxShadow: darkMode ? "0 18px 32px rgba(2, 6, 23, 0.28)" : undefined,
+  },
+  "& .MuiCard-root .MuiTypography-root": {
+    color: darkMode ? "#f8fafc !important" : undefined,
+  },
+  "& .MuiCard-root .MuiTypography-caption, & .MuiCard-root .MuiTypography-button, & .MuiCard-root .MuiTypography-body2": {
+    color: darkMode ? "rgba(226, 232, 240, 0.78) !important" : undefined,
+  },
+  "& .MuiCard-root .MuiDivider-root": {
+    borderColor: darkMode ? "rgba(148, 163, 184, 0.16)" : undefined,
+  },
+});
+
 const isBestSolutionRun = (run = {}) => run.topic === "BEST_SOLUTION_TOPIC";
 
 const isFinalOutcomeRun = (run = {}) =>
@@ -468,6 +492,7 @@ const deriveWorkflowSteps = (run = {}, initialEvent = null) => {
 };
 
 function Dashboard() {
+  const { t } = useI18n();
   const [controller] = useMaterialUIController();
   const { darkMode } = controller;
   const { runs, events, loading, error, connected } = useGraspMonitor(500);
@@ -1482,6 +1507,7 @@ function Dashboard() {
         { Header: "Stage / Search", accessor: "stage", align: "left" },
         { Header: "Dataset", accessor: "dataset", align: "left" },
         { Header: "Seed", accessor: "seed", align: "left" },
+        { Header: "Details", accessor: "details", align: "left" },
       ],
       rows: bestSolutionRuns.map((run) => {
         return {
@@ -1540,7 +1566,29 @@ function Dashboard() {
               </MDTypography>
             </MDBox>
           ),
-          seed: shortenSeed(run.seedId),
+          seed: (
+            <MDTypography
+              component={Link}
+              to={`/dashboard/runs/${run.seedId}`}
+              variant="button"
+              fontWeight="medium"
+              color="info"
+              sx={{ textDecoration: "none" }}
+            >
+              {shortenSeed(run.seedId)}
+            </MDTypography>
+          ),
+          details: (
+            <MDButton
+              component={Link}
+              to={`/dashboard/runs/${run.seedId}`}
+              variant="outlined"
+              color="info"
+              size="small"
+            >
+              View
+            </MDButton>
+          ),
         };
       }),
     }),
@@ -1577,7 +1625,13 @@ function Dashboard() {
               <MDTypography variant="button" fontWeight="medium" color="dark">
                 {formatFeatureSubset(event.solutionFeatures, 10)}
               </MDTypography>
-              <MDTypography variant="caption" color="text">
+              <MDTypography
+                component={Link}
+                to={`/dashboard/runs/${event.seedId}`}
+                variant="caption"
+                color="info"
+                sx={{ textDecoration: "none" }}
+              >
                 {shortenSeed(event.seedId)}
               </MDTypography>
             </MDBox>
@@ -1624,7 +1678,18 @@ function Dashboard() {
             />
           ),
           finalBest: formatCompactPercent(linkedBestRun?.bestF1Score),
-          seed: shortenSeed(event.seedId),
+          seed: (
+            <MDTypography
+              component={Link}
+              to={`/dashboard/runs/${event.seedId}`}
+              variant="button"
+              fontWeight="medium"
+              color="info"
+              sx={{ textDecoration: "none" }}
+            >
+              {shortenSeed(event.seedId)}
+            </MDTypography>
+          ),
         };
       }),
     }),
@@ -1657,7 +1722,18 @@ function Dashboard() {
             />
           ),
           search: `${run.localSearch || "--"} / ${run.neighborhood || "--"}`,
-          seed: shortenSeed(run.seedId),
+          seed: (
+            <MDTypography
+              component={Link}
+              to={`/dashboard/runs/${run.seedId}`}
+              variant="button"
+              fontWeight="medium"
+              color="info"
+              sx={{ textDecoration: "none" }}
+            >
+              {shortenSeed(run.seedId)}
+            </MDTypography>
+          ),
         };
       }),
     }),
@@ -1709,7 +1785,7 @@ function Dashboard() {
   return (
     <DashboardLayout>
       <DashboardNavbar />
-      <MDBox py={3}>
+      <MDBox py={3} sx={dashboardContentSx(darkMode)}>
         {error ? (
           <MDBox mb={3}>
             <Alert severity="error">{error}</Alert>
@@ -1754,10 +1830,10 @@ function Dashboard() {
               >
                 <MDBox>
                   <MDTypography variant="h5" color="dark">
-                    Dashboard Workspace
+                    {t("dashboard.workspaceTitle")}
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    {dashboardTabDescriptions[activeTab]}
+                    {activeTab === "overview" ? t("dashboard.workspaceSubtitle") : dashboardTabDescriptions[activeTab]}
                   </MDTypography>
                 </MDBox>
 
@@ -1803,10 +1879,10 @@ function Dashboard() {
                     <MDBox display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                       <MDBox>
                         <MDTypography variant="button" fontWeight="medium" sx={filterPanelHeadingSx(darkMode)}>
-                          Data Scope
+                          {t("dashboard.dataScopeTitle")}
                         </MDTypography>
                         <MDTypography variant="caption" display="block" sx={filterPanelCaptionSx(darkMode)}>
-                          Restrinja o painel por algoritmo e dataset.
+                          {t("dashboard.dataScopeSubtitle")}
                         </MDTypography>
                       </MDBox>
                       <Chip label="Base" color="info" size="small" variant="outlined" />
@@ -1822,7 +1898,7 @@ function Dashboard() {
                             label="Algorithm"
                             onChange={(event) => setSelectedAlgorithm(event.target.value)}
                           >
-                            <MenuItem value="all">All algorithms</MenuItem>
+                            <MenuItem value="all">{t("dashboard.allAlgorithms")}</MenuItem>
                             {algorithmOptions.map((algorithm) => (
                               <MenuItem key={algorithm} value={algorithm}>
                                 {algorithm}
@@ -1841,7 +1917,7 @@ function Dashboard() {
                             label="Dataset"
                             onChange={(event) => setSelectedDataset(event.target.value)}
                           >
-                            <MenuItem value="all">All datasets</MenuItem>
+                            <MenuItem value="all">{t("dashboard.allDatasets")}</MenuItem>
                             {datasetOptions.map((dataset) => (
                               <MenuItem key={dataset.key} value={dataset.key}>
                                 {dataset.label}
@@ -1859,10 +1935,10 @@ function Dashboard() {
                     <MDBox display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                       <MDBox>
                         <MDTypography variant="button" fontWeight="medium" sx={filterPanelHeadingSx(darkMode)}>
-                          Pipeline Lens
+                          {t("dashboard.pipelineLensTitle")}
                         </MDTypography>
                         <MDTypography variant="caption" display="block" sx={filterPanelCaptionSx(darkMode)}>
-                          Separe a leitura por etapa, status e estrategia usada.
+                          {t("dashboard.pipelineLensSubtitle")}
                         </MDTypography>
                       </MDBox>
                       <Chip label="Monitor" color="warning" size="small" variant="outlined" />
@@ -1896,7 +1972,7 @@ function Dashboard() {
                             label="Status"
                             onChange={(event) => setSelectedRunStatus(event.target.value)}
                           >
-                            <MenuItem value="all">All statuses</MenuItem>
+                            <MenuItem value="all">{t("dashboard.allStatuses")}</MenuItem>
                             {runStatusOptions.map((status) => (
                               <MenuItem key={status} value={status}>
                                 {formatWorkspaceLabel(status)}
@@ -1915,7 +1991,7 @@ function Dashboard() {
                             label="Search / Neighborhood"
                             onChange={(event) => setSelectedSearch(event.target.value)}
                           >
-                            <MenuItem value="all">All strategies</MenuItem>
+                            <MenuItem value="all">{t("dashboard.allSearches")}</MenuItem>
                             {searchOptions.map((search) => (
                               <MenuItem key={search} value={search}>
                                 {search}
@@ -1933,21 +2009,21 @@ function Dashboard() {
                     <MDBox display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                       <MDBox>
                         <MDTypography variant="button" fontWeight="medium" sx={filterPanelHeadingSx(darkMode)}>
-                          Execution Focus
+                          {t("dashboard.executionFocusTitle")}
                         </MDTypography>
                         <MDTypography variant="caption" display="block" sx={filterPanelCaptionSx(darkMode)}>
-                          Highlight a seed for the timeline and detail cards.
+                          {t("dashboard.executionFocusSubtitle")}
                         </MDTypography>
                       </MDBox>
                       <Chip label="Focus" color="secondary" size="small" variant="outlined" />
                     </MDBox>
 
                     <FormControl size="small" fullWidth>
-                      <InputLabel id="selected-run-label">Execution focus</InputLabel>
+                      <InputLabel id="selected-run-label">{t("dashboard.executionFocus")}</InputLabel>
                       <Select
                         labelId="selected-run-label"
                         value={selectedSeedId}
-                        label="Execution focus"
+                        label={t("dashboard.executionFocus")}
                         onChange={(event) => setSelectedSeedId(event.target.value)}
                       >
                         <MenuItem value="">Auto highlight latest run</MenuItem>
@@ -1965,7 +2041,7 @@ function Dashboard() {
                       <Chip
                         label={
                           selectedAlgorithm === "all"
-                            ? "All algorithms"
+                            ? t("dashboard.allAlgorithms")
                             : `Algorithm: ${selectedAlgorithm}`
                         }
                         color="info"
@@ -1975,7 +2051,7 @@ function Dashboard() {
                       <Chip
                         label={
                           selectedStageLens === "all"
-                            ? "All stages"
+                            ? t("dashboard.allStages")
                             : `Stage: ${formatWorkspaceLabel(selectedStageLens)}`
                         }
                         color="warning"
@@ -2009,7 +2085,7 @@ function Dashboard() {
                   </MDTypography>
                   {activeFilterCount > 0 ? (
                     <Chip
-                      label="Clear all filters"
+                      label={t("dashboard.clearAllFilters")}
                       color="primary"
                       size="small"
                       variant="outlined"
@@ -2148,7 +2224,7 @@ function Dashboard() {
                       <MDTypography variant="button" color="text">
                         {featuredRun
                           ? `${featuredRun.trainingFileName || "--"} -> ${featuredRun.testingFileName || "--"}`
-                          : "No execution selected"}
+                          : t("common.noExecutionSelected")}
                       </MDTypography>
 
                       <Divider sx={{ my: 2 }} />
@@ -2197,7 +2273,7 @@ function Dashboard() {
                                   {formatCompactPercent(featuredRun.bestF1Score)}
                                 </MDTypography>
                                 <MDTypography variant="caption" color="text">
-                                  Atual {formatCompactPercent(featuredRun.currentF1Score)}
+                                  Current {formatCompactPercent(featuredRun.currentF1Score)}
                                 </MDTypography>
                               </MDBox>
                             </Grid>
@@ -2220,7 +2296,7 @@ function Dashboard() {
                                   {fullHistory.length} checkpoints
                                 </MDTypography>
                                 <MDTypography variant="caption" color="text">
-                                  Persistidos no monitor
+                                  Persisted in the monitor
                                 </MDTypography>
                               </MDBox>
                             </Grid>
@@ -2309,6 +2385,15 @@ function Dashboard() {
                               {formatFeatureSubset(featuredRun.solutionFeatures, 12)}
                             </MDTypography>
                           </MDBox>
+
+                          <MDButton
+                            component={Link}
+                            to={`/dashboard/runs/${featuredRun.seedId}`}
+                            variant="outlined"
+                            color="info"
+                          >
+                            {t("common.openDetails")}
+                          </MDButton>
                         </Stack>
                       ) : (
                         <MDBox py={6} textAlign="center">
@@ -2404,13 +2489,41 @@ function Dashboard() {
                               size="small"
                             />
                           </MDBox>
-                          <MDTypography variant="caption" display="block" color="text" mt={0.75}>
-                            {`${shortenSeed(improvementSummary.latest.seedId)} improved from ${formatCompactPercent(
-                              improvementSummary.latest.previousBestScore
-                            )} to ${formatCompactPercent(
-                              improvementSummary.latest.bestF1Score ?? improvementSummary.latest.currentF1Score
-                            )} | ${formatRelativeTime(improvementSummary.latest.timestamp)}`}
-                          </MDTypography>
+                          <MDBox
+                            mt={0.75}
+                            display="flex"
+                            justifyContent="space-between"
+                            alignItems={{ xs: "flex-start", md: "center" }}
+                            flexDirection={{ xs: "column", md: "row" }}
+                            gap={1}
+                          >
+                            <MDTypography variant="caption" display="block" color="text">
+                              <MDTypography
+                                component={Link}
+                                to={`/dashboard/runs/${improvementSummary.latest.seedId}`}
+                                variant="caption"
+                                color="info"
+                                fontWeight="medium"
+                                sx={{ textDecoration: "none" }}
+                              >
+                                {shortenSeed(improvementSummary.latest.seedId)}
+                              </MDTypography>
+                              {` improved from ${formatCompactPercent(
+                                improvementSummary.latest.previousBestScore
+                              )} to ${formatCompactPercent(
+                                improvementSummary.latest.bestF1Score ?? improvementSummary.latest.currentF1Score
+                              )} | ${formatRelativeTime(improvementSummary.latest.timestamp)}`}
+                            </MDTypography>
+                            <MDButton
+                              component={Link}
+                              to={`/dashboard/runs/${improvementSummary.latest.seedId}`}
+                              variant="outlined"
+                              color="info"
+                              size="small"
+                            >
+                              Open run
+                            </MDButton>
+                          </MDBox>
                         </MDBox>
                       </MDBox>
                     ) : null}
@@ -2500,7 +2613,17 @@ function Dashboard() {
 
                                 <MDBox mt={1.25}>
                                   <MDTypography variant="caption" display="block" color="text">
-                                    {`${shortenSeed(event.seedId)} improved from ${formatCompactPercent(
+                                    <MDTypography
+                                      component={Link}
+                                      to={`/dashboard/runs/${event.seedId}`}
+                                      variant="caption"
+                                      color="info"
+                                      fontWeight="medium"
+                                      sx={{ textDecoration: "none" }}
+                                    >
+                                      {shortenSeed(event.seedId)}
+                                    </MDTypography>
+                                    {` improved from ${formatCompactPercent(
                                       event.previousBestScore
                                     )} to ${formatCompactPercent(
                                       event.bestF1Score ?? event.currentF1Score
@@ -2529,7 +2652,7 @@ function Dashboard() {
                     Initial Solutions by Algorithm
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    Quantas sementes iniciais cada algoritmo RCL gerou neste recorte.
+                    How many initial seeds each RCL algorithm generated in the current slice.
                   </MDTypography>
                   <MDBox height="300px" mt={2}>
                     <Bar data={initialSolutionsChartData} options={finalSolutionsChartOptions} />
@@ -2561,7 +2684,7 @@ function Dashboard() {
                     Best Results by Algorithm
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    Melhor best solution consolidada por algoritmo RCL.
+                    Best consolidated best-solution result for each RCL algorithm.
                   </MDTypography>
                   <MDBox height="300px" mt={2}>
                     <Bar data={finalSolutionsChartData} options={finalSolutionsChartOptions} />
@@ -2647,9 +2770,9 @@ function Dashboard() {
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 860 } }}>
                   <DataTable
                     table={resourceSummaryTableData}
-                    entriesPerPage={{ defaultValue: 8, entries: [8, 12, 20] }}
+                    entriesPerPage={false}
                     canSearch
-                    showTotalEntries
+                    showTotalEntries={false}
                     noEndBorder
                   />
                 </MDBox>
@@ -2662,7 +2785,11 @@ function Dashboard() {
         {activeTab === "executions" ? (
         <MDBox mt={4}>
           <Grid container spacing={3}>
-            <Grid item xs={12} lg={6}>
+            <Grid item xs={12}>
+              <ExecutionComparison runs={filteredRuns} />
+            </Grid>
+
+            <Grid item xs={12}>
               <Card sx={{ height: "100%" }}>
                 <MDBox
                   p={3}
@@ -2682,7 +2809,7 @@ function Dashboard() {
                   </MDBox>
                   <Chip label={`${initialSolutionEvents.length} rows`} color="info" size="small" variant="outlined" />
                 </MDBox>
-                <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 860 } }}>
+                <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 720 } }}>
                   <DataTable
                     table={initialSolutionsTableData}
                     entriesPerPage={{ defaultValue: 6, entries: [6, 10, 15] }}
@@ -2694,7 +2821,7 @@ function Dashboard() {
               </Card>
             </Grid>
 
-            <Grid item xs={12} lg={6}>
+            <Grid item xs={12}>
               <Card sx={{ height: "100%" }}>
                 <MDBox
                   p={3}
@@ -2714,7 +2841,7 @@ function Dashboard() {
                   </MDBox>
                   <Chip label={`${localSearchOutcomeEvents.length} rows`} color="success" size="small" variant="outlined" />
                 </MDBox>
-                <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 820 } }}>
+                <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 720 } }}>
                   <DataTable
                     table={localSearchTableData}
                     entriesPerPage={{ defaultValue: 6, entries: [6, 10, 15] }}
@@ -2741,7 +2868,7 @@ function Dashboard() {
                       Best Solutions Workflow
                     </MDTypography>
                     <MDTypography variant="button" color="text">
-                      Caminho completo da best solution: RCL, vizinhanca e buscas locais utilizadas.
+                      Full best-solution path, including RCL, neighborhood, and local searches used.
                     </MDTypography>
                   </MDBox>
                   <Chip label={`${bestSolutionRuns.length} rows`} color="warning" size="small" variant="outlined" />
@@ -2819,9 +2946,9 @@ function Dashboard() {
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 980 } }}>
                   <DataTable
                     table={algorithmSummaryTableData}
-                    entriesPerPage={{ defaultValue: 8, entries: [8, 12, 20] }}
+                    entriesPerPage={false}
                     canSearch
-                    showTotalEntries
+                    showTotalEntries={false}
                     noEndBorder
                   />
                 </MDBox>

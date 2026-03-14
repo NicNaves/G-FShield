@@ -105,6 +105,12 @@ router.get("/datasets", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), 
  */
 router.post("/run", authMiddleware, roleMiddleware("ADMIN"), (req, res, next) => graspController.startExecution(req, res, next));
 
+router.get("/executions", authMiddleware, roleMiddleware("ADMIN"), (req, res, next) => graspController.getExecutionLaunches(req, res, next));
+
+router.get("/executions/:requestId", authMiddleware, roleMiddleware("ADMIN"), (req, res, next) => graspController.getExecutionLaunch(req, res, next));
+
+router.post("/executions/:requestId/cancel", authMiddleware, roleMiddleware("ADMIN"), (req, res, next) => graspController.cancelExecution(req, res, next));
+
 /**
  * @swagger
  * /grasp/monitor/runs:
@@ -138,6 +144,8 @@ router.get("/monitor/runs", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"
  */
 router.get("/monitor/runs/:seedId", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.getRun(req, res, next));
 
+router.get("/monitor/compare", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.compareRuns(req, res, next));
+
 /**
  * @swagger
  * /grasp/monitor/events:
@@ -150,6 +158,32 @@ router.get("/monitor/runs/:seedId", authMiddleware, anyRoleMiddleware(["ADMIN", 
  *         description: Eventos retornados com sucesso.
  */
 router.get("/monitor/events", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.getEvents(req, res, next));
+
+/**
+ * @swagger
+ * /grasp/monitor/summary:
+ *   get:
+ *     tags: [Grasp]
+ *     summary: Retorna metricas agregadas do monitor
+ *     description: Consolida execucoes, topicos, etapas e medias por algoritmo para o dashboard.
+ *     responses:
+ *       200:
+ *         description: Resumo do monitor retornado com sucesso.
+ */
+router.get("/monitor/summary", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.getSummary(req, res, next));
+
+/**
+ * @swagger
+ * /grasp/monitor/reset:
+ *   post:
+ *     tags: [Grasp]
+ *     summary: Limpa o estado do monitor
+ *     description: Remove o estado em memoria e os registros persistidos do monitor para um novo ciclo de validacao.
+ *     responses:
+ *       200:
+ *         description: Estado do monitor limpo com sucesso.
+ */
+router.post("/monitor/reset", authMiddleware, roleMiddleware("ADMIN"), (req, res, next) => graspController.resetMonitor(req, res, next));
 
 /**
  * @swagger

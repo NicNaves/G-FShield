@@ -8,6 +8,7 @@ Esta pasta concentra a documentacao operacional do GF-Shield para setup local, r
 
 - [`LOCAL_DEV_RUNBOOK.md`](./LOCAL_DEV_RUNBOOK.md): fluxo recomendado para subir o projeto localmente.
 - [`OPERATIONS.md`](./OPERATIONS.md): limpeza de Kafka, limpeza de metricas, replay do monitor e comandos de suporte.
+- [`../docker-compose.local.yml`](../docker-compose.local.yml) e [`../docker-compose.server.yml`](../docker-compose.server.yml): presets de CPU e memoria para local e servidor.
 
 ### Ordem recomendada
 
@@ -23,6 +24,7 @@ This folder contains GF-Shield operational documentation for local setup, resets
 
 - [`LOCAL_DEV_RUNBOOK.md`](./LOCAL_DEV_RUNBOOK.md): recommended flow for starting the project locally.
 - [`OPERATIONS.md`](./OPERATIONS.md): Kafka cleanup, metrics cleanup, monitor replay, and support commands.
+- [`../docker-compose.local.yml`](../docker-compose.local.yml) and [`../docker-compose.server.yml`](../docker-compose.server.yml): CPU and memory presets for local and server environments.
 
 ### Recommended reading order
 

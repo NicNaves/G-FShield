@@ -33,9 +33,11 @@ import {
   setTransparentSidenav,
   setWhiteSidenav,
 } from "context";
+import useI18n from "hooks/useI18n";
 
 function Sidenav({ color, brand, brandName, routes, ...rest }) {
   const [controller, dispatch] = useMaterialUIController();
+  const { t } = useI18n();
   const { miniSidenav, transparentSidenav, whiteSidenav, darkMode, sidenavColor } = controller;
   const location = useLocation();
   const collapseName = location.pathname.replace("/", "");
@@ -73,8 +75,9 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
   // Render all the routes from the routes.js (All the visible items on the Sidenav)
   const renderRoutes = routes
   .filter((route) => !route.hidden) 
-  .map(({ type, name, icon, title, noCollapse, key, href, route }) => {
+  .map(({ type, name, nameKey, icon, title, noCollapse, key, href, route }) => {
     let returnValue;
+    const resolvedName = nameKey ? t(nameKey) : name;
 
     if (type === "collapse") {
       returnValue = href ? (
@@ -86,7 +89,7 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
           sx={{ textDecoration: "none" }}
         >
           <SidenavCollapse
-            name={name}
+            name={resolvedName}
             icon={icon}
             active={key === collapseName}
             noCollapse={noCollapse}
@@ -94,7 +97,7 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
         </Link>
       ) : (
         <NavLink key={key} to={route}>
-          <SidenavCollapse name={name} icon={icon} active={key === collapseName} />
+          <SidenavCollapse name={resolvedName} icon={icon} active={key === collapseName} />
         </NavLink>
       );
     } else if (type === "title") {

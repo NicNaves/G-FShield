@@ -1,1 +1,2 @@
-require('@testing-library/jest-dom'); // Extensões para Jest DOM
+require("regenerator-runtime/runtime");
+require("@testing-library/jest-dom");

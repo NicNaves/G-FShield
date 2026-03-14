@@ -1,5 +1,7 @@
 services:
   webservice-postgres:
+    cpus: 0.50
+    mem_limit: 512m
     image: postgres:14
     container_name: grasp-webservice-postgres
     restart: unless-stopped

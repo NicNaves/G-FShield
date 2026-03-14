@@ -23,9 +23,6 @@ public class VndService {
     private final KafkaIwssrProducer kafkaIwssrProducer;
     private final KafkaInitialSolutionProducer kafkaInitialSolutionProducer;
 
-    /**
-     * Inicia o processo de VND com a vizinhança definida.
-     */
     public void doVnd(DataSolution data, LocalSearch localSearch) {
         List<LocalSearch> sequence = resolveEnabledLocalSearches(data);
         LocalSearch effectiveLocalSearch = localSearch != null && sequence.contains(localSearch)
@@ -36,31 +33,54 @@ public class VndService {
         int currentIteration = data.getIterationNeighborhood() != null ? data.getIterationNeighborhood() : 0;
         data.setIterationNeighborhood(currentIteration + 1);
 
-        log.info("🔁 [{}] Enviando para {}", effectiveLocalSearch.getEnumIdentifier(), effectiveLocalSearch.name());
+        log.info(
+                "vnd dispatch seedId={} iterationNeighborhood={} selectedSearch={} availableSearches={} currentBestF1={}",
+                data.getSeedId(),
+                data.getIterationNeighborhood(),
+                effectiveLocalSearch,
+                sequence,
+                data.getF1Score()
+        );
 
         switch (effectiveLocalSearch) {
             case BIT_FLIP -> bitFlipProducer.send(data);
             case IWSS -> kafkaIwssProducer.send(data);
             case IWSSR -> kafkaIwssrProducer.send(data);
-            default -> throw new IllegalStateException("🚫 Estratégia de busca inválida: " + effectiveLocalSearch);
+            default -> throw new IllegalStateException("Invalid VND local search: " + effectiveLocalSearch);
         }
     }
 
-    /**
-     * Define se a solução recebida deve reiniciar o VND ou seguir para próxima vizinhança.
-     */
     public DataSolution callNextService(DataSolution bestSolution, DataSolution incoming) {
-        log.info("📨 Solução recebida (F1: {}, Estratégia: {})", incoming.getF1Score(), incoming.getLocalSearch());
         List<LocalSearch> sequence = resolveEnabledLocalSearches(incoming);
 
+        log.info(
+                "vnd result seedId={} incomingSearch={} incomingF1={} bestF1={} availableSearches={}",
+                incoming.getSeedId(),
+                incoming.getLocalSearch(),
+                scoreOf(incoming),
+                scoreOf(bestSolution),
+                sequence
+        );
+
         if (scoreOf(incoming) > scoreOf(bestSolution)) {
-            log.info("✅ Nova melhor solução encontrada. Reiniciando ciclo VND.");
+            log.info(
+                    "vnd improvement seedId={} previousBestF1={} newBestF1={} restartingCycle=true",
+                    incoming.getSeedId(),
+                    scoreOf(bestSolution),
+                    scoreOf(incoming)
+            );
             kafkaInitialSolutionProducer.send(incoming);
             return incoming;
         }
 
         LocalSearch nextLocalSearch = nextLocalSearch(sequence, incoming.getLocalSearch());
-        log.info("➡️ Próxima vizinhança: {}", nextLocalSearch);
+        log.info(
+                "vnd continuing seedId={} currentSearch={} nextSearch={} sequenceSize={}",
+                incoming.getSeedId(),
+                incoming.getLocalSearch(),
+                nextLocalSearch,
+                sequence.size()
+        );
         doVnd(incoming, nextLocalSearch);
 
         return bestSolution;
@@ -85,7 +105,7 @@ public class VndService {
                         resolved.add(parsed);
                     }
                 } catch (IllegalArgumentException ex) {
-                    log.warn("⚠️ Busca local inválida ignorada no VND: {}", configured);
+                    log.warn("vnd ignored invalid local-search configuration={}", configured);
                 }
             }
         }

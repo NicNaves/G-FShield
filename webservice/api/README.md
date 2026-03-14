@@ -28,10 +28,16 @@ Esta API fornece autenticacao, gestao de usuarios, disparo de execucao GRASP-FS,
 - `GET /api/grasp/services`
 - `GET /api/grasp/datasets`
 - `POST /api/grasp/run`
+- `GET /api/grasp/executions`
+- `GET /api/grasp/executions/:requestId`
+- `POST /api/grasp/executions/:requestId/cancel`
 - `GET /api/grasp/monitor/runs`
 - `GET /api/grasp/monitor/runs/:seedId`
+- `GET /api/grasp/monitor/compare`
+- `GET /api/grasp/monitor/summary`
 - `GET /api/grasp/monitor/events`
 - `GET /api/grasp/monitor/stream`
+- `POST /api/grasp/monitor/reset`
 
 #### Swagger
 
@@ -45,6 +51,14 @@ O schema em modo real e pequeno e focado no GF-Shield:
 - `GraspExecutionLaunch`
 - `GraspExecutionRun`
 - `GraspExecutionEvent`
+
+`GraspExecutionLaunch` persiste:
+
+- parametros da request
+- algoritmos selecionados
+- datasets e classificador
+- estado da fila
+- historico de dispatch
 
 ### Variaveis de ambiente
 
@@ -82,6 +96,8 @@ O monitor assina:
 - `SOLUTIONS_TOPIC`
 - `BEST_SOLUTION_TOPIC`
 
+O dashboard consome principalmente agregados e estados finais expostos pela API.
+
 ## EN-US
 
 This API provides authentication, user management, GRASP-FS execution dispatch, dataset catalog access, and the monitor endpoints used by the dashboard.
@@ -110,10 +126,16 @@ This API provides authentication, user management, GRASP-FS execution dispatch, 
 - `GET /api/grasp/services`
 - `GET /api/grasp/datasets`
 - `POST /api/grasp/run`
+- `GET /api/grasp/executions`
+- `GET /api/grasp/executions/:requestId`
+- `POST /api/grasp/executions/:requestId/cancel`
 - `GET /api/grasp/monitor/runs`
 - `GET /api/grasp/monitor/runs/:seedId`
+- `GET /api/grasp/monitor/compare`
+- `GET /api/grasp/monitor/summary`
 - `GET /api/grasp/monitor/events`
 - `GET /api/grasp/monitor/stream`
+- `POST /api/grasp/monitor/reset`
 
 #### Swagger
 
@@ -127,6 +149,14 @@ The real-mode schema is intentionally small and focused on GF-Shield:
 - `GraspExecutionLaunch`
 - `GraspExecutionRun`
 - `GraspExecutionEvent`
+
+`GraspExecutionLaunch` persists:
+
+- request parameters
+- selected algorithms
+- datasets and classifier
+- queue state
+- dispatch history
 
 ### Environment variables
 
@@ -163,3 +193,5 @@ The monitor subscribes to:
 - `LOCAL_SEARCH_PROGRESS_TOPIC`
 - `SOLUTIONS_TOPIC`
 - `BEST_SOLUTION_TOPIC`
+
+The dashboard mostly consumes final-state data and API aggregates.

@@ -28,6 +28,7 @@ import {
   isValidPhone,
   normalizeEmail,
 } from "utils/userInputFormatters";
+import useI18n from "hooks/useI18n";
 
 const defaultForm = {
   name: "",
@@ -40,6 +41,7 @@ const defaultForm = {
 
 function Users() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -53,7 +55,7 @@ function Users() {
       setUsers(response);
       setError("");
     } catch (requestError) {
-      setError(requestError.response?.data?.error || requestError.message || "Unable to load users.");
+      setError(requestError.response?.data?.error || requestError.message || t("users.unableLoad"));
     } finally {
       setLoading(false);
     }
@@ -81,33 +83,33 @@ function Users() {
     event.preventDefault();
 
     if (!isValidEmail(form.email)) {
-      toast.error("Enter a valid email address.");
+      toast.error(t("auth.invalidEmail"));
       return;
     }
 
     if (form.cpf && !isValidCpf(form.cpf)) {
-      toast.error("Enter CPF in the 000.000.000-00 format.");
+      toast.error(t("auth.invalidCpf"));
       return;
     }
 
     if (form.telefone && !isValidPhone(form.telefone)) {
-      toast.error("Enter a phone number as (11) 99999-9999 or (11) 3333-4444.");
+      toast.error(t("auth.invalidPhone"));
       return;
     }
 
     if (!form.password || form.password.length < 6) {
-      toast.error("Password must be at least 6 characters long.");
+      toast.error(t("auth.passwordMin"));
       return;
     }
 
     try {
       setCreating(true);
       await userService.createUser(buildUserPayload(form));
-      toast.success("User created successfully.");
+      toast.success(t("users.created"));
       setForm(defaultForm);
       await loadUsers();
     } catch (requestError) {
-      const message = requestError.response?.data?.error || requestError.message || "Unable to create the user.";
+      const message = requestError.response?.data?.error || requestError.message || t("users.unableCreate");
       toast.error(message);
     } finally {
       setCreating(false);
@@ -116,20 +118,20 @@ function Users() {
 
   const table = {
     columns: [
-      { Header: "Name", accessor: "name", align: "left" },
-      { Header: "Email", accessor: "email", align: "left" },
-      { Header: "Role", accessor: "role", align: "center" },
-      { Header: "Status", accessor: "active", align: "center" },
-      { Header: "Actions", accessor: "actions", align: "center" },
+      { Header: t("users.name"), accessor: "name", align: "left" },
+      { Header: t("users.email"), accessor: "email", align: "left" },
+      { Header: t("users.role"), accessor: "role", align: "center" },
+      { Header: t("users.status"), accessor: "active", align: "center" },
+      { Header: t("users.actions"), accessor: "actions", align: "center" },
     ],
     rows: users.map((user) => ({
       name: user.name,
       email: user.email,
       role: user.role,
-      active: user.active ? "Active" : "Inactive",
+      active: user.active ? t("users.active") : t("users.inactive"),
       actions: (
         <MDButton variant="outlined" color="info" size="small" onClick={() => navigate(`/admin/users/${user.id}`)}>
-          Edit
+          {t("users.edit")}
         </MDButton>
       ),
     })),
@@ -143,15 +145,15 @@ function Users() {
           <Grid item xs={12} lg={5}>
             <Card component="form" onSubmit={handleCreate}>
               <MDBox p={3}>
-                <MDTypography variant="h5">User administration</MDTypography>
+                <MDTypography variant="h5">{t("users.title")}</MDTypography>
                 <MDTypography variant="button" color="text">
-                  Create users and define who can run pipeline requests or only monitor the dashboard.
+                  {t("users.subtitle")}
                 </MDTypography>
 
                 <Stack spacing={2} mt={3}>
-                  <TextField label="Name" value={form.name} onChange={handleChange("name")} autoComplete="name" fullWidth />
+                  <TextField label={t("users.name")} value={form.name} onChange={handleChange("name")} autoComplete="name" fullWidth />
                   <TextField
-                    label="Email"
+                    label={t("users.email")}
                     type="email"
                     value={form.email}
                     onChange={handleChange("email")}
@@ -159,7 +161,7 @@ function Users() {
                     fullWidth
                   />
                   <TextField
-                    label="CPF"
+                    label={t("users.cpf")}
                     value={form.cpf}
                     onChange={handleChange("cpf")}
                     placeholder="000.000.000-00"
@@ -168,7 +170,7 @@ function Users() {
                     fullWidth
                   />
                   <TextField
-                    label="Phone"
+                    label={t("users.phone")}
                     value={form.telefone}
                     onChange={handleChange("telefone")}
                     placeholder="(11) 99999-9999"
@@ -177,22 +179,22 @@ function Users() {
                     fullWidth
                   />
                   <TextField
-                    label="Password"
+                    label={t("users.password")}
                     type="password"
                     value={form.password}
                     onChange={handleChange("password")}
                     autoComplete="new-password"
                     fullWidth
                   />
-                  <TextField select label="Role" value={form.role} onChange={handleChange("role")} fullWidth>
-                    <MenuItem value="ADMIN">Administrator</MenuItem>
-                    <MenuItem value="VIEWER">Viewer</MenuItem>
+                  <TextField select label={t("users.role")} value={form.role} onChange={handleChange("role")} fullWidth>
+                    <MenuItem value="ADMIN">{t("users.administrator")}</MenuItem>
+                    <MenuItem value="VIEWER">{t("users.viewer")}</MenuItem>
                   </TextField>
                 </Stack>
 
                 <MDBox mt={3}>
                   <MDButton type="submit" variant="gradient" color="info" disabled={creating}>
-                    {creating ? "Creating..." : "Create user"}
+                    {creating ? t("users.creating") : t("users.createUser")}
                   </MDButton>
                 </MDBox>
               </MDBox>
@@ -202,9 +204,9 @@ function Users() {
           <Grid item xs={12} lg={7}>
             <Card>
               <MDBox p={3}>
-                <MDTypography variant="h5">Registered users</MDTypography>
+                <MDTypography variant="h5">{t("users.registeredUsers")}</MDTypography>
                 <MDTypography variant="button" color="text">
-                  Administrators can run the pipeline. Viewers are limited to the dashboard and dataset catalog.
+                  {t("users.registeredUsersSubtitle")}
                 </MDTypography>
               </MDBox>
 
@@ -226,7 +228,7 @@ function Users() {
               {loading ? (
                 <MDBox px={3} pb={3}>
                   <MDTypography variant="button" color="text">
-                    Loading users...
+                    {t("users.loadingUsers")}
                   </MDTypography>
                 </MDBox>
               ) : null}

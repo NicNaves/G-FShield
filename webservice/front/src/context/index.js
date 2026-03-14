@@ -1,6 +1,7 @@
 import { createContext, useContext, useReducer, useMemo } from "react";
 import PropTypes from "prop-types";
 import { AUTH_DISABLED, DEV_ROLE, DEV_TOKEN, DEV_USER_ID } from "../config/runtime";
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "../i18n";
 
 const MaterialUI = createContext();
 MaterialUI.displayName = "MaterialUIContext";
@@ -28,6 +29,11 @@ const getStoredDarkMode = () => {
   return storedValue === "true";
 };
 
+const getStoredLocale = () => {
+  const storedLocale = localStorage.getItem("locale");
+  return SUPPORTED_LOCALES.includes(storedLocale) ? storedLocale : DEFAULT_LOCALE;
+};
+
 function reducer(state, action) {
   switch (action.type) {
     case "MINI_SIDENAV":
@@ -50,6 +56,8 @@ function reducer(state, action) {
       return { ...state, layout: action.value };
     case "DARKMODE":
       return { ...state, darkMode: action.value };
+    case "LOCALE":
+      return { ...state, locale: action.value };
     case "LOGIN":
       return { ...state, auth: { token: action.token, role: action.role, userId: action.userId } };
     case "LOGOUT":
@@ -72,6 +80,7 @@ function MaterialUIControllerProvider({ children }) {
     direction: "ltr",
     layout: "dashboard",
     darkMode: getStoredDarkMode(),
+    locale: getStoredLocale(),
     auth: {
       token: getStoredToken() || (AUTH_DISABLED ? DEV_TOKEN : null),
       role: localStorage.getItem("role") || (AUTH_DISABLED ? DEV_ROLE : null),
@@ -125,6 +134,11 @@ const setDarkMode = (dispatch, value) => {
   localStorage.setItem("darkMode", value ? "true" : "false");
   dispatch({ type: "DARKMODE", value });
 };
+const setLocale = (dispatch, value) => {
+  const nextLocale = SUPPORTED_LOCALES.includes(value) ? value : DEFAULT_LOCALE;
+  localStorage.setItem("locale", nextLocale);
+  dispatch({ type: "LOCALE", value: nextLocale });
+};
 
 MaterialUIControllerProvider.propTypes = {
   children: PropTypes.node.isRequired,
@@ -143,6 +157,7 @@ export {
   setDirection,
   setLayout,
   setDarkMode,
+  setLocale,
   setLogin,
   setLogout, 
 };

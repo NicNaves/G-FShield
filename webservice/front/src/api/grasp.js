@@ -23,12 +23,54 @@ export const getMonitorRun = async (seedId) => {
   return data;
 };
 
+export const compareMonitorRuns = async (seedIds = [], historyLimit = 50) => {
+  const { data } = await api.get("/grasp/monitor/compare", {
+    params: {
+      seedIds: seedIds.join(","),
+      historyLimit,
+    },
+  });
+
+  return data;
+};
+
 export const getMonitorEvents = async (limit = 100) => {
   const { data } = await api.get("/grasp/monitor/events", {
     params: { limit },
   });
 
   return data.events || [];
+};
+
+export const getMonitorSummary = async (runLimit = 300, eventLimit = 300) => {
+  const { data } = await api.get("/grasp/monitor/summary", {
+    params: { runLimit, eventLimit },
+  });
+
+  return data.summary || null;
+};
+
+export const resetMonitorState = async () => {
+  const { data } = await api.post("/grasp/monitor/reset");
+  return data;
+};
+
+export const getExecutionLaunches = async (limit = 25) => {
+  const { data } = await api.get("/grasp/executions", {
+    params: { limit },
+  });
+
+  return data.launches || [];
+};
+
+export const getExecutionLaunch = async (requestId) => {
+  const { data } = await api.get(`/grasp/executions/${requestId}`);
+  return data.launch || null;
+};
+
+export const cancelExecutionLaunch = async (requestId) => {
+  const { data } = await api.post(`/grasp/executions/${requestId}/cancel`);
+  return data.launch || null;
 };
 
 export const startGraspExecution = async (payload) => {

@@ -8,6 +8,17 @@ export default function useDatasetCatalog() {
     exists: false,
     datasets: [],
     suggestedPairs: [],
+    summary: {
+      totalFiles: 0,
+      totalSizeBytes: 0,
+      totalSizeLabel: "0 B",
+      totalInstances: 0,
+      totalAttributes: 0,
+      totalSuggestedPairs: 0,
+      familyCount: 0,
+      availableFormats: [],
+      richestDataset: null,
+    },
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

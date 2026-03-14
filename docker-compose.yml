@@ -1,14 +1,31 @@
 version: '3.8'
 
+x-rcl-service: &rcl-service
+  cpus: 1.50
+  mem_limit: 1536m
+
+x-dls-service: &dls-service
+  cpus: 1.00
+  mem_limit: 1536m
+
+x-neighborhood-service: &neighborhood-service
+  cpus: 0.75
+  mem_limit: 768m
+
+x-postgres-service: &postgres-service
+  cpus: 0.50
+  mem_limit: 512m
+
 services:
   grasp-fs-rcl-su:
+    <<: *rcl-service
     build:
       context: ./grasp-fs-rcl-generator/Features Selection/Symmetrical Uncertainty/grasp-fs-rcl-su
     environment:
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=35 -XX:MaxRAMPercentage=82 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
-      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "3"
-      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "6"
-      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "150"
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "2"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "4"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "80"
     ports:
       - "8087:8087"
     volumes:
@@ -22,13 +39,14 @@ services:
       kafka:
         condition: service_started
   grasp-fs-rcl-rf:
+    <<: *rcl-service
     build:
       context: ./grasp-fs-rcl-generator/Features Selection/RelieF/grasp-fs-rcl-rf
     environment:
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=35 -XX:MaxRAMPercentage=82 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
-      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "3"
-      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "6"
-      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "150"
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "2"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "4"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "80"
     ports:
       - "8086:8086"
     volumes:
@@ -42,13 +60,14 @@ services:
       kafka:
         condition: service_started
   grasp-fs-rcl-ig:
+    <<: *rcl-service
     build:
       context: ./grasp-fs-rcl-generator/Features Selection/InfoGain/grasp-fs-rcl-ig
     environment:
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=35 -XX:MaxRAMPercentage=82 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
-      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "3"
-      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "6"
-      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "150"
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "2"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "4"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "80"
     ports:
       - "8089:8089"
     volumes:
@@ -62,13 +81,14 @@ services:
       kafka:
         condition: service_started
   grasp-fs-rcl-gr:
+    <<: *rcl-service
     build:
       context: ./grasp-fs-rcl-generator/Features Selection/GainRatio/grasp-fs-rcl-gr
     environment:
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=35 -XX:MaxRAMPercentage=82 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
-      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "3"
-      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "6"
-      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "150"
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "2"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "4"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "80"
     ports:
       - "8088:8088"
     volumes:
@@ -82,10 +102,11 @@ services:
       kafka:
         condition: service_started
   grasp-fs.dls.verify:
+    <<: *neighborhood-service
     build:
       context: ./grasp-fs-distributed-ls/Verify/grasp-fs.dls.verify
     environment:
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60 -Djava.security.egd=file:/dev/./urandom"
+      JAVA_OPTS: "-Xms128m -Xmx512m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
       KAFKA_LISTENER_CONCURRENCY: "1"
     ports:
       - "8085:8085"
@@ -100,10 +121,11 @@ services:
       kafka:
         condition: service_started
   grasp-fs-dls-bf:
+    <<: *dls-service
     build:
       context: ./grasp-fs-distributed-ls/Local Search/BitFlip/grasp-fs-dls-bf
     environment:
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60 -Djava.security.egd=file:/dev/./urandom"
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
       KAFKA_LISTENER_CONCURRENCY: "1"
     ports:
       - "8082:8082"
@@ -118,10 +140,11 @@ services:
       kafka:
         condition: service_started
   grasp-fs-dls-iw:
+    <<: *dls-service
     build:
       context: ./grasp-fs-distributed-ls/Local Search/IWSS/grasp-fs-dls-iw
     environment:
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60 -Djava.security.egd=file:/dev/./urandom"
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
       KAFKA_LISTENER_CONCURRENCY: "1"
     ports:
       - "8083:8083"
@@ -136,10 +159,11 @@ services:
       kafka:
         condition: service_started
   grasp-fs-dls-iwr:
+    <<: *dls-service
     build:
       context: ./grasp-fs-distributed-ls/Local Search/IWSSR/grasp-fs-dls-iwr
     environment:
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60 -Djava.security.egd=file:/dev/./urandom"
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
       KAFKA_LISTENER_CONCURRENCY: "1"
     ports:
       - "8084:8084"
@@ -154,10 +178,11 @@ services:
       kafka:
         condition: service_started
   grasp-fs-dls-rvnd:
+    <<: *neighborhood-service
     build:
       context: ./grasp-fs-distributed-ls/Neighborhood/RVND/grasp-fs-dls-rvnd
     environment:
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60 -Djava.security.egd=file:/dev/./urandom"
+      JAVA_OPTS: "-Xms128m -Xmx512m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
       KAFKA_LISTENER_CONCURRENCY: "1"
     ports:
       - "8090:8090"
@@ -172,10 +197,11 @@ services:
       kafka:
         condition: service_started
   grasp-fs-dls-vnd:
+    <<: *neighborhood-service
     build:
       context: ./grasp-fs-distributed-ls/Neighborhood/VND/grasp-fs-dls-vnd
     environment:
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60 -Djava.security.egd=file:/dev/./urandom"
+      JAVA_OPTS: "-Xms128m -Xmx512m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
       KAFKA_LISTENER_CONCURRENCY: "1"
     ports:
       - "8091:8091"
@@ -190,6 +216,8 @@ services:
       kafka:
         condition: service_started
   zookeeper:
+    cpus: 0.50
+    mem_limit: 256m
     image: 'confluentinc/cp-zookeeper:7.4.0'
     ports:
       - '2181:2181'
@@ -198,6 +226,8 @@ services:
       - ZOOKEEPER_TICK_TIME=2000
 
   kafka:
+    cpus: 1.00
+    mem_limit: 1024m
     image: 'confluentinc/cp-kafka:7.4.0'
     ports:
       - '9092:9092'
@@ -221,6 +251,7 @@ services:
       - zookeeper
 
   postgresql:
+    <<: *postgres-service
     image: postgres:14
     hostname: postgresql
     volumes:
@@ -238,6 +269,7 @@ services:
       retries: 5
 
   postgresql-2:
+    <<: *postgres-service
     image: postgres:14
     hostname: postgresql-sql
     volumes:
@@ -255,6 +287,8 @@ services:
       retries: 5
 
   conduktor-console:
+    cpus: 0.75
+    mem_limit: 768m
     image: conduktor/conduktor-console:1.32.0
     ports:
       - "8080:8080"
@@ -282,6 +316,8 @@ services:
         condition: service_started
 
   conduktor-monitoring:
+    cpus: 0.50
+    mem_limit: 384m
     image: conduktor/conduktor-console-cortex:1.32.0
     environment:
       CDK_CONSOLE-URL: "http://conduktor-console:8080"

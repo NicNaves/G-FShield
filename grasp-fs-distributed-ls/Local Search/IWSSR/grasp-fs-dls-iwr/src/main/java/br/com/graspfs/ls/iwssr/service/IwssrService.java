@@ -46,9 +46,20 @@ public class IwssrService {
     private boolean firstTime = true;
 
     public void doIwssr(DataSolution seed) throws Exception {
+        long startedAt = System.currentTimeMillis();
         DataSolution data = updateSolution(seed);
         data.setLocalSearch(LocalSearch.IWSSR);
         data.setIterationLocalSearch(data.getIterationLocalSearch() + 1);
+        int configuredMaxIterations = resolveMaxIterations(data);
+        log.info(
+                "iwssr start seedId={} neighborhood={} maxIterations={} featureCount={} training={} testing={}",
+                data.getSeedId(),
+                data.getNeighborhood(),
+                configuredMaxIterations,
+                data.getSolutionFeatures() != null ? data.getSolutionFeatures().size() : 0,
+                data.getTrainingFileName(),
+                data.getTestingFileName()
+        );
 
         Instances trainingDataset = MachineLearningUtils.lerDataset(
                 new FileInputStream(datasetsBasePath + data.getTrainingFileName()));
@@ -67,6 +78,13 @@ public class IwssrService {
             DataSolution bestSolution = incrementalWrapperSequencialSearch(
                     data, trainingDataset, testingDataset, classifier);
             bestSolution = updateSolution(resetDataSolution(seed, bestSolution));
+            log.info(
+                    "iwssr finished seedId={} bestF1={} iterationLocalSearch={} elapsedMs={}",
+                    bestSolution.getSeedId(),
+                    bestSolution.getF1Score(),
+                    bestSolution.getIterationLocalSearch(),
+                    System.currentTimeMillis() - startedAt
+            );
             kafkaSolutionsProducer.send(bestSolution);
         }
     }

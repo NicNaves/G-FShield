@@ -74,3 +74,22 @@ export const pushGraspNotification = (notification, limit = 12) => {
 
   return nextNotifications;
 };
+
+export const clearGraspNotifications = () => {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    window.localStorage.removeItem(GRASP_NOTIFICATION_STORAGE_KEY);
+    window.dispatchEvent(
+      new CustomEvent(GRASP_NOTIFICATION_EVENT_NAME, {
+        detail: [],
+      })
+    );
+  } catch (error) {
+    return [];
+  }
+
+  return [];
+};

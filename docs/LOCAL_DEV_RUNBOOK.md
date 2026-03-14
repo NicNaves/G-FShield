@@ -15,7 +15,9 @@ Este guia descreve o fluxo recomendado para subir o GF-Shield localmente com Doc
 ### O que sobe no ambiente local
 
 - stack principal via [`docker-compose.yml`](../docker-compose.yml)
+- preset local opcional via [`docker-compose.local.yml`](../docker-compose.local.yml)
 - banco PostgreSQL da API via [`webservice/api/docker-compose.db.yml`](../webservice/api/docker-compose.db.yml)
+- preset local opcional via [`webservice/api/docker-compose.db.local.yml`](../webservice/api/docker-compose.db.local.yml)
 - API Express na porta `4000`
 - front React na porta `3000`
 
@@ -60,11 +62,24 @@ Se quiser derrubar o banco da API e remover volumes:
 docker compose up -d --build
 ```
 
+Ou com limite local de recursos:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
+
 #### Banco da API
 
 ```powershell
 cd .\webservice\api
 docker compose -f .\docker-compose.db.yml up -d
+```
+
+Ou com limite local de recursos:
+
+```powershell
+cd .\webservice\api
+docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.local.yml up -d
 ```
 
 #### Migracao e seed
@@ -100,6 +115,8 @@ npm.cmd start
 - No PowerShell, prefira `npm.cmd` em vez de `npm` se a execution policy bloquear scripts.
 - O catalogo de datasets da API usa `GRASP_DATASETS_DIR="../../datasets"` por padrao.
 - O dashboard usa eventos persistidos da API, nao os CSVs de `metrics`.
+- a aba `Settings > Operations` mostra o `Request Summary` das launches persistidas.
+- a fila da API suporta cancelamento best-effort.
 
 ### Troubleshooting
 
@@ -143,7 +160,9 @@ This guide describes the recommended flow to start GF-Shield locally with Docker
 ### What starts in the local environment
 
 - main stack via [`docker-compose.yml`](../docker-compose.yml)
+- optional local preset via [`docker-compose.local.yml`](../docker-compose.local.yml)
 - API PostgreSQL database via [`webservice/api/docker-compose.db.yml`](../webservice/api/docker-compose.db.yml)
+- optional local preset via [`webservice/api/docker-compose.db.local.yml`](../webservice/api/docker-compose.db.local.yml)
 - Express API on port `4000`
 - React front-end on port `3000`
 
@@ -188,11 +207,24 @@ If you want to stop the API database and remove volumes:
 docker compose up -d --build
 ```
 
+Or with local resource limits:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
+
 #### API database
 
 ```powershell
 cd .\webservice\api
 docker compose -f .\docker-compose.db.yml up -d
+```
+
+Or with local resource limits:
+
+```powershell
+cd .\webservice\api
+docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.local.yml up -d
 ```
 
 #### Migration and seed
@@ -228,6 +260,8 @@ npm.cmd start
 - In PowerShell, prefer `npm.cmd` instead of `npm` if execution policy blocks scripts.
 - The API dataset catalog uses `GRASP_DATASETS_DIR="../../datasets"` by default.
 - The dashboard uses API-persisted execution events, not the CSV files under `metrics`.
+- `Settings > Operations` shows the persisted `Request Summary` for launches.
+- the API queue supports best-effort cancellation.
 
 ### Troubleshooting
 

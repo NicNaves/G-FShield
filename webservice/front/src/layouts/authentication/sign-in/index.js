@@ -18,6 +18,7 @@ import BasicLayout from "layouts/authentication/components/BasicLayout";
 
 import bgImage from "assets/images/bg-sign-in-basic.jpeg";
 import { AUTH_DISABLED, DEV_ROLE, DEV_TOKEN, DEV_USER_ID } from "../../../config/runtime";
+import useI18n from "hooks/useI18n";
 
 function Login() {
   const [controller, dispatch] = useMaterialUIController(); 
@@ -25,6 +26,7 @@ function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   const handleGuestAccess = () => {
     setLogin(dispatch, DEV_TOKEN, DEV_ROLE, DEV_USER_ID);
@@ -45,7 +47,7 @@ function Login() {
       
       navigate("/dashboard");
     } catch (err) {
-      setError(err.message || "Unable to sign in.");
+      setError(err.message || t("auth.signInError"));
     }
   };
 
@@ -64,7 +66,7 @@ function Login() {
           textAlign="center"
         >
           <MDTypography variant="h4" fontWeight="medium" color="white" mt={1}>
-            {AUTH_DISABLED ? "Local mode" : "Sign in"}
+            {AUTH_DISABLED ? t("auth.localMode") : t("auth.signIn")}
           </MDTypography>
           <Grid container spacing={3} justifyContent="center" sx={{ mt: 1, mb: 2 }}></Grid>
         </MDBox>
@@ -72,7 +74,7 @@ function Login() {
           <MDBox component="form" role="form" onSubmit={handleSubmit}>
             {AUTH_DISABLED && (
               <MDTypography variant="button" color="text" fontWeight="regular">
-                Authentication is disabled in this environment. Continue directly as a guest user.
+                {t("auth.guestDescription")}
               </MDTypography>
             )}
             {error && (
@@ -85,7 +87,7 @@ function Login() {
                 <MDBox mb={2}>
                   <MDInput
                     type="email"
-                    label="Email"
+                    label={t("auth.email")}
                     fullWidth
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -94,7 +96,7 @@ function Login() {
                 <MDBox mb={2}>
                   <MDInput
                     type="password"
-                    label="Password"
+                    label={t("auth.password")}
                     fullWidth
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -110,13 +112,13 @@ function Login() {
                 type={AUTH_DISABLED ? "button" : "submit"}
                 onClick={AUTH_DISABLED ? handleGuestAccess : undefined}
               >
-                {AUTH_DISABLED ? "Continue without sign-in" : "Sign in"}
+                {AUTH_DISABLED ? t("auth.continueWithoutSignIn") : t("auth.signIn")}
               </MDButton>
             </MDBox>
             {!AUTH_DISABLED && (
               <MDBox mt={3} textAlign="center">
                 <MDTypography variant="button" color="text">
-                  Don&apos;t have an account yet?{" "}
+                  {t("auth.noAccount")}{" "}
                   <MDTypography
                     component={Link}
                     to="/authentication/sign-up"
@@ -125,7 +127,7 @@ function Login() {
                     fontWeight="medium"
                     textGradient
                   >
-                    Create account
+                    {t("auth.createAccount")}
                   </MDTypography>
                 </MDTypography>
               </MDBox>

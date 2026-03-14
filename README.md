@@ -79,11 +79,24 @@ Suba a stack principal:
 docker compose up -d --build
 ```
 
+Ou com o preset local de recursos:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
+
 Suba o banco da API:
 
 ```powershell
 cd .\webservice\api
 docker compose -f .\docker-compose.db.yml up -d
+```
+
+Ou com o preset local de recursos:
+
+```powershell
+cd .\webservice\api
+docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.local.yml up -d
 ```
 
 Execute migracao e seed:
@@ -124,6 +137,23 @@ Para encerrar:
 - eventos de execucao usados no dashboard sao persistidos pela API
 - metricas CSV ficam na pasta [`metrics`](./metrics)
 - o front persiste `token`, `role`, `userId`, `darkMode` e notificacoes em `localStorage`
+- launches da fila de execucao sao persistidas em `GraspExecutionLaunch`
+
+### Funcionalidades recentes
+
+- fila de execucoes com cancelamento best-effort
+- pagina `Run Details` por `seedId`
+- comparacao entre execucoes no dashboard
+- catalogo enriquecido de datasets
+- `Request Summary` persistido em `Settings > Operations`
+- links clicaveis de seed nas tabelas e alerts
+
+### Presets de recursos
+
+- [`docker-compose.local.yml`](./docker-compose.local.yml)
+- [`docker-compose.server.yml`](./docker-compose.server.yml)
+- [`webservice/api/docker-compose.db.local.yml`](./webservice/api/docker-compose.db.local.yml)
+- [`webservice/api/docker-compose.db.server.yml`](./webservice/api/docker-compose.db.server.yml)
 
 ### Autenticacao
 
@@ -226,11 +256,24 @@ Start the main stack:
 docker compose up -d --build
 ```
 
+Or with the local resource preset:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
+
 Start the API database:
 
 ```powershell
 cd .\webservice\api
 docker compose -f .\docker-compose.db.yml up -d
+```
+
+Or with the local resource preset:
+
+```powershell
+cd .\webservice\api
+docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.local.yml up -d
 ```
 
 Run migration and seed:
@@ -271,6 +314,23 @@ To stop everything:
 - execution events used by the dashboard are persisted by the API
 - CSV metrics are stored under [`metrics`](./metrics)
 - the front-end stores `token`, `role`, `userId`, `darkMode`, and notifications in `localStorage`
+- execution queue launches are persisted in `GraspExecutionLaunch`
+
+### Recent features
+
+- execution queue with best-effort cancellation
+- `Run Details` page by `seedId`
+- execution comparison in the dashboard
+- enriched dataset catalog
+- persisted `Request Summary` under `Settings > Operations`
+- clickable seed links across tables and alerts
+
+### Resource presets
+
+- [`docker-compose.local.yml`](./docker-compose.local.yml)
+- [`docker-compose.server.yml`](./docker-compose.server.yml)
+- [`webservice/api/docker-compose.db.local.yml`](./webservice/api/docker-compose.db.local.yml)
+- [`webservice/api/docker-compose.db.server.yml`](./webservice/api/docker-compose.db.server.yml)
 
 ### Authentication
 

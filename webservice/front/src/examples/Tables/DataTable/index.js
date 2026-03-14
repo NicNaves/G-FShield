@@ -28,6 +28,7 @@ import MDInput from "components/MDInput";
 import MDPagination from "components/MDPagination";
 import DataTableHeadCell from "examples/Tables/DataTable/DataTableHeadCell";
 import DataTableBodyCell from "examples/Tables/DataTable/DataTableBodyCell";
+import useI18n from "hooks/useI18n";
 
 function DataTable({
   entriesPerPage,
@@ -38,6 +39,7 @@ function DataTable({
   isSorted,
   noEndBorder,
 }) {
+  const { t } = useI18n();
   const defaultValue = entriesPerPage.defaultValue ? entriesPerPage.defaultValue : 10;
   const entries = entriesPerPage.entries
     ? entriesPerPage.entries.map((entry) => entry.toString())
@@ -46,7 +48,7 @@ function DataTable({
   const data = useMemo(() => table.rows, [table]);
 
   const tableInstance = useTable(
-    { columns, data, initialState: { pageIndex: 0 } },
+    { columns, data, initialState: { pageIndex: 0, pageSize: defaultValue || 10 } },
     useGlobalFilter,
     useSortBy,
     usePagination
@@ -120,7 +122,7 @@ function DataTable({
   const totalEntries = rows.length;
   const entriesStart = totalEntries === 0 ? 0 : pageIndex * pageSize + 1;
   const entriesEnd = totalEntries === 0 ? 0 : Math.min(totalEntries, pageSize * (pageIndex + 1));
-  const totalLabel = totalEntries === 1 ? "item" : "items";
+  const totalLabel = totalEntries === 1 ? t("datatable.itemSingular") : t("datatable.itemPlural");
 
   return (
     <TableContainer sx={{ boxShadow: "none" }}>
@@ -140,14 +142,14 @@ function DataTable({
                 renderInput={(params) => <MDInput {...params} />}
               />
               <MDTypography variant="caption" color="secondary">
-                &nbsp;&nbsp;items per page
+                &nbsp;&nbsp;{t("datatable.itemsPerPage")}
               </MDTypography>
             </MDBox>
           )}
           {canSearch && (
             <MDBox width="12rem" ml="auto">
               <MDInput
-                placeholder="Search..."
+                placeholder={t("datatable.searchPlaceholder")}
                 value={search || ""}
                 size="small"
                 fullWidth
@@ -209,7 +211,12 @@ function DataTable({
         {showTotalEntries && (
           <MDBox mb={{ xs: 3, sm: 0 }}>
             <MDTypography variant="button" color="secondary" fontWeight="regular">
-              Showing {entriesStart} to {entriesEnd} of {totalEntries} {totalLabel}
+              {t("datatable.showing", {
+                start: entriesStart,
+                end: entriesEnd,
+                total: totalEntries,
+                label: totalLabel,
+              })}
             </MDTypography>
           </MDBox>
         )}

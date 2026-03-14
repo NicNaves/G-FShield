@@ -5,7 +5,9 @@ import {
   createGraspMonitorStream,
   getMonitorEvents,
   getMonitorRuns,
+  getMonitorSummary,
 } from "api/grasp";
+import { DEFAULT_LOCALE, translate } from "i18n";
 import { pushGraspNotification } from "utils/graspNotifications";
 
 const topicPriority = (topic) => {
@@ -93,6 +95,7 @@ const mergeEvents = (currentEvents, incomingEvents = [], limit = 100) => {
 export default function useGraspMonitor(limit = 100) {
   const [runs, setRuns] = useState([]);
   const [events, setEvents] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [connected, setConnected] = useState(false);
@@ -156,7 +159,12 @@ export default function useGraspMonitor(limit = 100) {
 
     const searchLabel = incomingRun.localSearch || incomingRun.neighborhood || incomingRun.stage || "pipeline";
     const algorithmLabel = incomingRun.rclAlgorithm || "Unknown";
-    const message = `${algorithmLabel} improved to ${incomingScore}% via ${searchLabel}`;
+    const locale = window.localStorage.getItem("locale") || DEFAULT_LOCALE;
+    const message = translate(locale, "dashboard.improvementToast", {
+      algorithm: algorithmLabel,
+      score: incomingScore,
+      search: searchLabel,
+    });
 
     pushGraspNotification({
       id: `${incomingRun.seedId}:${incomingRun.updatedAt || incomingRun.topic}:${incomingScore}`,
@@ -182,18 +190,20 @@ export default function useGraspMonitor(limit = 100) {
         setLoading(true);
         setError("");
 
-        const [initialRuns, initialEvents] = await Promise.all([
+        const [runsResponse, eventsResponse, summaryResponse] = await Promise.all([
           getMonitorRuns(limit, 30),
           getMonitorEvents(limit),
+          getMonitorSummary(limit, limit),
         ]);
 
         if (cancelled) {
           return;
         }
 
-        setRuns(initialRuns);
-        setEvents(initialEvents);
-        registerCurrentRuns(initialRuns);
+        setRuns(runsResponse);
+        setEvents(eventsResponse);
+        setSummary(summaryResponse);
+        registerCurrentRuns(runsResponse);
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError.message || "Unable to load monitor data.");
@@ -227,6 +237,9 @@ export default function useGraspMonitor(limit = 100) {
               return nextRuns;
             });
             setEvents((currentEvents) => mergeEvents(currentEvents, payload.events || [], limit));
+            if (payload.summary) {
+              setSummary(payload.summary);
+            }
             setConnected(true);
           }
           return;
@@ -268,6 +281,7 @@ export default function useGraspMonitor(limit = 100) {
   return {
     runs,
     events,
+    summary,
     loading,
     error,
     connected,

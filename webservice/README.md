@@ -18,6 +18,7 @@ A pasta `webservice` contem a camada operacional web do GF-Shield:
 - autorizacao por perfil
 - exposicao do catalogo de datasets
 - disparo de execucao GRASP-FS
+- fila de execucoes com cancelamento best-effort
 - API do monitor de execucao
 - dashboard em tempo real via SSE
 
@@ -72,6 +73,12 @@ O dashboard e organizado em torno de tres estagios relevantes:
 
 A UI ignora a maior parte do ruido bruto de `LOCAL_SEARCH_PROGRESS_TOPIC` e enfatiza os estados finais mais uteis para analise.
 
+### Funcionalidades de operacao
+
+- `Settings > Operations`: fila de execucao com `Request Summary`
+- `Dashboard > Executions`: comparacao entre runs
+- `Dashboard > Run Details`: tela por `seedId`
+
 ### Estado persistido no browser
 
 O front guarda no `localStorage`:
@@ -100,6 +107,7 @@ The `webservice` folder contains the GF-Shield operational web layer:
 - role-based authorization
 - dataset catalog exposure
 - GRASP-FS execution dispatch
+- execution queue with best-effort cancellation
 - execution monitor API
 - real-time dashboard via SSE
 
@@ -153,6 +161,12 @@ The dashboard is organized around three meaningful stages:
 - best solution
 
 The UI intentionally ignores most raw `LOCAL_SEARCH_PROGRESS_TOPIC` noise and emphasizes the final states that matter most to analysis.
+
+### Operational features
+
+- `Settings > Operations`: execution queue with `Request Summary`
+- `Dashboard > Executions`: run comparison
+- `Dashboard > Run Details`: detail page by `seedId`
 
 ### Persisted browser state
 

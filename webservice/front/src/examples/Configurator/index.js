@@ -20,6 +20,8 @@ import Divider from "@mui/material/Divider";
 import Switch from "@mui/material/Switch";
 import IconButton from "@mui/material/IconButton";
 import Icon from "@mui/material/Icon";
+import TextField from "@mui/material/TextField";
+import MenuItem from "@mui/material/MenuItem";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
@@ -38,7 +40,10 @@ import {
   setFixedNavbar,
   setSidenavColor,
   setDarkMode,
+  setLocale,
 } from "context";
+import useI18n from "hooks/useI18n";
+import { SUPPORTED_LOCALES } from "i18n";
 
 function Configurator() {
   const [controller, dispatch] = useMaterialUIController();
@@ -49,7 +54,9 @@ function Configurator() {
     transparentSidenav,
     whiteSidenav,
     darkMode,
+    locale,
   } = controller;
+  const { t } = useI18n();
   const [disabled, setDisabled] = useState(false);
   const sidenavColors = ["primary", "dark", "info", "success", "warning", "error"];
 
@@ -85,6 +92,7 @@ function Configurator() {
   };
   const handleFixedNavbar = () => setFixedNavbar(dispatch, !fixedNavbar);
   const handleDarkMode = () => setDarkMode(dispatch, !darkMode);
+  const handleLocaleChange = ({ target: { value } }) => setLocale(dispatch, value);
 
   // sidenav type buttons styles
   const sidenavTypeButtonsStyles = ({
@@ -130,9 +138,9 @@ function Configurator() {
         px={3}
       >
         <MDBox>
-          <MDTypography variant="h5">GF-Shield Configurator</MDTypography>
+          <MDTypography variant="h5">{t("configurator.title")}</MDTypography>
           <MDTypography variant="body2" color="text">
-            Quickly adjust the dashboard appearance.
+            {t("configurator.subtitle")}
           </MDTypography>
         </MDBox>
 
@@ -155,7 +163,7 @@ function Configurator() {
 
       <MDBox pt={0.5} pb={3} px={3}>
         <MDBox>
-          <MDTypography variant="h6">Sidenav Colors</MDTypography>
+          <MDTypography variant="h6">{t("configurator.sidenavColors")}</MDTypography>
 
           <MDBox mb={0.5}>
             {sidenavColors.map((color) => (
@@ -201,9 +209,9 @@ function Configurator() {
         </MDBox>
 
         <MDBox mt={3} lineHeight={1}>
-          <MDTypography variant="h6">Sidenav Type</MDTypography>
+          <MDTypography variant="h6">{t("configurator.sidenavType")}</MDTypography>
           <MDTypography variant="button" color="text">
-            Choose between different sidenav types.
+            {t("configurator.sidenavTypeDescription")}
           </MDTypography>
 
           <MDBox
@@ -225,7 +233,7 @@ function Configurator() {
                   : sidenavTypeButtonsStyles
               }
             >
-              Dark
+              {t("configurator.dark")}
             </MDButton>
             <MDBox sx={{ mx: 1, width: "8rem", minWidth: "8rem" }}>
               <MDButton
@@ -240,7 +248,7 @@ function Configurator() {
                     : sidenavTypeButtonsStyles
                 }
               >
-                Transparent
+                {t("configurator.transparent")}
               </MDButton>
             </MDBox>
             <MDButton
@@ -255,7 +263,7 @@ function Configurator() {
                   : sidenavTypeButtonsStyles
               }
             >
-              White
+              {t("configurator.white")}
             </MDButton>
           </MDBox>
         </MDBox>
@@ -266,15 +274,40 @@ function Configurator() {
           mt={3}
           lineHeight={1}
         >
-          <MDTypography variant="h6">Navbar Fixed</MDTypography>
+          <MDTypography variant="h6">{t("configurator.navbarFixed")}</MDTypography>
 
           <Switch checked={fixedNavbar} onChange={handleFixedNavbar} />
         </MDBox>
         <Divider />
         <MDBox display="flex" justifyContent="space-between" alignItems="center" lineHeight={1}>
-          <MDTypography variant="h6">Light / Dark</MDTypography>
+          <MDTypography variant="h6">{t("configurator.lightDark")}</MDTypography>
 
           <Switch checked={darkMode} onChange={handleDarkMode} />
+        </MDBox>
+        <Divider />
+        <MDBox mt={3}>
+          <MDTypography variant="h6">{t("configurator.language")}</MDTypography>
+          <MDTypography variant="button" color="text">
+            {t("configurator.languageDescription")}
+          </MDTypography>
+          <MDBox mt={2}>
+            <TextField
+              select
+              fullWidth
+              size="small"
+              label={t("configurator.language")}
+              value={locale}
+              onChange={handleLocaleChange}
+            >
+              {SUPPORTED_LOCALES.map((localeKey) => (
+                <MenuItem key={localeKey} value={localeKey}>
+                  {localeKey === "pt-BR"
+                    ? t("configurator.localePortuguese")
+                    : t("configurator.localeEnglish")}
+                </MenuItem>
+              ))}
+            </TextField>
+          </MDBox>
         </MDBox>
       </MDBox>
     </ConfiguratorRoot>

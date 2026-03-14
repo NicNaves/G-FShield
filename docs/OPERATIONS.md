@@ -53,11 +53,24 @@ Exemplo de topicos normalmente usados:
 
 Recrie ou apague conforme sua rotina operacional. Nao remova `__consumer_offsets`.
 
+Exemplo:
+
+```powershell
+docker exec gf-shield-kafka-1 kafka-topics --bootstrap-server localhost:9092 --delete --if-exists --topic BEST_SOLUTION_TOPIC
+```
+
 ### Parar toda a stack
 
 ```powershell
 docker compose down
 ```
+
+### Presets de recursos
+
+- stack local: `docker compose -f docker-compose.yml -f docker-compose.local.yml up -d`
+- stack server: `docker compose -f docker-compose.yml -f docker-compose.server.yml up -d`
+- banco API local: `docker compose -f docker-compose.db.yml -f docker-compose.db.local.yml up -d`
+- banco API server: `docker compose -f docker-compose.db.yml -f docker-compose.db.server.yml up -d`
 
 ### Resetar o banco da API
 
@@ -88,6 +101,8 @@ O monitor persistido fica nas tabelas:
 - `GraspExecutionEvent`
 
 Se necessario, limpe essas tabelas no PostgreSQL da API para zerar o dashboard.
+
+`GraspExecutionLaunch` tambem guarda os parametros da request usados na fila do webservice.
 
 ### Limpar estado do navegador
 
@@ -165,11 +180,24 @@ Examples of commonly used topics:
 
 Recreate or delete them according to your operational workflow. Do not remove `__consumer_offsets`.
 
+Example:
+
+```powershell
+docker exec gf-shield-kafka-1 kafka-topics --bootstrap-server localhost:9092 --delete --if-exists --topic BEST_SOLUTION_TOPIC
+```
+
 ### Stop the full stack
 
 ```powershell
 docker compose down
 ```
+
+### Resource presets
+
+- local stack: `docker compose -f docker-compose.yml -f docker-compose.local.yml up -d`
+- server stack: `docker compose -f docker-compose.yml -f docker-compose.server.yml up -d`
+- local API DB: `docker compose -f docker-compose.db.yml -f docker-compose.db.local.yml up -d`
+- server API DB: `docker compose -f docker-compose.db.yml -f docker-compose.db.server.yml up -d`
 
 ### Reset the API database
 
@@ -200,6 +228,8 @@ Persisted monitor data lives in these tables:
 - `GraspExecutionEvent`
 
 If needed, clear those tables in the API PostgreSQL database to reset the dashboard.
+
+`GraspExecutionLaunch` also stores the request parameters used by the webservice queue.
 
 ### Clear browser state
 

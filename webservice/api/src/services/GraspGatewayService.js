@@ -81,7 +81,9 @@ class GraspGatewayService {
       "datasetTestingName",
     ];
 
-    const missing = required.filter((field) => payload[field] === undefined || payload[field] === null || payload[field] === "");
+    const missing = required.filter(
+      (field) => payload[field] === undefined || payload[field] === null || payload[field] === ""
+    );
     if (missing.length > 0) {
       throw new Error(`Campos obrigatorios ausentes: ${missing.join(", ")}`);
     }
@@ -114,7 +116,7 @@ class GraspGatewayService {
     });
   }
 
-  async startExecution(payload) {
+  prepareExecution(payload = {}, requestId = payload.requestId || randomUUID()) {
     this.validatePayload(payload);
     const algorithms = this.normalizeAlgorithms(payload.algorithms);
 
@@ -122,37 +124,69 @@ class GraspGatewayService {
       throw new Error("Nenhum algoritmo valido foi informado.");
     }
 
-    const params = this.buildParams(payload);
-    const requestId = payload.requestId || randomUUID();
-
-    const executions = await Promise.all(
-      algorithms.map(async (algorithm) => {
-        const service = graspServices[algorithm];
-        const url = `${service.baseUrl}${service.path}`;
-
-        const response = await axios.post(url, null, {
-          params,
-          timeout: Number(process.env.GRASP_FS_HTTP_TIMEOUT_MS || 30000),
-        });
-
-        return {
-          algorithm,
-          service: service.label,
-          url,
-          status: response.status,
-          data: response.data,
-        };
-      })
-    );
-
     return {
       requestId,
       requestedAt: new Date().toISOString(),
       algorithms,
-      params,
-      status: "requested",
+      params: this.buildParams(payload),
+    };
+  }
+
+  async dispatchExecution(preparedExecution, options = {}) {
+    const executions = [];
+    let cancelled = false;
+
+    for (const [index, algorithm] of preparedExecution.algorithms.entries()) {
+      if (options.shouldCancel?.()) {
+        cancelled = true;
+        break;
+      }
+
+      const service = graspServices[algorithm];
+      const url = `${service.baseUrl}${service.path}`;
+      const dispatchContext = {
+        algorithm,
+        index,
+        total: preparedExecution.algorithms.length,
+        url,
+      };
+
+      if (options.beforeDispatch) {
+        await options.beforeDispatch(dispatchContext);
+      }
+
+      const response = await axios.post(url, null, {
+        params: preparedExecution.params,
+        timeout: Number(process.env.GRASP_FS_HTTP_TIMEOUT_MS || 30000),
+      });
+
+      const execution = {
+        algorithm,
+        service: service.label,
+        url,
+        status: response.status,
+        data: response.data,
+        dispatchedAt: new Date().toISOString(),
+      };
+
+      executions.push(execution);
+
+      if (options.afterDispatch) {
+        await options.afterDispatch(execution, executions, dispatchContext);
+      }
+    }
+
+    return {
+      ...preparedExecution,
+      status: cancelled ? "cancelled" : "requested",
+      cancelled,
       executions,
     };
+  }
+
+  async startExecution(payload) {
+    const preparedExecution = this.prepareExecution(payload);
+    return this.dispatchExecution(preparedExecution);
   }
 
   getServices() {

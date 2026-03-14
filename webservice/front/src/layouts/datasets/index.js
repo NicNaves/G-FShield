@@ -28,6 +28,7 @@ import DataTable from "examples/Tables/DataTable";
 
 import useGraspMonitor from "hooks/useGraspMonitor";
 import useDatasetCatalog from "hooks/useDatasetCatalog";
+import useI18n from "hooks/useI18n";
 import {
   formatCompactPercent,
   formatDateTime,
@@ -38,6 +39,7 @@ import {
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 function Datasets() {
+  const { t } = useI18n();
   const { runs, error: runsError } = useGraspMonitor(100);
   const { catalog, loading, error: catalogError } = useDatasetCatalog();
 
@@ -118,15 +120,22 @@ function Datasets() {
   const tableData = useMemo(
     () => ({
       columns: [
-        { Header: "Dataset", accessor: "dataset", align: "left" },
-        { Header: "Role", accessor: "role", align: "left" },
-        { Header: "Size", accessor: "size", align: "left" },
-        { Header: "Observed Runs", accessor: "runs", align: "left" },
-        { Header: "Best F1", accessor: "bestF1", align: "left" },
-        { Header: "Updated", accessor: "updated", align: "left" },
+        { Header: t("datasets.dataset"), accessor: "dataset", align: "left" },
+        { Header: "Format", accessor: "format", align: "left" },
+        { Header: "Relation", accessor: "relation", align: "left" },
+        { Header: t("datasets.role"), accessor: "role", align: "left" },
+        { Header: "Attributes", accessor: "attributes", align: "left" },
+        { Header: "Instances", accessor: "instances", align: "left" },
+        { Header: "Class", accessor: "classAttribute", align: "left" },
+        { Header: t("datasets.size"), accessor: "size", align: "left" },
+        { Header: t("datasets.observedRuns"), accessor: "runs", align: "left" },
+        { Header: t("datasets.bestF1"), accessor: "bestF1", align: "left" },
+        { Header: t("datasets.updated"), accessor: "updated", align: "left" },
       ],
       rows: datasetRows.map((entry) => ({
         dataset: entry.name,
+        format: entry.datasetFormat || "--",
+        relation: entry.relationName || "--",
         role: (
           <Chip
             label={getDatasetRoleLabel(entry.roleSuggestion)}
@@ -135,6 +144,9 @@ function Datasets() {
             color={entry.roleSuggestion === "either" ? "default" : "info"}
           />
         ),
+        attributes: entry.attributeCount ?? "--",
+        instances: entry.instanceCount ?? "--",
+        classAttribute: entry.classAttribute || "--",
         size: entry.sizeLabel,
         runs: entry.observedRuns,
         bestF1: entry.observedRuns > 0 ? formatCompactPercent(entry.bestF1Score) : "--",
@@ -159,20 +171,23 @@ function Datasets() {
         {!catalog.exists && !loading ? (
           <MDBox mb={3}>
             <Alert severity="warning">
-              The API could not find the shared datasets folder. Update `GRASP_DATASETS_DIR` or mount it at `/datasets`.
+              {t("datasets.sharedFolderWarning")}
             </Alert>
           </MDBox>
         ) : null}
 
         <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
-            <ComplexStatisticsCard color="dark" icon="storage" title="Shared Files" count={catalog.datasets.length} />
+          <Grid item xs={12} md={6} xl={3}>
+            <ComplexStatisticsCard color="dark" icon="storage" title={t("datasets.sharedFiles")} count={catalog.datasets.length} />
           </Grid>
-          <Grid item xs={12} md={4}>
-            <ComplexStatisticsCard color="info" icon="compare_arrows" title="Suggested Pairs" count={catalog.suggestedPairs.length} />
+          <Grid item xs={12} md={6} xl={3}>
+            <ComplexStatisticsCard color="info" icon="compare_arrows" title={t("datasets.suggestedPairs")} count={catalog.suggestedPairs.length} />
           </Grid>
-          <Grid item xs={12} md={4}>
-            <ComplexStatisticsCard color="success" icon="folder_zip" title="Largest File" count={largestDataset?.sizeLabel || "--"} />
+          <Grid item xs={12} md={6} xl={3}>
+            <ComplexStatisticsCard color="success" icon="dataset" title="Total instances" count={catalog.summary?.totalInstances || 0} />
+          </Grid>
+          <Grid item xs={12} md={6} xl={3}>
+            <ComplexStatisticsCard color="warning" icon="folder_zip" title={t("datasets.largestFile")} count={largestDataset?.sizeLabel || "--"} />
           </Grid>
         </Grid>
 
@@ -182,10 +197,10 @@ function Datasets() {
               <Card>
                 <MDBox p={3}>
                   <MDTypography variant="h5" color="dark">
-                    Shared Folder Inventory
+                    {t("datasets.inventoryTitle")}
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    Size of the datasets currently available to the server.
+                    {t("datasets.inventorySubtitle")}
                   </MDTypography>
 
                   <MDBox mt={3} height="320px">
@@ -199,23 +214,46 @@ function Datasets() {
               <Card sx={{ height: "100%" }}>
                 <MDBox p={3}>
                   <MDTypography variant="h6" color="dark">
-                    Shared path
+                    {t("datasets.sharedPath")}
                   </MDTypography>
                   <MDTypography variant="caption" display="block" color="text" mt={1}>
-                    {catalog.directory || "Shared folder not resolved"}
+                    {catalog.directory || t("datasets.sharedPathMissing")}
                   </MDTypography>
 
                   <Divider sx={{ my: 2 }} />
 
                   <MDTypography variant="button" color="dark" fontWeight="medium">
-                    Suggested pairs
+                    Catalog summary
+                  </MDTypography>
+                  <MDTypography variant="caption" display="block" color="text" mt={1}>
+                    {`Formats: ${(catalog.summary?.availableFormats || []).join(", ") || "--"}`}
+                  </MDTypography>
+                  <MDTypography variant="caption" display="block" color="text">
+                    {`Total size: ${catalog.summary?.totalSizeLabel || "--"}`}
+                  </MDTypography>
+                  <MDTypography variant="caption" display="block" color="text">
+                    {`Catalogued attributes: ${catalog.summary?.totalAttributes || 0}`}
+                  </MDTypography>
+                  <MDTypography variant="caption" display="block" color="text">
+                    {`Richest dataset: ${catalog.summary?.richestDataset?.name || "--"} (${catalog.summary?.richestDataset?.attributeCount || "--"} attrs)`}
+                  </MDTypography>
+
+                  <Divider sx={{ my: 2 }} />
+
+                  <MDTypography variant="button" color="dark" fontWeight="medium">
+                      {t("datasets.suggestedPairs")}
                   </MDTypography>
                   <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap mt={1}>
                     {catalog.suggestedPairs.map((pair) => (
-                      <Chip key={pair.id} label={pair.label} size="small" variant="outlined" />
+                      <Chip
+                        key={pair.id}
+                        label={`${pair.label}${pair.attributeDelta !== null ? ` | dAttrs ${pair.attributeDelta}` : ""}`}
+                        size="small"
+                        variant="outlined"
+                      />
                     ))}
                     {!loading && catalog.suggestedPairs.length === 0 ? (
-                      <Chip label="No inferred pairs" size="small" variant="outlined" />
+                      <Chip label={t("datasets.noInferredPairs")} size="small" variant="outlined" />
                     ) : null}
                   </Stack>
 
@@ -224,20 +262,20 @@ function Datasets() {
                   {largestDataset ? (
                     <>
                       <MDTypography variant="button" color="dark" fontWeight="medium">
-                        Largest dataset
+                        {t("datasets.largestDataset")}
                       </MDTypography>
                       <MDTypography variant="caption" display="block" color="text" mt={1}>
                         {largestDataset.name}
                       </MDTypography>
                       <MDTypography variant="caption" display="block" color="text">
-                        {largestDataset.sizeLabel} · {formatDateTime(largestDataset.modifiedAt)}
+                        {largestDataset.sizeLabel} | {largestDataset.attributeCount ?? "--"} attrs | {largestDataset.instanceCount ?? "--"} rows | {formatDateTime(largestDataset.modifiedAt)}
                       </MDTypography>
                     </>
                   ) : (
                       <MDTypography variant="button" color="text">
                       {loading
-                        ? "Loading shared files..."
-                        : "No dataset was found in the shared folder."}
+                        ? t("datasets.loadingSharedFiles")
+                        : t("datasets.noDatasetsFound")}
                     </MDTypography>
                   )}
                 </MDBox>
@@ -249,8 +287,8 @@ function Datasets() {
         <MDBox mt={4}>
           <Card>
             <MDBox p={3}>
-              <MDTypography variant="h6" color="dark">
-                Dataset Catalog
+                <MDTypography variant="h6" color="dark">
+                {t("datasets.catalogTitle")}
               </MDTypography>
             </MDBox>
             <DataTable

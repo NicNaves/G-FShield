@@ -45,7 +45,18 @@ public class BitFlipService {
     private int progressEveryN;
 
     public void doBitFlip(DataSolution data) throws Exception {
+        long startedAt = System.currentTimeMillis();
         data.setLocalSearch(LocalSearch.BIT_FLIP);
+        int configuredMaxIterations = resolveMaxIterations(data);
+        log.info(
+                "bitflip start seedId={} neighborhood={} maxIterations={} featureCount={} training={} testing={}",
+                data.getSeedId(),
+                data.getNeighborhood(),
+                configuredMaxIterations,
+                data.getSolutionFeatures() != null ? data.getSolutionFeatures().size() : 0,
+                data.getTrainingFileName(),
+                data.getTestingFileName()
+        );
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(metricsFileName, true))) {
             escreverCabecalhoCSV(writer);
@@ -60,6 +71,14 @@ public class BitFlipService {
             log.info("✅ Melhor solução: F1={} Tempo={} Features={} Iteração={}",
                     bestSolution.getF1Score(), bestSolution.getRunnigTime(),
                     bestSolution.getSolutionFeatures(), bestSolution.getIterationLocalSearch());
+
+            log.info(
+                    "bitflip finished seedId={} bestF1={} iterationLocalSearch={} elapsedMs={}",
+                    bestSolution.getSeedId(),
+                    bestSolution.getF1Score(),
+                    bestSolution.getIterationLocalSearch(),
+                    System.currentTimeMillis() - startedAt
+            );
 
             kafkaSolutionsProducer.send(bestSolution);
         }

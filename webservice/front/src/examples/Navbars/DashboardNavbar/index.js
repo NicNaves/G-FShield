@@ -18,6 +18,7 @@ import {
   GRASP_NOTIFICATION_EVENT_NAME,
   readGraspNotifications,
 } from "../../../utils/graspNotifications";
+import useI18n from "hooks/useI18n";
 
 function DashboardNavbar({ absolute, light, isMini }) {
   const [navbarType, setNavbarType] = useState();
@@ -28,6 +29,7 @@ function DashboardNavbar({ absolute, light, isMini }) {
   const [notifications, setNotifications] = useState([]);
   const route = useLocation().pathname.split("/").slice(1);
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   useEffect(() => {
     if (fixedNavbar) {
@@ -94,7 +96,7 @@ function DashboardNavbar({ absolute, light, isMini }) {
       sx={{ mt: 2 }}
     >
       <MenuItem onClick={handleLogout}>
-        <Icon fontSize="small" sx={{ mr: 1 }}>logout</Icon> Sign out
+        <Icon fontSize="small" sx={{ mr: 1 }}>logout</Icon> {t("navbar.signOut")}
       </MenuItem>
     </Menu>
   );
@@ -117,7 +119,7 @@ function DashboardNavbar({ absolute, light, isMini }) {
       {notifications.length === 0 ? (
         <MenuItem onClick={handleCloseNotifications}>
           <Icon fontSize="small" sx={{ mr: 1 }}>notifications_none</Icon>
-          No recent improvements
+          {t("navbar.noRecentImprovements")}
         </MenuItem>
       ) : (
         notifications.slice(0, 6).map((notification) => (

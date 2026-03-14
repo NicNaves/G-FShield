@@ -28,31 +28,29 @@ public class RvndService {
     private final Random random = new Random();
     private final AtomicInteger iteration = new AtomicInteger(1);
 
-    /**
-     * Executa a lógica RVND com seleção aleatória da vizinhança.
-     */
     public void doRvnd(DataSolution data) {
         data.setNeighborhood("RVND");
         data.setIterationNeighborhood(iteration.getAndIncrement());
 
-        LocalSearch selected = pickRandomNeighborhood(data);
+        List<LocalSearch> enabledSearches = resolveEnabledLocalSearches(data);
+        LocalSearch selected = enabledSearches.get(random.nextInt(enabledSearches.size()));
         data.setLocalSearch(selected);
 
-        log.info("🔀 RVND escolheu vizinhança: {}", selected);
+        log.info(
+                "rvnd dispatch seedId={} iterationNeighborhood={} selectedSearch={} enabledSearches={} currentBestF1={}",
+                data.getSeedId(),
+                data.getIterationNeighborhood(),
+                selected,
+                enabledSearches,
+                data.getF1Score()
+        );
 
         switch (selected) {
             case BIT_FLIP -> bitFlipProducer.send(data);
             case IWSS -> kafkaIwssProducer.send(data);
             case IWSSR -> kafkaIwssrProducer.send(data);
+            default -> throw new IllegalStateException("Invalid RVND local search: " + selected);
         }
-    }
-
-    /**
-     * Seleciona aleatoriamente uma vizinhança local.
-     */
-    private LocalSearch pickRandomNeighborhood(DataSolution data) {
-        List<LocalSearch> enabled = resolveEnabledLocalSearches(data);
-        return enabled.get(random.nextInt(enabled.size()));
     }
 
     private List<LocalSearch> resolveEnabledLocalSearches(DataSolution data) {
@@ -70,7 +68,7 @@ public class RvndService {
                         resolved.add(parsed);
                     }
                 } catch (IllegalArgumentException ex) {
-                    log.warn("⚠️ Busca local inválida ignorada no RVND: {}", configured);
+                    log.warn("rvnd ignored invalid local-search configuration={}", configured);
                 }
             }
         }

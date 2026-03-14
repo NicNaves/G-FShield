@@ -1,0 +1,4 @@
+services:
+  webservice-postgres:
+    cpus: 1.00
+    mem_limit: 1024m

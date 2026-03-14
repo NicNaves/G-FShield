@@ -1,5 +1,6 @@
 const prisma = require("../lib/prisma");
 const logger = require("../utils/jsonLogger");
+const { MONITOR_SCHEMA_VERSION } = require("./GraspMonitorSummaryService");
 
 class GraspExecutionStoreService {
   isProgressTopic(topic) {
@@ -168,6 +169,7 @@ class GraspExecutionStoreService {
       cpuUsage: runRecord.cpuUsage,
       memoryUsage: runRecord.memoryUsage,
       memoryUsagePercent: runRecord.memoryUsagePercent,
+      monitorSchemaVersion: MONITOR_SCHEMA_VERSION,
       runnigTime: bestSnapshot.runnigTime ?? bestSnapshot.runningTime ?? runRecord.runningTime,
       solutionFeatures: bestSnapshot.solutionFeatures || runRecord.solutionFeatures || [],
       rclfeatures: bestSnapshot.rclfeatures || bestSnapshot.rclFeatures || runRecord.rclFeatures || [],
@@ -188,6 +190,7 @@ class GraspExecutionStoreService {
       requestId: eventRecord.requestId,
       sourcePartition: eventRecord.sourcePartition,
       sourceOffset: eventRecord.sourceOffset,
+      schemaVersion: MONITOR_SCHEMA_VERSION,
       payload: eventRecord.payload,
     };
   }
@@ -359,6 +362,14 @@ class GraspExecutionStoreService {
     });
 
     return events.map((event) => this.mapEvent(event));
+  }
+
+  async resetMonitorState() {
+    await prisma.$transaction([
+      prisma.graspExecutionEvent.deleteMany({}),
+      prisma.graspExecutionRun.deleteMany({}),
+      prisma.graspExecutionLaunch.deleteMany({}),
+    ]);
   }
 
   async disconnect() {

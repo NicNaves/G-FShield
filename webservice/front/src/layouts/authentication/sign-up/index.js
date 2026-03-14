@@ -23,9 +23,11 @@ import {
   isValidPhone,
   normalizeEmail,
 } from "utils/userInputFormatters";
+import useI18n from "hooks/useI18n";
 
 function SignUp() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -58,27 +60,27 @@ function SignUp() {
     setSuccess("");
 
     if (form.password.length < 6) {
-      setError("Password must be at least 6 characters long.");
+      setError(t("auth.passwordMin"));
       return;
     }
 
     if (form.password !== form.confirmPassword) {
-      setError("Password confirmation does not match.");
+      setError(t("auth.passwordMismatch"));
       return;
     }
 
     if (!isValidEmail(form.email)) {
-      setError("Enter a valid email address.");
+      setError(t("auth.invalidEmail"));
       return;
     }
 
     if (form.cpf && !isValidCpf(form.cpf)) {
-      setError("Enter CPF in the 000.000.000-00 format.");
+      setError(t("auth.invalidCpf"));
       return;
     }
 
     if (form.telefone && !isValidPhone(form.telefone)) {
-      setError("Enter a phone number as (11) 99999-9999 or (11) 3333-4444.");
+      setError(t("auth.invalidPhone"));
       return;
     }
 
@@ -92,10 +94,10 @@ function SignUp() {
         password: form.password,
       }));
 
-      setSuccess("Account created successfully. You can sign in now.");
+      setSuccess(t("auth.accountCreated"));
       setTimeout(() => navigate("/authentication/sign-in"), 1200);
     } catch (requestError) {
-      setError(requestError.error || requestError.message || "Unable to complete the sign-up process.");
+      setError(requestError.error || requestError.message || t("auth.unableSignUp"));
     } finally {
       setSubmitting(false);
     }
@@ -116,10 +118,10 @@ function SignUp() {
           textAlign="center"
         >
           <MDTypography variant="h4" fontWeight="medium" color="white" mt={1}>
-            Create account
+            {t("auth.signUpTitle")}
           </MDTypography>
           <MDTypography display="block" variant="button" color="white" my={1}>
-            Register a user to access the GF-Shield dashboard.
+            {t("auth.signUpSubtitle")}
           </MDTypography>
         </MDBox>
         <MDBox pt={4} pb={3} px={3}>
@@ -127,10 +129,10 @@ function SignUp() {
             <Stack spacing={2}>
               {error ? <Alert severity="error">{error}</Alert> : null}
               {success ? <Alert severity="success">{success}</Alert> : null}
-              <MDInput type="text" label="Name" value={form.name} onChange={handleChange("name")} autoComplete="name" fullWidth />
+              <MDInput type="text" label={t("auth.name")} value={form.name} onChange={handleChange("name")} autoComplete="name" fullWidth />
               <MDInput
                 type="email"
-                label="Email"
+                label={t("auth.email")}
                 value={form.email}
                 onChange={handleChange("email")}
                 autoComplete="email"
@@ -138,7 +140,7 @@ function SignUp() {
               />
               <MDInput
                 type="text"
-                label="CPF"
+                label={t("auth.cpf")}
                 value={form.cpf}
                 onChange={handleChange("cpf")}
                 placeholder="000.000.000-00"
@@ -148,7 +150,7 @@ function SignUp() {
               />
               <MDInput
                 type="text"
-                label="Phone"
+                label={t("auth.phone")}
                 value={form.telefone}
                 onChange={handleChange("telefone")}
                 placeholder="(11) 99999-9999"
@@ -156,10 +158,10 @@ function SignUp() {
                 autoComplete="tel-national"
                 fullWidth
               />
-              <MDInput type="password" label="Password" value={form.password} onChange={handleChange("password")} autoComplete="new-password" fullWidth />
+              <MDInput type="password" label={t("auth.password")} value={form.password} onChange={handleChange("password")} autoComplete="new-password" fullWidth />
               <MDInput
                 type="password"
-                label="Confirm password"
+                label={t("auth.confirmPassword")}
                 value={form.confirmPassword}
                 onChange={handleChange("confirmPassword")}
                 autoComplete="new-password"
@@ -168,12 +170,12 @@ function SignUp() {
             </Stack>
             <MDBox mt={4} mb={1}>
               <MDButton variant="gradient" color="info" fullWidth type="submit" disabled={submitting}>
-                {submitting ? "Creating account..." : "Create account"}
+                {submitting ? t("auth.creatingAccount") : t("auth.createAccount")}
               </MDButton>
             </MDBox>
             <MDBox mt={3} mb={1} textAlign="center">
               <MDTypography variant="button" color="text">
-                Already have an account?{" "}
+                {t("auth.alreadyHaveAccount")}{" "}
                 <MDTypography
                   component={Link}
                   to="/authentication/sign-in"
@@ -182,7 +184,7 @@ function SignUp() {
                   fontWeight="medium"
                   textGradient
                 >
-                  Sign in
+                  {t("auth.signIn")}
                 </MDTypography>
               </MDTypography>
             </MDBox>

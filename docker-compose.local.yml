@@ -1,0 +1,102 @@
+services:
+  grasp-fs-rcl-su:
+    cpus: 1.50
+    mem_limit: 1536m
+    environment:
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "2"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "4"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "80"
+
+  grasp-fs-rcl-rf:
+    cpus: 1.50
+    mem_limit: 1536m
+    environment:
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "2"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "4"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "80"
+
+  grasp-fs-rcl-ig:
+    cpus: 1.50
+    mem_limit: 1536m
+    environment:
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "2"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "4"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "80"
+
+  grasp-fs-rcl-gr:
+    cpus: 1.50
+    mem_limit: 1536m
+    environment:
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "2"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "4"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "80"
+
+  grasp-fs.dls.verify:
+    cpus: 0.75
+    mem_limit: 768m
+    environment:
+      JAVA_OPTS: "-Xms128m -Xmx512m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      KAFKA_LISTENER_CONCURRENCY: "1"
+
+  grasp-fs-dls-bf:
+    cpus: 1.00
+    mem_limit: 1536m
+    environment:
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      KAFKA_LISTENER_CONCURRENCY: "1"
+
+  grasp-fs-dls-iw:
+    cpus: 1.00
+    mem_limit: 1536m
+    environment:
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      KAFKA_LISTENER_CONCURRENCY: "1"
+
+  grasp-fs-dls-iwr:
+    cpus: 1.00
+    mem_limit: 1536m
+    environment:
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      KAFKA_LISTENER_CONCURRENCY: "1"
+
+  grasp-fs-dls-rvnd:
+    cpus: 0.75
+    mem_limit: 768m
+    environment:
+      JAVA_OPTS: "-Xms128m -Xmx512m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      KAFKA_LISTENER_CONCURRENCY: "1"
+
+  grasp-fs-dls-vnd:
+    cpus: 0.75
+    mem_limit: 768m
+    environment:
+      JAVA_OPTS: "-Xms128m -Xmx512m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+      KAFKA_LISTENER_CONCURRENCY: "1"
+
+  zookeeper:
+    cpus: 0.50
+    mem_limit: 256m
+
+  kafka:
+    cpus: 1.00
+    mem_limit: 1024m
+
+  postgresql:
+    cpus: 0.50
+    mem_limit: 512m
+
+  postgresql-2:
+    cpus: 0.50
+    mem_limit: 512m
+
+  conduktor-console:
+    cpus: 0.75
+    mem_limit: 2048m
+
+  conduktor-monitoring:
+    cpus: 0.50
+    mem_limit: 384m
