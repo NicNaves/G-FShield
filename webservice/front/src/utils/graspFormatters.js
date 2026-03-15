@@ -108,6 +108,8 @@ export const getStageLabel = (stage) => {
   switch (String(stage || "").toLowerCase()) {
     case "initial_solution":
       return "Initial Solution";
+    case "neighborhood_restart":
+      return "Neighborhood Restart";
     case "best_solution":
       return "Best Solution";
     case "solution_update":

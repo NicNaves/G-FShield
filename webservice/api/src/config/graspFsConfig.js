@@ -34,6 +34,7 @@ const kafkaBrokers = (process.env.KAFKA_BROKERS || "localhost:9092")
 
 const monitorTopics = [
   "INITIAL_SOLUTION_TOPIC",
+  "NEIGHBORHOOD_RESTART_TOPIC",
   "LOCAL_SEARCH_PROGRESS_TOPIC",
   "SOLUTIONS_TOPIC",
   "BEST_SOLUTION_TOPIC",

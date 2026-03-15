@@ -218,6 +218,7 @@ const dashboardTabs = [
 const stageLensOptions = [
   { value: "all", labelKey: "dashboard.allStages" },
   { value: "initial", labelKey: "dashboard.stageInitial" },
+  { value: "restart", labelKey: "dashboard.stageRestart" },
   { value: "local", labelKey: "dashboard.stageLocal" },
   { value: "progress", labelKey: "dashboard.stageProgress" },
   { value: "best", labelKey: "dashboard.stageBest" },
@@ -407,8 +408,7 @@ const dashboardContentSx = (darkMode) => ({
 
 const isBestSolutionRun = (run = {}) => run.topic === "BEST_SOLUTION_TOPIC";
 
-const isFinalOutcomeRun = (run = {}) =>
-  isBestSolutionRun(run) || String(run.status || "").toLowerCase() === "completed";
+const isFinalOutcomeRun = (run = {}) => String(run.status || "").toLowerCase() === "completed";
 
 const pickPreferredRun = (currentRun, candidateRun) => {
   if (!currentRun) {
@@ -443,8 +443,8 @@ const promoteBestSolutionEvent = (event = {}) => ({
   seedId: event.seedId || null,
   createdAt: event.timestamp || null,
   updatedAt: event.timestamp || null,
-  completedAt: event.timestamp || null,
-  status: "completed",
+  completedAt: String(event.status || "").toLowerCase() === "completed" ? event.timestamp || null : null,
+  status: String(event.status || "").toLowerCase() || "running",
   stage: event.stage || "best_solution",
   topic: event.topic || "BEST_SOLUTION_TOPIC",
   rclAlgorithm: event.rclAlgorithm || null,
@@ -632,9 +632,7 @@ function Dashboard() {
     const values = new Set();
 
     [...runs, ...snapshotEvents].forEach((entry) => {
-      const status = String(
-        entry?.status || (entry?.topic === "BEST_SOLUTION_TOPIC" ? "completed" : "")
-      )
+      const status = String(entry?.status || "")
         .trim()
         .toLowerCase();
 
@@ -664,12 +662,11 @@ function Dashboard() {
     const matchesStageLens =
       selectedStageLens === "all"
       || (selectedStageLens === "initial" && entryTopic === "INITIAL_SOLUTION_TOPIC")
+      || (selectedStageLens === "restart" && entryTopic === "NEIGHBORHOOD_RESTART_TOPIC")
       || (selectedStageLens === "local" && entryTopic === "SOLUTIONS_TOPIC")
       || (selectedStageLens === "progress" && entryTopic === "LOCAL_SEARCH_PROGRESS_TOPIC")
       || (selectedStageLens === "best" && entryTopic === "BEST_SOLUTION_TOPIC");
-    const normalizedStatus = String(
-      entry.status || (entryTopic === "BEST_SOLUTION_TOPIC" ? "completed" : "running")
-    ).toLowerCase();
+    const normalizedStatus = String(entry.status || "running").toLowerCase();
     const matchesRunStatus = selectedRunStatus === "all" || normalizedStatus === selectedRunStatus;
     const normalizedSearch = String(entry.localSearch || entry.neighborhood || "").toUpperCase();
     const matchesSearch = selectedSearch === "all" || normalizedSearch === selectedSearch;
@@ -875,7 +872,7 @@ function Dashboard() {
 
     return [...monitorSnapshots]
       .filter((event) =>
-        ["INITIAL_SOLUTION_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(event.topic)
+        ["INITIAL_SOLUTION_TOPIC", "NEIGHBORHOOD_RESTART_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(event.topic)
       )
       .sort((left, right) => getSortableDateValue(left.timestamp) - getSortableDateValue(right.timestamp))
       .reduce((nextEvents, event) => {
@@ -884,7 +881,7 @@ function Dashboard() {
         bestBySeed.set(event.seedId, Math.max(previous ?? Number.NEGATIVE_INFINITY, score));
 
         if (
-          ["INITIAL_SOLUTION_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(event.topic)
+          ["INITIAL_SOLUTION_TOPIC", "NEIGHBORHOOD_RESTART_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(event.topic)
           && previous !== undefined
           && score > previous
         ) {
@@ -904,6 +901,10 @@ function Dashboard() {
     const grouped = new Map();
 
     monitorSnapshots.forEach((event) => {
+      if (event.topic !== "INITIAL_SOLUTION_TOPIC") {
+        return;
+      }
+
       const algorithm = event.rclAlgorithm || "Unknown";
       const cpuUsage = getFiniteMetric(event.cpuUsage);
       const memoryUsage = getFiniteMetric(event.memoryUsage);
@@ -942,6 +943,70 @@ function Dashboard() {
       }
 
       grouped.set(algorithm, current);
+    });
+
+    return [...grouped.values()]
+      .map((entry) => ({
+        algorithm: entry.algorithm,
+        sampleCount: entry.sampleCount,
+        avgCpuUsage: entry.cpuCount > 0 ? entry.cpuTotal / entry.cpuCount : null,
+        avgMemoryUsage: entry.memoryCount > 0 ? entry.memoryTotal / entry.memoryCount : null,
+        avgMemoryUsagePercent:
+          entry.memoryPercentCount > 0 ? entry.memoryPercentTotal / entry.memoryPercentCount : null,
+      }))
+      .sort(
+        (left, right) =>
+          getNumericScore(right.avgCpuUsage, Number.NEGATIVE_INFINITY)
+          - getNumericScore(left.avgCpuUsage, Number.NEGATIVE_INFINITY)
+      );
+  }, [monitorSnapshots]);
+
+  const resourceAveragesByLocalSearch = useMemo(() => {
+    const grouped = new Map();
+
+    monitorSnapshots.forEach((event) => {
+      if (!["LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC"].includes(event.topic)) {
+        return;
+      }
+
+      const localSearch = event.localSearch || event.searchLabel;
+      const cpuUsage = getFiniteMetric(event.cpuUsage);
+      const memoryUsage = getFiniteMetric(event.memoryUsage);
+      const memoryUsagePercent = getFiniteMetric(event.memoryUsagePercent);
+
+      if (!localSearch || (cpuUsage === null && memoryUsage === null && memoryUsagePercent === null)) {
+        return;
+      }
+
+      const current = grouped.get(localSearch) || {
+        algorithm: localSearch,
+        sampleCount: 0,
+        cpuTotal: 0,
+        cpuCount: 0,
+        memoryTotal: 0,
+        memoryCount: 0,
+        memoryPercentTotal: 0,
+        memoryPercentCount: 0,
+      };
+
+      current.sampleCount += 1;
+
+      if (cpuUsage !== null) {
+        current.cpuTotal += cpuUsage;
+        current.cpuCount += 1;
+      }
+
+      if (memoryUsage !== null) {
+        current.memoryTotal += memoryUsage;
+        current.memoryCount += 1;
+      }
+
+      if (memoryUsagePercent !== null) {
+        current.memoryPercentTotal += memoryUsagePercent;
+        current.memoryPercentCount += 1;
+      }
+
+      grouped.set(localSearch, current);
     });
 
     return [...grouped.values()]
@@ -1586,6 +1651,56 @@ function Dashboard() {
     };
   }, [resourceAveragesByAlgorithm]);
 
+  const averageCpuByLocalSearchChartData = useMemo(() => {
+    if (!resourceAveragesByLocalSearch.length) {
+      return buildEmptyBarData("Average CPU");
+    }
+
+    const labels = resourceAveragesByLocalSearch.map((entry) => entry.algorithm);
+    const palette = getBarPaletteForLabels(labels, "search");
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: "Average CPU (%)",
+          data: resourceAveragesByLocalSearch.map((entry) => entry.avgCpuUsage ?? 0),
+          backgroundColor: palette.backgroundColor,
+          hoverBackgroundColor: palette.hoverBackgroundColor,
+          borderColor: palette.borderColor,
+          borderWidth: 1,
+          borderRadius: 8,
+          borderSkipped: false,
+        },
+      ],
+    };
+  }, [resourceAveragesByLocalSearch]);
+
+  const averageMemoryByLocalSearchChartData = useMemo(() => {
+    if (!resourceAveragesByLocalSearch.length) {
+      return buildEmptyBarData("Average memory");
+    }
+
+    const labels = resourceAveragesByLocalSearch.map((entry) => entry.algorithm);
+    const palette = getBarPaletteForLabels(labels, "search");
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: "Average Memory (%)",
+          data: resourceAveragesByLocalSearch.map((entry) => entry.avgMemoryUsagePercent ?? 0),
+          backgroundColor: palette.backgroundColor,
+          hoverBackgroundColor: palette.hoverBackgroundColor,
+          borderColor: palette.borderColor,
+          borderWidth: 1,
+          borderRadius: 8,
+          borderSkipped: false,
+        },
+      ],
+    };
+  }, [resourceAveragesByLocalSearch]);
+
   const rawTopicVolumeChartData = useMemo(() => {
     if (!rawTopicMetrics.length) {
       return buildEmptyBarData("Topic volume");
@@ -1631,6 +1746,26 @@ function Dashboard() {
     [resourceAveragesByAlgorithm]
   );
 
+  const localSearchResourceSummaryTableData = useMemo(
+    () => ({
+      columns: [
+        { Header: "Local Search", accessor: "algorithm", align: "left" },
+        { Header: "Avg CPU", accessor: "avgCpu", align: "left" },
+        { Header: "Avg Memory", accessor: "avgMemory", align: "left" },
+        { Header: "Avg Memory %", accessor: "avgMemoryPercent", align: "left" },
+        { Header: "Samples", accessor: "samples", align: "left" },
+      ],
+      rows: resourceAveragesByLocalSearch.map((entry) => ({
+        algorithm: entry.algorithm,
+        avgCpu: formatMetric(entry.avgCpuUsage, "%"),
+        avgMemory: formatMetric(entry.avgMemoryUsage, " MB"),
+        avgMemoryPercent: formatMetric(entry.avgMemoryUsagePercent, "%"),
+        samples: entry.sampleCount,
+      })),
+    }),
+    [resourceAveragesByLocalSearch]
+  );
+
   const finalSolutionsChartOptions = useMemo(
     () => ({
       responsive: true,
@@ -1663,7 +1798,7 @@ function Dashboard() {
       columns: [
         { Header: "Time", accessor: "timestamp", align: "left" },
         { Header: "Algorithm", accessor: "algorithm", align: "left" },
-        { Header: "Final Solution", accessor: "solution", align: "left" },
+        { Header: "Best Solution", accessor: "solution", align: "left" },
         { Header: "Best F1-Score", accessor: "bestF1Score", align: "left" },
         { Header: "Stage / Search", accessor: "stage", align: "left" },
         { Header: "Dataset", accessor: "dataset", align: "left" },
@@ -2064,7 +2199,7 @@ function Dashboard() {
       columns: [
         { Header: "Algorithm", accessor: "algorithm", align: "left" },
         { Header: "Workflow", accessor: "workflow", align: "left" },
-        { Header: "Final Solution", accessor: "solution", align: "left" },
+        { Header: "Best Solution", accessor: "solution", align: "left" },
         { Header: "Best F1", accessor: "bestF1", align: "left" },
         { Header: "Search / Neighborhood", accessor: "search", align: "left" },
         { Header: "Seed", accessor: "seed", align: "left" },
@@ -3121,6 +3256,38 @@ function Dashboard() {
                 </MDBox>
               </Card>
             </Grid>
+
+            <Grid item xs={12} md={6} xl={3}>
+              <Card sx={{ height: "100%" }}>
+                <MDBox p={3}>
+                  <MDTypography variant="h6" color="dark">
+                    {t("dashboard.performanceAverageCpuByLocalSearch")}
+                  </MDTypography>
+                  <MDTypography variant="button" color="text">
+                    {t("dashboard.performanceAverageCpuByLocalSearchSubtitle")}
+                  </MDTypography>
+                  <MDBox height="300px" mt={2}>
+                    <Bar data={averageCpuByLocalSearchChartData} options={finalSolutionsChartOptions} />
+                  </MDBox>
+                </MDBox>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12} md={6} xl={3}>
+              <Card sx={{ height: "100%" }}>
+                <MDBox p={3}>
+                  <MDTypography variant="h6" color="dark">
+                    {t("dashboard.performanceAverageMemoryByLocalSearch")}
+                  </MDTypography>
+                  <MDTypography variant="button" color="text">
+                    {t("dashboard.performanceAverageMemoryByLocalSearchSubtitle")}
+                  </MDTypography>
+                  <MDBox height="300px" mt={2}>
+                    <Bar data={averageMemoryByLocalSearchChartData} options={finalSolutionsChartOptions} />
+                  </MDBox>
+                </MDBox>
+              </Card>
+            </Grid>
           </Grid>
         </MDBox>
         ) : null}
@@ -3128,7 +3295,7 @@ function Dashboard() {
         {activeTab === "algorithms" ? (
         <MDBox mt={4}>
           <Grid container spacing={3}>
-            <Grid item xs={12}>
+            <Grid item xs={12} lg={6}>
               <Card>
                 <MDBox
                   p={3}
@@ -3151,6 +3318,43 @@ function Dashboard() {
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 860 } }}>
                   <DataTable
                     table={resourceSummaryTableData}
+                    entriesPerPage={false}
+                    canSearch
+                    showTotalEntries={false}
+                    noEndBorder
+                  />
+                </MDBox>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12} lg={6}>
+              <Card>
+                <MDBox
+                  p={3}
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems={{ xs: "flex-start", md: "center" }}
+                  flexDirection={{ xs: "column", md: "row" }}
+                  gap={1.5}
+                >
+                  <MDBox>
+                    <MDTypography variant="h6" color="dark">
+                      {t("dashboard.localSearchResourceFootprintTitle")}
+                    </MDTypography>
+                    <MDTypography variant="button" color="text">
+                      {t("dashboard.localSearchResourceFootprintSubtitle")}
+                    </MDTypography>
+                  </MDBox>
+                  <Chip
+                    label={t("dashboard.algorithmsCount", { count: resourceAveragesByLocalSearch.length })}
+                    color="info"
+                    size="small"
+                    variant="outlined"
+                  />
+                </MDBox>
+                <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 860 } }}>
+                  <DataTable
+                    table={localSearchResourceSummaryTableData}
                     entriesPerPage={false}
                     canSearch
                     showTotalEntries={false}

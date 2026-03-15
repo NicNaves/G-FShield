@@ -21,7 +21,7 @@ class GraspController {
 
   topicPriority(topic) {
     if (topic === "BEST_SOLUTION_TOPIC") {
-      return 3;
+      return 2;
     }
 
     if (topic === "SOLUTIONS_TOPIC") {

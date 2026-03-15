@@ -357,6 +357,7 @@ const translations = {
       tabDescExecutions:
         "Per-seed breakdown with initial solutions, local-search outcomes, and best-solution workflows.",
       stageInitial: "Initial solutions",
+      stageRestart: "Neighborhood restarts",
       stageLocal: "Local search finals",
       stageProgress: "Local progress",
       stageBest: "Best solutions",
@@ -413,12 +414,21 @@ const translations = {
       performanceAverageCpuByAlgorithm: "Average CPU by Algorithm",
       performanceAverageCpuSubtitle:
         "Average CPU usage across persisted snapshots for each RCL algorithm.",
+      performanceAverageCpuByLocalSearch: "Average CPU by Local Search",
+      performanceAverageCpuByLocalSearchSubtitle:
+        "Average CPU usage across persisted snapshots for each local-search service.",
       performanceAverageMemoryByAlgorithm: "Average Memory by Algorithm",
       performanceAverageMemorySubtitle:
         "Average memory percentage observed across persisted snapshots.",
+      performanceAverageMemoryByLocalSearch: "Average Memory by Local Search",
+      performanceAverageMemoryByLocalSearchSubtitle:
+        "Average memory percentage observed across persisted snapshots for each local-search service.",
       algorithmResourceFootprintTitle: "Resource Footprint by Algorithm",
       algorithmResourceFootprintSubtitle:
         "Consolidated CPU and memory averages from persisted snapshots by algorithm.",
+      localSearchResourceFootprintTitle: "Resource Footprint by Local Search",
+      localSearchResourceFootprintSubtitle:
+        "Consolidated CPU and memory averages from persisted snapshots by local-search service.",
       topicVolumeTitle: "Topic Volume",
       topicVolumeSubtitle: "Visible snapshot count by Kafka topic in the current workspace window.",
       topicSummaryTitle: "Topic Summary",
@@ -440,7 +450,7 @@ const translations = {
         "Full best-solution path, including RCL, neighborhood, and local searches used.",
       algorithmsBestSolutionsByAlgorithmTitle: "Best Solutions by Algorithm",
       algorithmsBestSolutionsByAlgorithmSubtitle:
-        "Each row below comes directly from BEST_SOLUTION_TOPIC. Total visible final solutions: {{count}}",
+        "Each row below comes directly from BEST_SOLUTION_TOPIC. Total visible best-solution updates: {{count}}",
       algorithmsBestOutcomeTitle: "Best Outcome by Algorithm",
       algorithmsBestOutcomeSubtitle:
         "Consolidated table with the best visible final result per algorithm.",
@@ -844,6 +854,7 @@ const translations = {
       tabDescExecutions:
         "Quebra por seed com solucoes iniciais, saidas da busca local e fluxo das melhores solucoes.",
       stageInitial: "Solucoes iniciais",
+      stageRestart: "Reinicios da vizinhanca",
       stageLocal: "Finais da busca local",
       stageProgress: "Progresso local",
       stageBest: "Melhores solucoes",
@@ -901,12 +912,21 @@ const translations = {
       performanceAverageCpuByAlgorithm: "CPU media por algoritmo",
       performanceAverageCpuSubtitle:
         "Uso medio de CPU entre snapshots persistidos para cada algoritmo RCL.",
+      performanceAverageCpuByLocalSearch: "CPU media por busca local",
+      performanceAverageCpuByLocalSearchSubtitle:
+        "Uso medio de CPU entre snapshots persistidos para cada servico de busca local.",
       performanceAverageMemoryByAlgorithm: "Memoria media por algoritmo",
       performanceAverageMemorySubtitle:
         "Percentual medio de memoria observado entre snapshots persistidos.",
+      performanceAverageMemoryByLocalSearch: "Memoria media por busca local",
+      performanceAverageMemoryByLocalSearchSubtitle:
+        "Percentual medio de memoria observado entre snapshots persistidos para cada servico de busca local.",
       algorithmResourceFootprintTitle: "Pegada de recursos por algoritmo",
       algorithmResourceFootprintSubtitle:
         "Medias consolidadas de CPU e memoria por algoritmo a partir dos snapshots persistidos.",
+      localSearchResourceFootprintTitle: "Pegada de recursos por busca local",
+      localSearchResourceFootprintSubtitle:
+        "Medias consolidadas de CPU e memoria por servico de busca local a partir dos snapshots persistidos.",
       topicVolumeTitle: "Volume por topico",
       topicVolumeSubtitle: "Quantidade de snapshots visiveis por topico Kafka na janela atual.",
       topicSummaryTitle: "Resumo por topico",
@@ -928,7 +948,7 @@ const translations = {
         "Caminho completo da melhor solucao, incluindo RCL, vizinhanca e buscas locais usadas.",
       algorithmsBestSolutionsByAlgorithmTitle: "Melhores solucoes por algoritmo",
       algorithmsBestSolutionsByAlgorithmSubtitle:
-        "Cada linha abaixo vem diretamente de BEST_SOLUTION_TOPIC. Total de solucoes finais visiveis: {{count}}",
+        "Cada linha abaixo vem diretamente de BEST_SOLUTION_TOPIC. Total de atualizacoes visiveis da best solution: {{count}}",
       algorithmsBestOutcomeTitle: "Melhor resultado por algoritmo",
       algorithmsBestOutcomeSubtitle:
         "Tabela consolidada com o melhor resultado final visivel por algoritmo.",

@@ -3,7 +3,7 @@ package br.com.graspfs.dlsrvnd.service;
 import br.com.graspfs.dlsrvnd.dto.DataSolution;
 import br.com.graspfs.dlsrvnd.enuns.LocalSearch;
 import br.com.graspfs.dlsrvnd.producer.KafkaBitFlipProducer;
-import br.com.graspfs.dlsrvnd.producer.KafkaInitialSolutionProducer;
+import br.com.graspfs.dlsrvnd.producer.KafkaNeighborhoodRestartProducer;
 import br.com.graspfs.dlsrvnd.producer.KafkaIwssProducer;
 import br.com.graspfs.dlsrvnd.producer.KafkaIwssrProducer;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +26,7 @@ public class RvndService {
     private final KafkaBitFlipProducer bitFlipProducer;
     private final KafkaIwssProducer kafkaIwssProducer;
     private final KafkaIwssrProducer kafkaIwssrProducer;
-    private final KafkaInitialSolutionProducer kafkaInitialSolutionProducer;
+    private final KafkaNeighborhoodRestartProducer kafkaNeighborhoodRestartProducer;
 
     private final Random random = new Random();
 
@@ -93,8 +93,7 @@ public class RvndService {
                         scoreOf(incoming),
                         Math.max(maxIterations - currentIteration, 0)
                 );
-                incoming.setIterationNeighborhood(0);
-                kafkaInitialSolutionProducer.send(incoming);
+                kafkaNeighborhoodRestartProducer.send(incoming);
             } else {
                 log.info(
                         "rvnd improvement seedId={} previousBestF1={} newBestF1={} restartingCycle=false reason=iteration-budget-exhausted",

@@ -9,7 +9,7 @@ class GraspExecutionStoreService {
 
   topicPriority(topic) {
     if (topic === "BEST_SOLUTION_TOPIC") {
-      return 3;
+      return 2;
     }
 
     if (topic === "SOLUTIONS_TOPIC") {
@@ -147,35 +147,32 @@ class GraspExecutionStoreService {
     const bestSnapshot = this.extractSnapshotFromEventPayload(bestSolutionEvent?.payload);
     const latestEvent = (runRecord.events || [])[0] || null;
     const latestSnapshot = this.extractSnapshotFromEventPayload(latestEvent?.payload);
-    const shouldPromoteBestSnapshot =
-      this.topicPriority(bestSnapshot.topic || bestSolutionEvent?.topic) > this.topicPriority(runRecord.topic);
-
-    const effectiveTopic = shouldPromoteBestSnapshot ? (bestSnapshot.topic || bestSolutionEvent?.topic) : runRecord.topic;
-    const effectiveStage = shouldPromoteBestSnapshot ? (bestSnapshot.stage || bestSolutionEvent?.stage) : runRecord.stage;
-    const effectiveCompletedAt = shouldPromoteBestSnapshot
-      ? (this.parseDate(bestSnapshot.completedAt) || bestSolutionEvent?.createdAt || runRecord.completedAt)
-      : runRecord.completedAt;
     const history = this.buildHistory(runRecord.events || []);
+    const bestSolutionFeatures = bestSnapshot.solutionFeatures || runRecord.solutionFeatures || [];
+    const bestRclFeatures = bestSnapshot.rclfeatures
+      || bestSnapshot.rclFeatures
+      || latestSnapshot.rclfeatures
+      || latestSnapshot.rclFeatures
+      || runRecord.rclFeatures
+      || [];
 
     return {
       seedId: runRecord.seedId,
       createdAt: runRecord.createdAt.toISOString(),
       updatedAt: runRecord.updatedAt.toISOString(),
-      completedAt: effectiveCompletedAt ? effectiveCompletedAt.toISOString() : null,
-      status: shouldPromoteBestSnapshot ? "completed" : runRecord.status.toLowerCase(),
-      stage: effectiveStage,
-      topic: effectiveTopic,
+      completedAt: runRecord.completedAt ? runRecord.completedAt.toISOString() : null,
+      status: runRecord.status.toLowerCase(),
+      stage: runRecord.stage,
+      topic: runRecord.topic,
       rclAlgorithm: bestSnapshot.rclAlgorithm || runRecord.rclAlgorithm,
       classifier: bestSnapshot.classifier || bestSnapshot.classfier || runRecord.classifier,
       localSearch: bestSnapshot.localSearch || runRecord.localSearch,
       neighborhood: bestSnapshot.neighborhood || runRecord.neighborhood,
       trainingFileName: bestSnapshot.trainingFileName || runRecord.trainingFileName,
       testingFileName: bestSnapshot.testingFileName || runRecord.testingFileName,
-      iterationNeighborhood: bestSnapshot.iterationNeighborhood ?? runRecord.iterationNeighborhood,
-      iterationLocalSearch: bestSnapshot.iterationLocalSearch ?? runRecord.iterationLocalSearch,
-      currentF1Score: shouldPromoteBestSnapshot
-        ? (bestSnapshot.currentF1Score ?? bestSnapshot.f1Score ?? runRecord.currentF1Score)
-        : runRecord.currentF1Score,
+      iterationNeighborhood: runRecord.iterationNeighborhood ?? bestSnapshot.iterationNeighborhood ?? latestSnapshot.iterationNeighborhood,
+      iterationLocalSearch: runRecord.iterationLocalSearch ?? bestSnapshot.iterationLocalSearch ?? latestSnapshot.iterationLocalSearch,
+      currentF1Score: runRecord.currentF1Score,
       bestF1Score: runRecord.bestF1Score,
       accuracy: bestSnapshot.accuracy ?? runRecord.accuracy,
       precision: bestSnapshot.precision ?? runRecord.precision,
@@ -185,16 +182,16 @@ class GraspExecutionStoreService {
       memoryUsagePercent: runRecord.memoryUsagePercent,
       monitorSchemaVersion: MONITOR_SCHEMA_VERSION,
       runnigTime: bestSnapshot.runnigTime ?? bestSnapshot.runningTime ?? runRecord.runningTime,
-      solutionFeatures: bestSnapshot.solutionFeatures || runRecord.solutionFeatures || [],
-      rclfeatures: bestSnapshot.rclfeatures || bestSnapshot.rclFeatures || runRecord.rclFeatures || [],
-      rclFeatures: bestSnapshot.rclfeatures || bestSnapshot.rclFeatures || latestSnapshot.rclfeatures || latestSnapshot.rclFeatures || runRecord.rclFeatures || [],
+      solutionFeatures: bestSolutionFeatures,
+      rclfeatures: bestRclFeatures,
+      rclFeatures: bestRclFeatures,
       enabledLocalSearches: bestSnapshot.enabledLocalSearches || latestSnapshot.enabledLocalSearches || [],
       neighborhoodMaxIterations: bestSnapshot.neighborhoodMaxIterations ?? latestSnapshot.neighborhoodMaxIterations ?? null,
       bitFlipMaxIterations: bestSnapshot.bitFlipMaxIterations ?? latestSnapshot.bitFlipMaxIterations ?? null,
       iwssMaxIterations: bestSnapshot.iwssMaxIterations ?? latestSnapshot.iwssMaxIterations ?? null,
       iwssrMaxIterations: bestSnapshot.iwssrMaxIterations ?? latestSnapshot.iwssrMaxIterations ?? null,
-      solutionSize: bestSnapshot.solutionSize ?? (Array.isArray(bestSnapshot.solutionFeatures) ? bestSnapshot.solutionFeatures.length : Array.isArray(runRecord.solutionFeatures) ? runRecord.solutionFeatures.length : 0),
-      rclSize: bestSnapshot.rclSize ?? (Array.isArray(bestSnapshot.rclfeatures || bestSnapshot.rclFeatures) ? (bestSnapshot.rclfeatures || bestSnapshot.rclFeatures).length : Array.isArray(runRecord.rclFeatures) ? runRecord.rclFeatures.length : 0),
+      solutionSize: bestSnapshot.solutionSize ?? bestSolutionFeatures.length,
+      rclSize: bestSnapshot.rclSize ?? bestRclFeatures.length,
       previousBestF1Score: bestSnapshot.previousBestF1Score ?? latestSnapshot.previousBestF1Score ?? null,
       scoreDelta: bestSnapshot.scoreDelta ?? latestSnapshot.scoreDelta ?? null,
       improved: bestSnapshot.improved ?? latestSnapshot.improved ?? null,

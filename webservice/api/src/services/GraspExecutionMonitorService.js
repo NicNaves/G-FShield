@@ -24,10 +24,6 @@ class GraspExecutionMonitorService {
   }
 
   isTerminalRun(topic, payload = {}, currentRun = null) {
-    if (topic === "BEST_SOLUTION_TOPIC") {
-      return true;
-    }
-
     if (topic !== "SOLUTIONS_TOPIC") {
       return false;
     }
@@ -82,7 +78,7 @@ class GraspExecutionMonitorService {
 
   topicPriority(topic) {
     if (topic === "BEST_SOLUTION_TOPIC") {
-      return 3;
+      return 2;
     }
 
     if (topic === "SOLUTIONS_TOPIC") {
@@ -342,10 +338,8 @@ class GraspExecutionMonitorService {
       ? current.bestF1Score
       : Math.max(current.bestF1Score ?? Number.NEGATIVE_INFINITY, incomingF1);
     const hasCompletedSnapshot = String(current.status || "").toLowerCase() === "completed";
-    const hasFinalSnapshot = current.topic === "BEST_SOLUTION_TOPIC";
-    const preserveCompletedSnapshot = hasCompletedSnapshot && !terminalRun && topic !== "BEST_SOLUTION_TOPIC";
-    const preserveFinalSnapshot = hasFinalSnapshot && topic !== "BEST_SOLUTION_TOPIC";
-    const preserveTerminalSnapshot = preserveCompletedSnapshot || preserveFinalSnapshot;
+    const preserveCompletedSnapshot = hasCompletedSnapshot && !terminalRun;
+    const preserveTerminalSnapshot = preserveCompletedSnapshot;
 
     const run = {
       ...current,
@@ -356,7 +350,7 @@ class GraspExecutionMonitorService {
         : (terminalRun ? now : current.completedAt || null),
       status: preserveTerminalSnapshot ? current.status || "completed" : status,
       stage: preserveTerminalSnapshot ? current.stage || "best_solution" : stage,
-      topic: preserveTerminalSnapshot ? current.topic || "BEST_SOLUTION_TOPIC" : topic,
+      topic: preserveTerminalSnapshot ? current.topic || topic : topic,
       rclAlgorithm: payload.rclAlgorithm || current.rclAlgorithm || null,
       classifier: payload.classifier || payload.classfier || current.classifier || null,
       localSearch: preserveTerminalSnapshot
@@ -468,6 +462,10 @@ class GraspExecutionMonitorService {
   resolveStage(topic, payload) {
     if (topic === "INITIAL_SOLUTION_TOPIC") {
       return "initial_solution";
+    }
+
+    if (topic === "NEIGHBORHOOD_RESTART_TOPIC") {
+      return "neighborhood_restart";
     }
 
     if (topic === "LOCAL_SEARCH_PROGRESS_TOPIC") {

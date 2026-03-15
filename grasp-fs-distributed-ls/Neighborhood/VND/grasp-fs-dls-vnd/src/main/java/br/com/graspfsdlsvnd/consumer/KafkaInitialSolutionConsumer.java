@@ -17,15 +17,16 @@ public class KafkaInitialSolutionConsumer {
     private final VndService vndService;
 
     @KafkaListener(
-        topics = "INITIAL_SOLUTION_TOPIC",
+        topics = {"INITIAL_SOLUTION_TOPIC", "NEIGHBORHOOD_RESTART_TOPIC"},
         groupId = "VND",
         containerFactory = "jsonKafkaListenerContainer"
     )
     public void consume(ConsumerRecord<String, DataSolution> record) {
         DataSolution data = record.value();
+        String topic = record.topic();
 
         if (data == null) {
-            log.warn("📭 Mensagem nula recebida no tópico INITIAL_SOLUTION_TOPIC.");
+            log.warn("📭 Mensagem nula recebida no tópico {}.", topic);
             return;
         }
 
@@ -36,8 +37,8 @@ public class KafkaInitialSolutionConsumer {
             return;
         }
 
-        log.info("📥 Recebida solução inicial (seedId={}, features={}, search=VND)", 
-                 data.getSeedId(), data.getSolutionFeatures());
+        log.info("📥 Recebida mensagem de bootstrap VND (topic={}, seedId={}, features={})",
+                 topic, data.getSeedId(), data.getSolutionFeatures());
 
         try {
             vndService.doVnd(data, null);

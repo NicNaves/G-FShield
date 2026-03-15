@@ -3,7 +3,7 @@ package br.com.graspfsdlsvnd.service;
 import br.com.graspfsdlsvnd.dto.DataSolution;
 import br.com.graspfsdlsvnd.enuns.LocalSearch;
 import br.com.graspfsdlsvnd.producer.KafkaBitFlipProducer;
-import br.com.graspfsdlsvnd.producer.KafkaInitialSolutionProducer;
+import br.com.graspfsdlsvnd.producer.KafkaNeighborhoodRestartProducer;
 import br.com.graspfsdlsvnd.producer.KafkaIwssProducer;
 import br.com.graspfsdlsvnd.producer.KafkaIwssrProducer;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +25,7 @@ public class VndService {
     private final KafkaBitFlipProducer bitFlipProducer;
     private final KafkaIwssProducer kafkaIwssProducer;
     private final KafkaIwssrProducer kafkaIwssrProducer;
-    private final KafkaInitialSolutionProducer kafkaInitialSolutionProducer;
+    private final KafkaNeighborhoodRestartProducer kafkaNeighborhoodRestartProducer;
 
     public void doVnd(DataSolution data, LocalSearch localSearch) {
         List<LocalSearch> sequence = resolveEnabledLocalSearches(data);
@@ -85,7 +85,7 @@ public class VndService {
                         scoreOf(incoming),
                         Math.max(dispatchBudget - currentStep, 0)
                 );
-                kafkaInitialSolutionProducer.send(incoming);
+                kafkaNeighborhoodRestartProducer.send(incoming);
             } else {
                 log.info(
                         "vnd improvement seedId={} previousBestF1={} newBestF1={} restartingCycle=false reason=dispatch-budget-exhausted",

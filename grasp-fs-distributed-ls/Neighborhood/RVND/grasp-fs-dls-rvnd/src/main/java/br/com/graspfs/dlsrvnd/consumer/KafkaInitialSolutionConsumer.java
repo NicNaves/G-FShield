@@ -16,15 +16,16 @@ public class KafkaInitialSolutionConsumer {
     private final RvndService rvndService;
 
     @KafkaListener(
-        topics = "INITIAL_SOLUTION_TOPIC",
+        topics = {"INITIAL_SOLUTION_TOPIC", "NEIGHBORHOOD_RESTART_TOPIC"},
         groupId = "RVND",
         containerFactory = "jsonKafkaListenerContainer"
     )
     public void consume(ConsumerRecord<String, DataSolution> record) {
         DataSolution data = record.value();
+        String topic = record.topic();
 
         if (data == null) {
-            log.warn("Null message received from INITIAL_SOLUTION_TOPIC.");
+            log.warn("Null message received from {}.", topic);
             return;
         }
 
@@ -36,7 +37,8 @@ public class KafkaInitialSolutionConsumer {
         }
 
         log.info(
-                "RVND initial message received: seedId={}, F1={}, Features={}",
+                "RVND bootstrap message received: topic={}, seedId={}, F1={}, Features={}",
+                topic,
                 data.getSeedId(),
                 data.getF1Score(),
                 data.getSolutionFeatures()

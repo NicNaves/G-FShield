@@ -12,7 +12,7 @@ import { pushGraspNotification } from "utils/graspNotifications";
 
 const topicPriority = (topic) => {
   if (topic === "BEST_SOLUTION_TOPIC") {
-    return 3;
+    return 2;
   }
 
   if (topic === "SOLUTIONS_TOPIC") {
@@ -140,7 +140,7 @@ export default function useGraspMonitor(limit = 100) {
       return;
     }
 
-    if (!["INITIAL_SOLUTION_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(incomingRun.topic)) {
+    if (!["INITIAL_SOLUTION_TOPIC", "NEIGHBORHOOD_RESTART_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(incomingRun.topic)) {
       return;
     }
 
@@ -254,7 +254,7 @@ export default function useGraspMonitor(limit = 100) {
         if ((payload.type === "kafka.update" || payload.type === "kafka.progress")
           && payload.payload?.seedId
           && !cancelled) {
-          if (["INITIAL_SOLUTION_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(payload.payload.topic)) {
+          if (["INITIAL_SOLUTION_TOPIC", "NEIGHBORHOOD_RESTART_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(payload.payload.topic)) {
             notifyIfImproved(payload.payload);
           } else {
             rememberObservedScore(payload.payload);

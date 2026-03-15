@@ -97,8 +97,7 @@ class ExecutionLaunchService {
 
     const uniqueRuns = [...latestRunBySeed.values()];
     const completedSeedCount = uniqueRuns.filter((run) =>
-      String(run.topic || "").toUpperCase() === "BEST_SOLUTION_TOPIC"
-      || String(run.status || "").toUpperCase() === "COMPLETED"
+      String(run.status || "").toUpperCase() === "COMPLETED"
     ).length;
 
     const timestamps = uniqueRuns
@@ -143,6 +142,7 @@ class ExecutionLaunchService {
         ...record,
         status: "COMPLETED",
         metadata: this.mergeMetadata(nextMetadata, {
+          queueState: "completed",
           completedAt: metadata.completedAt || progress.lastResultAt || new Date().toISOString(),
           note: "Distributed pipeline finished all expected seeds for this execution.",
         }),
