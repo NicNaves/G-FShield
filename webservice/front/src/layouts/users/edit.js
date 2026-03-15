@@ -28,10 +28,12 @@ import {
   isValidPhone,
   normalizeEmail,
 } from "utils/userInputFormatters";
+import useI18n from "hooks/useI18n";
 
 function UserEdit() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { t } = useI18n();
   const [user, setUser] = useState(null);
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -53,14 +55,14 @@ function UserEdit() {
           password: "",
         }));
       } catch (requestError) {
-        setError(requestError.response?.data?.error || requestError.message || "Unable to load the user.");
+        setError(requestError.response?.data?.error || requestError.message || t("users.unableLoadUser"));
       } finally {
         setLoading(false);
       }
     };
 
     loadUser();
-  }, [id]);
+  }, [id, t]);
 
   const handleChange = (field) => (event) => {
     const valueMap = {
@@ -81,28 +83,28 @@ function UserEdit() {
     setError("");
 
     if (!isValidEmail(form.email)) {
-      const message = "Enter a valid email address.";
+      const message = t("auth.invalidEmail");
       setError(message);
       toast.error(message);
       return;
     }
 
     if (form.cpf && !isValidCpf(form.cpf)) {
-      const message = "Enter CPF in the 000.000.000-00 format.";
+      const message = t("auth.invalidCpf");
       setError(message);
       toast.error(message);
       return;
     }
 
     if (form.telefone && !isValidPhone(form.telefone)) {
-      const message = "Enter a phone number as (11) 99999-9999 or (11) 3333-4444.";
+      const message = t("auth.invalidPhone");
       setError(message);
       toast.error(message);
       return;
     }
 
     if (form.password && form.password.length < 6) {
-      const message = "The new password must be at least 6 characters long.";
+      const message = t("auth.passwordMin");
       setError(message);
       toast.error(message);
       return;
@@ -122,9 +124,9 @@ function UserEdit() {
         ...current,
         password: "",
       }));
-      toast.success("User updated successfully.");
+      toast.success(t("users.updateSuccess"));
     } catch (requestError) {
-      const message = requestError.response?.data?.error || requestError.message || "Unable to save the user.";
+      const message = requestError.response?.data?.error || requestError.message || t("users.unableSaveUser");
       setError(message);
       toast.error(message);
     } finally {
@@ -138,9 +140,9 @@ function UserEdit() {
       <MDBox py={3}>
         <Card>
           <MDBox p={3}>
-            <MDTypography variant="h4">Edit user</MDTypography>
+            <MDTypography variant="h4">{t("users.editUserTitle")}</MDTypography>
             <MDTypography variant="button" color="text">
-              Update access role, status, and profile details for the selected user.
+              {t("users.editUserSubtitle")}
             </MDTypography>
 
             {error ? (
@@ -152,22 +154,22 @@ function UserEdit() {
             {loading || !form ? (
               <MDBox mt={3}>
                 <MDTypography variant="button" color="text">
-                  Loading user...
+                  {t("users.loadingUser")}
                 </MDTypography>
               </MDBox>
             ) : (
               <>
                 <Grid container spacing={2} mt={1}>
                   <Grid item xs={12} md={6}>
-                    <TextField fullWidth label="Name" value={form.name} onChange={handleChange("name")} autoComplete="name" />
+                    <TextField fullWidth label={t("users.name")} value={form.name} onChange={handleChange("name")} autoComplete="name" />
                   </Grid>
                   <Grid item xs={12} md={6}>
-                    <TextField fullWidth label="Email" type="email" value={form.email} onChange={handleChange("email")} autoComplete="email" />
+                    <TextField fullWidth label={t("users.email")} type="email" value={form.email} onChange={handleChange("email")} autoComplete="email" />
                   </Grid>
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="CPF"
+                      label={t("users.cpf")}
                       value={form.cpf}
                       onChange={handleChange("cpf")}
                       placeholder="000.000.000-00"
@@ -178,7 +180,7 @@ function UserEdit() {
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="Phone"
+                      label={t("users.phone")}
                       value={form.telefone}
                       onChange={handleChange("telefone")}
                       placeholder="(11) 99999-9999"
@@ -187,43 +189,43 @@ function UserEdit() {
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
-                    <TextField select fullWidth label="Role" value={form.role} onChange={handleChange("role")}>
-                      <MenuItem value="ADMIN">Administrator</MenuItem>
-                      <MenuItem value="VIEWER">Viewer</MenuItem>
+                    <TextField select fullWidth label={t("users.role")} value={form.role} onChange={handleChange("role")}>
+                      <MenuItem value="ADMIN">{t("users.administrator")}</MenuItem>
+                      <MenuItem value="VIEWER">{t("users.viewer")}</MenuItem>
                     </TextField>
                   </Grid>
                   <Grid item xs={12} md={6}>
-                    <TextField select fullWidth label="Status" value={String(form.active)} onChange={handleChange("active")}>
-                      <MenuItem value="true">Active</MenuItem>
-                      <MenuItem value="false">Inactive</MenuItem>
+                    <TextField select fullWidth label={t("users.status")} value={String(form.active)} onChange={handleChange("active")}>
+                      <MenuItem value="true">{t("users.active")}</MenuItem>
+                      <MenuItem value="false">{t("users.inactive")}</MenuItem>
                     </TextField>
                   </Grid>
                   <Grid item xs={12}>
                     <TextField
                       fullWidth
-                      label="New password"
+                      label={t("users.newPassword")}
                       type="password"
                       value={form.password}
                       onChange={handleChange("password")}
                       autoComplete="new-password"
-                      helperText="Fill this only if you want to reset the password."
+                      helperText={t("users.newPasswordHelper")}
                     />
                   </Grid>
                 </Grid>
 
                 <Stack direction="row" spacing={1.5} mt={3}>
                   <MDButton variant="gradient" color="info" onClick={handleSave} disabled={saving}>
-                    {saving ? "Saving..." : "Save changes"}
+                    {saving ? t("users.savingChanges") : t("users.saveChanges")}
                   </MDButton>
                   <MDButton variant="outlined" color="secondary" onClick={() => navigate("/admin/users")}>
-                    Back
+                    {t("users.backToUsers")}
                   </MDButton>
                 </Stack>
 
                 {user ? (
                   <MDBox mt={3}>
                     <MDTypography variant="caption" color="text">
-                      User created on {new Date(user.createdAt).toLocaleString()}.
+                      {t("users.createdOn", { value: new Date(user.createdAt).toLocaleString() })}
                     </MDTypography>
                   </MDBox>
                 ) : null}

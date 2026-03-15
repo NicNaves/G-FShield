@@ -187,6 +187,19 @@ router.post("/monitor/reset", authMiddleware, roleMiddleware("ADMIN"), (req, res
 
 /**
  * @swagger
+ * /grasp/environment/reset:
+ *   post:
+ *     tags: [Grasp]
+ *     summary: Reinicia o ambiente distribuido e limpa o estado experimental
+ *     description: Derruba e sobe novamente o docker compose do pipeline, limpa CSVs de metricas e remove o historico persistido do monitor.
+ *     responses:
+ *       200:
+ *         description: Ambiente resetado com sucesso.
+ */
+router.post("/environment/reset", authMiddleware, roleMiddleware("ADMIN"), (req, res, next) => graspController.resetEnvironment(req, res, next));
+
+/**
+ * @swagger
  * /grasp/monitor/stream:
  *   get:
  *     tags: [Grasp]

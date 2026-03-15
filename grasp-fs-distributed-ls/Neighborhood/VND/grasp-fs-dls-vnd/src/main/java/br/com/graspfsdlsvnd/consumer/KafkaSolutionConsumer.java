@@ -5,7 +5,6 @@ import br.com.graspfsdlsvnd.service.VndService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -20,9 +19,6 @@ public class KafkaSolutionConsumer {
 
     private final VndService vndService;
     private final ConcurrentMap<UUID, DataSolution> bestSolutions = new ConcurrentHashMap<>();
-
-    @Value("${vnd.max.iterations:10}")
-    private int maxIterations;
 
     @KafkaListener(topics = "SOLUTIONS_TOPIC", groupId = "VND", containerFactory = "jsonKafkaListenerContainer")
     public void consume(ConsumerRecord<String, DataSolution> record) {
@@ -44,14 +40,12 @@ public class KafkaSolutionConsumer {
         int iterationNeighborhood = incoming.getIterationNeighborhood() != null
                 ? incoming.getIterationNeighborhood()
                 : 0;
-        int configuredMaxIterations = incoming.getNeighborhoodMaxIterations() != null
-                && incoming.getNeighborhoodMaxIterations() > 0
-                ? incoming.getNeighborhoodMaxIterations()
-                : maxIterations;
+        int dispatchBudget = vndService.resolveDispatchBudget(incoming);
+        boolean allowContinuation = iterationNeighborhood < dispatchBudget;
 
-        if (iterationNeighborhood < configuredMaxIterations) {
+        if (iterationNeighborhood <= dispatchBudget) {
             try {
-                bestSolutions.compute(incoming.getSeedId(), (seedId, currentBest) -> {
+                DataSolution finalBest = bestSolutions.compute(incoming.getSeedId(), (seedId, currentBest) -> {
                     DataSolution baseline = currentBest;
                     if (baseline == null) {
                         log.info("First solution stored. Starting the VND cycle.");
@@ -60,7 +54,7 @@ public class KafkaSolutionConsumer {
                         log.info("Comparing the new solution against the current best one.");
                     }
 
-                    DataSolution updatedBest = vndService.callNextService(baseline, incoming);
+                    DataSolution updatedBest = vndService.callNextService(baseline, incoming, allowContinuation);
                     log.info(
                             "Current best solution (seedId={}): F1 = {}, Features = {}",
                             seedId,
@@ -70,13 +64,31 @@ public class KafkaSolutionConsumer {
                     return updatedBest;
                 });
 
+                if (!allowContinuation) {
+                    bestSolutions.remove(incoming.getSeedId());
+                    if (finalBest != null) {
+                        log.info(
+                                "VND execution finished seedId={} dispatchBudget={} finalBestF1={} features={}",
+                                incoming.getSeedId(),
+                                dispatchBudget,
+                                finalBest.getF1Score(),
+                                finalBest.getSolutionFeatures()
+                        );
+                    }
+                }
+
             } catch (IllegalArgumentException ex) {
                 log.error("Error while processing the received solution: {}", ex.getMessage(), ex);
                 throw ex;
             }
         } else {
             bestSolutions.remove(incoming.getSeedId());
-            log.warn("Maximum neighborhood iterations ({}) reached. Ignoring solution.", configuredMaxIterations);
+            log.warn(
+                    "Maximum VND dispatch budget ({}) reached for seedId={} at step={}. Ignoring solution.",
+                    dispatchBudget,
+                    incoming.getSeedId(),
+                    iterationNeighborhood
+            );
         }
     }
 }

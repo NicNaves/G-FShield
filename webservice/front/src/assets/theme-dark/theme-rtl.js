@@ -87,7 +87,20 @@ import dialogActions from "assets/theme-dark/components/dialog/dialogActions";
 export default createTheme({
   direction: "rtl",
   breakpoints: { ...breakpoints },
-  palette: { ...colors },
+  palette: {
+    mode: "dark",
+    ...colors,
+    background: {
+      ...colors.background,
+      paper: colors.background.card,
+    },
+    text: {
+      ...colors.text,
+      primary: rgba(colors.white.main, 0.92),
+      secondary: rgba(colors.white.main, 0.72),
+    },
+    divider: rgba(colors.white.main, 0.12),
+  },
   typography: { ...typography },
   boxShadows: { ...boxShadows },
   borders: { ...borders },

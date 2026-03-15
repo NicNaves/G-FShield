@@ -55,6 +55,13 @@ export const resetMonitorState = async () => {
   return data;
 };
 
+export const resetDistributedEnvironment = async () => {
+  const { data } = await api.post("/grasp/environment/reset", null, {
+    timeout: 5 * 60 * 1000,
+  });
+  return data;
+};
+
 export const getExecutionLaunches = async (limit = 25) => {
   const { data } = await api.get("/grasp/executions", {
     params: { limit },

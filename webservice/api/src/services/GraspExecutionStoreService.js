@@ -109,22 +109,34 @@ class GraspExecutionStoreService {
 
   buildHistory(events = []) {
     return events
-      .filter((event) => !this.isProgressTopic(event.topic))
       .map((event) => {
         const payload = event.payload || {};
         const snapshot = payload.payload || {};
+        const historyEntry = snapshot.historyEntry || {};
+        const solutionFeatures = historyEntry.solutionFeatures || snapshot.solutionFeatures || [];
+        const rclFeatures = historyEntry.rclFeatures || snapshot.rclfeatures || snapshot.rclFeatures || [];
 
         return {
           timestamp: event.createdAt.toISOString(),
-          stage: event.stage || snapshot.stage || null,
-          topic: event.topic || snapshot.topic || null,
-          f1Score: snapshot.currentF1Score ?? snapshot.f1Score ?? null,
-          cpuUsage: snapshot.cpuUsage ?? null,
-          memoryUsage: snapshot.memoryUsage ?? null,
-          memoryUsagePercent: snapshot.memoryUsagePercent ?? null,
-          localSearch: snapshot.localSearch || null,
-          neighborhood: snapshot.neighborhood || null,
-          solutionFeatures: snapshot.solutionFeatures || [],
+          stage: historyEntry.stage || event.stage || snapshot.stage || null,
+          topic: historyEntry.topic || event.topic || snapshot.topic || null,
+          eventType: event.eventType || null,
+          f1Score: historyEntry.f1Score ?? snapshot.currentF1Score ?? snapshot.f1Score ?? null,
+          previousBestF1Score: historyEntry.previousBestF1Score ?? snapshot.previousBestF1Score ?? null,
+          scoreDelta: historyEntry.scoreDelta ?? snapshot.scoreDelta ?? null,
+          improved: historyEntry.improved ?? snapshot.improved ?? null,
+          cpuUsage: historyEntry.cpuUsage ?? snapshot.cpuUsage ?? null,
+          memoryUsage: historyEntry.memoryUsage ?? snapshot.memoryUsage ?? null,
+          memoryUsagePercent: historyEntry.memoryUsagePercent ?? snapshot.memoryUsagePercent ?? null,
+          localSearch: historyEntry.localSearch || snapshot.localSearch || null,
+          neighborhood: historyEntry.neighborhood || snapshot.neighborhood || null,
+          iterationNeighborhood: historyEntry.iterationNeighborhood ?? snapshot.iterationNeighborhood ?? null,
+          iterationLocalSearch: historyEntry.iterationLocalSearch ?? snapshot.iterationLocalSearch ?? null,
+          solutionSize: historyEntry.solutionSize ?? snapshot.solutionSize ?? solutionFeatures.length,
+          rclSize: historyEntry.rclSize ?? snapshot.rclSize ?? rclFeatures.length,
+          enabledLocalSearches: historyEntry.enabledLocalSearches || snapshot.enabledLocalSearches || [],
+          rclFeatures,
+          solutionFeatures,
         };
       })
       .reverse();
@@ -133,6 +145,8 @@ class GraspExecutionStoreService {
   mapRun(runRecord) {
     const bestSolutionEvent = (runRecord.bestSolutionEvents || [])[0] || null;
     const bestSnapshot = this.extractSnapshotFromEventPayload(bestSolutionEvent?.payload);
+    const latestEvent = (runRecord.events || [])[0] || null;
+    const latestSnapshot = this.extractSnapshotFromEventPayload(latestEvent?.payload);
     const shouldPromoteBestSnapshot =
       this.topicPriority(bestSnapshot.topic || bestSolutionEvent?.topic) > this.topicPriority(runRecord.topic);
 
@@ -173,6 +187,17 @@ class GraspExecutionStoreService {
       runnigTime: bestSnapshot.runnigTime ?? bestSnapshot.runningTime ?? runRecord.runningTime,
       solutionFeatures: bestSnapshot.solutionFeatures || runRecord.solutionFeatures || [],
       rclfeatures: bestSnapshot.rclfeatures || bestSnapshot.rclFeatures || runRecord.rclFeatures || [],
+      rclFeatures: bestSnapshot.rclfeatures || bestSnapshot.rclFeatures || latestSnapshot.rclfeatures || latestSnapshot.rclFeatures || runRecord.rclFeatures || [],
+      enabledLocalSearches: bestSnapshot.enabledLocalSearches || latestSnapshot.enabledLocalSearches || [],
+      neighborhoodMaxIterations: bestSnapshot.neighborhoodMaxIterations ?? latestSnapshot.neighborhoodMaxIterations ?? null,
+      bitFlipMaxIterations: bestSnapshot.bitFlipMaxIterations ?? latestSnapshot.bitFlipMaxIterations ?? null,
+      iwssMaxIterations: bestSnapshot.iwssMaxIterations ?? latestSnapshot.iwssMaxIterations ?? null,
+      iwssrMaxIterations: bestSnapshot.iwssrMaxIterations ?? latestSnapshot.iwssrMaxIterations ?? null,
+      solutionSize: bestSnapshot.solutionSize ?? (Array.isArray(bestSnapshot.solutionFeatures) ? bestSnapshot.solutionFeatures.length : Array.isArray(runRecord.solutionFeatures) ? runRecord.solutionFeatures.length : 0),
+      rclSize: bestSnapshot.rclSize ?? (Array.isArray(bestSnapshot.rclfeatures || bestSnapshot.rclFeatures) ? (bestSnapshot.rclfeatures || bestSnapshot.rclFeatures).length : Array.isArray(runRecord.rclFeatures) ? runRecord.rclFeatures.length : 0),
+      previousBestF1Score: bestSnapshot.previousBestF1Score ?? latestSnapshot.previousBestF1Score ?? null,
+      scoreDelta: bestSnapshot.scoreDelta ?? latestSnapshot.scoreDelta ?? null,
+      improved: bestSnapshot.improved ?? latestSnapshot.improved ?? null,
       updates: runRecord.updates,
       history,
     };
@@ -351,12 +376,6 @@ class GraspExecutionStoreService {
 
   async listEvents(limit = 100) {
     const events = await prisma.graspExecutionEvent.findMany({
-      where: {
-        OR: [
-          { topic: null },
-          { topic: { not: "LOCAL_SEARCH_PROGRESS_TOPIC" } },
-        ],
-      },
       orderBy: { createdAt: "desc" },
       take: limit,
     });

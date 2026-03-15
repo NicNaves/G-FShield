@@ -194,6 +194,17 @@ public class IwssService {
             int totalIterations,
             double lastPublishedBestF1
     ) {
+        if (shouldPublishProgress(snapshot, iteration, totalIterations, lastPublishedBestF1)) {
+            kafkaSolutionsProducer.sendProgress(snapshot);
+            log.debug(
+                    "iwss progress seedId={} iteration={} f1={} reason={}",
+                    snapshot.getSeedId(),
+                    snapshot.getIterationLocalSearch(),
+                    snapshot.getF1Score(),
+                    resolveProgressReason(snapshot, iteration, totalIterations, lastPublishedBestF1)
+            );
+        }
+
         return Math.max(lastPublishedBestF1, scoreOf(snapshot));
     }
 
@@ -219,6 +230,36 @@ public class IwssService {
 
     private double scoreOf(DataSolution snapshot) {
         return snapshot.getF1Score() == null ? Double.NEGATIVE_INFINITY : snapshot.getF1Score();
+    }
+
+    private String resolveProgressReason(
+            DataSolution snapshot,
+            int iteration,
+            int totalIterations,
+            double lastPublishedBestF1
+    ) {
+        boolean firstIteration = iteration == 0;
+        boolean lastIteration = iteration >= Math.max(totalIterations - 1, 0);
+        boolean improved = scoreOf(snapshot) > lastPublishedBestF1;
+        boolean sampledIteration = progressEveryN > 0 && ((iteration + 1) % progressEveryN == 0);
+
+        if (firstIteration) {
+            return "first";
+        }
+
+        if (lastIteration) {
+            return "last";
+        }
+
+        if (improved) {
+            return "improvement";
+        }
+
+        if (sampledIteration) {
+            return "sampled";
+        }
+
+        return "progress";
     }
 
     public DataSolution resetDataSolution(DataSolution seed, DataSolution data) {

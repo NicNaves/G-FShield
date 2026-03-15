@@ -70,7 +70,7 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
 
     // Remove event listener on cleanup
     return () => window.removeEventListener("resize", handleMiniSidenav);
-  }, [dispatch, location]);
+  }, [dispatch, transparentSidenav, whiteSidenav]);
 
   // Render all the routes from the routes.js (All the visible items on the Sidenav)
   const renderRoutes = routes
@@ -155,7 +155,7 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
         </MDBox>
         <MDBox
           component={NavLink}
-          to="/"
+          to="/dashboard"
           display="flex"
           flexDirection="column"
           justifyContent="center"

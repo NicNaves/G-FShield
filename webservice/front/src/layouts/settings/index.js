@@ -6,8 +6,11 @@ import Autocomplete from "@mui/material/Autocomplete";
 import Card from "@mui/material/Card";
 import Checkbox from "@mui/material/Checkbox";
 import Chip from "@mui/material/Chip";
-import CircularProgress from "@mui/material/CircularProgress";
 import Divider from "@mui/material/Divider";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Grid from "@mui/material/Grid";
 import MenuItem from "@mui/material/MenuItem";
@@ -25,7 +28,7 @@ import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import Footer from "examples/Footer";
 
 import { useMaterialUIController } from "context";
-import { getGraspServices, resetMonitorState, startGraspExecution } from "api/grasp";
+import { getGraspServices, resetDistributedEnvironment, resetMonitorState, startGraspExecution } from "api/grasp";
 import {
   algorithmCatalog,
   classifierOptions,
@@ -39,12 +42,6 @@ import { formatDateTime, getDatasetRoleLabel } from "utils/graspFormatters";
 import { clearGraspNotifications } from "utils/graspNotifications";
 import ExecutionQueuePanel from "./execution-queue-panel";
 import { toast } from "react-toastify";
-
-const tabs = [
-  { value: "execution", label: "Execution Setup", icon: "tune" },
-  { value: "datasets", label: "Datasets & Summary", icon: "dataset" },
-  { value: "operations", label: "Operations", icon: "admin_panel_settings" },
-];
 
 const cardSx = (darkMode) => ({
   borderRadius: 3,
@@ -141,6 +138,9 @@ function Settings() {
   const [services, setServices] = useState([]);
   const [loadingServices, setLoadingServices] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [resettingMonitor, setResettingMonitor] = useState(false);
+  const [resettingEnvironment, setResettingEnvironment] = useState(false);
+  const [fullResetDialogOpen, setFullResetDialogOpen] = useState(false);
   const [lastDispatch, setLastDispatch] = useState(null);
   const [error, setError] = useState("");
   const { catalog, loading: loadingDatasets, error: datasetError } = useDatasetCatalog();
@@ -181,8 +181,22 @@ function Settings() {
 
   const helperForDataset = (dataset) =>
     dataset
-      ? `${dataset.sizeLabel} | ${dataset.attributeCount ?? "--"} attrs | ${dataset.instanceCount ?? "--"} rows | ${getDatasetRoleLabel(dataset.roleSuggestion)}`
-      : "Choose a file from the shared folder";
+      ? t("datasets.datasetMetaSummary", {
+          size: dataset.sizeLabel,
+          attributes: dataset.attributeCount ?? "--",
+          instances: dataset.instanceCount ?? "--",
+          updated: getDatasetRoleLabel(dataset.roleSuggestion),
+        })
+      : t("settings.chooseSharedFile");
+
+  const tabs = useMemo(
+    () => [
+      { value: "execution", label: t("settings.executionTab"), icon: "tune" },
+      { value: "datasets", label: t("settings.datasetsTab"), icon: "dataset" },
+      { value: "operations", label: t("settings.operationsTab"), icon: "admin_panel_settings" },
+    ],
+    [t]
+  );
 
   const handleChange = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
   const toggleListValue = (field, value) => setForm((current) => ({
@@ -215,7 +229,7 @@ function Settings() {
       );
       const response = await startGraspExecution(payload);
       setLastDispatch(response.launch || response);
-      toast.success("Execution queued successfully.");
+      toast.success(t("settings.executionStarted"));
       setActiveTab("operations");
     } catch (submitError) {
       const message = submitError.response?.data?.error || submitError.message;
@@ -228,13 +242,36 @@ function Settings() {
 
   const handleResetMonitor = async () => {
     try {
+      setResettingMonitor(true);
       await resetMonitorState();
       clearGraspNotifications();
       setLastDispatch(null);
       toast.success(t("settings.resetMonitorSuccess"));
     } catch (requestError) {
       toast.error(requestError.message || t("settings.resetMonitorError"));
+    } finally {
+      setResettingMonitor(false);
     }
+  };
+
+  const handleResetEnvironment = async () => {
+    try {
+      setFullResetDialogOpen(false);
+      setResettingEnvironment(true);
+      await resetDistributedEnvironment();
+      clearGraspNotifications();
+      setLastDispatch(null);
+      toast.success(t("settings.fullResetSuccess"));
+    } catch (requestError) {
+      toast.error(requestError.message || t("settings.fullResetError"));
+    } finally {
+      setResettingEnvironment(false);
+    }
+  };
+
+  const closeFullResetDialog = () => {
+    if (resettingEnvironment) return;
+    setFullResetDialogOpen(false);
   };
 
   return (
@@ -270,13 +307,13 @@ function Settings() {
 
             {activeTab === "execution" ? <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
-                <SettingsSection darkMode={darkMode} title="Execution budget" description="Core parameters that define the construction and neighborhood budget.">
+                <SettingsSection darkMode={darkMode} title={t("settings.executionBudget")} description={t("settings.executionBudgetDescription")}>
                   <Stack spacing={2}>
                     {[
-                      ["maxGenerations", "Max. Number of Generations"],
-                      ["rclCutoff", "RCL Cutoff"],
-                      ["sampleSize", "Sample Size"],
-                      ["neighborhoodMaxIterations", "Neighborhood Max Iterations"],
+                      ["maxGenerations", t("settings.maxGenerations")],
+                      ["rclCutoff", t("settings.rclCutoff")],
+                      ["sampleSize", t("settings.sampleSize")],
+                      ["neighborhoodMaxIterations", t("settings.neighborhoodMaxIterations")],
                     ].map(([field, label]) => (
                       <TextField key={field} sx={fieldSx(darkMode)} fullWidth type="number" label={label} value={form[field]} onChange={handleChange(field)} />
                     ))}
@@ -284,31 +321,31 @@ function Settings() {
                 </SettingsSection>
               </Grid>
               <Grid item xs={12} md={6}>
-                <SettingsSection darkMode={darkMode} title="Classifier and orchestration" description="Define the classifier and the neighborhood strategy used by the distributed local search.">
+                <SettingsSection darkMode={darkMode} title={t("settings.classifierSection")} description={t("settings.classifierSectionDescription")}>
                   <Stack spacing={2}>
-                    <TextField sx={fieldSx(darkMode)} select SelectProps={{ MenuProps: selectMenuProps(darkMode) }} fullWidth label="Classifier Algorithm" value={form.classifier} onChange={handleChange("classifier")}>
+                    <TextField sx={fieldSx(darkMode)} select SelectProps={{ MenuProps: selectMenuProps(darkMode) }} fullWidth label={t("settings.classifier")} value={form.classifier} onChange={handleChange("classifier")}>
                       {classifierOptions.map((classifier) => <MenuItem key={classifier} value={classifier}>{classifier}</MenuItem>)}
                     </TextField>
-                    <TextField sx={fieldSx(darkMode)} select SelectProps={{ MenuProps: selectMenuProps(darkMode) }} fullWidth label="Neighborhood Strategy" value={form.neighborhoodStrategy} onChange={handleChange("neighborhoodStrategy")}>
+                    <TextField sx={fieldSx(darkMode)} select SelectProps={{ MenuProps: selectMenuProps(darkMode) }} fullWidth label={t("settings.neighborhoodStrategy")} value={form.neighborhoodStrategy} onChange={handleChange("neighborhoodStrategy")}>
                       {neighborhoodOptions.map((option) => <MenuItem key={option.key} value={option.key}>{option.label}</MenuItem>)}
                     </TextField>
                   </Stack>
                 </SettingsSection>
               </Grid>
               <Grid item xs={12} md={6}>
-                <SettingsSection darkMode={darkMode} title="Distributed local search" description="Enable the DLS services and set the max iteration budget for each one.">
+                <SettingsSection darkMode={darkMode} title={t("settings.localSearchSection")} description={t("settings.localSearchSectionDescription")}>
                   <Stack spacing={1.5}>
                     {localSearchCatalog.map((search) => (
                       <Card key={search.key} variant="outlined" sx={{ ...cardSx(darkMode), p: 1.5 }}>
                         <FormControlLabel
                           control={<Checkbox checked={form.localSearches.includes(search.key)} onChange={() => toggleListValue("localSearches", search.key)} sx={{ color: darkMode ? "rgba(226,232,240,0.84)" : undefined }} />}
-                          label={search.label}
+                              label={search.label}
                         />
                         <MDTypography variant="caption">{search.shortDescription}</MDTypography>
                         <MDBox mt={1.5}>
                           <TextField
                             sx={fieldSx(darkMode)}
-                            fullWidth size="small" type="number" label={`${search.label} Max Iterations`}
+                            fullWidth size="small" type="number" label={`${search.label} ${t("settings.neighborhoodMaxIterations")}`}
                             value={search.key === "BIT_FLIP" ? form.bitFlipMaxIterations : search.key === "IWSS" ? form.iwssMaxIterations : form.iwssrMaxIterations}
                             onChange={search.key === "BIT_FLIP" ? handleChange("bitFlipMaxIterations") : search.key === "IWSS" ? handleChange("iwssMaxIterations") : handleChange("iwssrMaxIterations")}
                             disabled={!form.localSearches.includes(search.key)}
@@ -320,7 +357,7 @@ function Settings() {
                 </SettingsSection>
               </Grid>
               <Grid item xs={12} md={6}>
-                <SettingsSection darkMode={darkMode} title="RCL algorithms" description="Choose the generators that should produce the initial solutions.">
+                <SettingsSection darkMode={darkMode} title={t("settings.algorithmsSection")} description={t("settings.algorithmsSectionDescription")}>
                   <Stack spacing={1.5}>
                     {algorithmCatalog.map((algorithm) => (
                       <Card key={algorithm.key} variant="outlined" sx={{ ...cardSx(darkMode), p: 1.5 }}>
@@ -338,17 +375,17 @@ function Settings() {
 
             {activeTab === "datasets" ? <Grid container spacing={3}>
               <Grid item xs={12} lg={7}>
-                <SettingsSection darkMode={darkMode} title="Dataset selection" description="Choose the training and testing files manually or start from an inferred pair.">
+                <SettingsSection darkMode={darkMode} title={t("settings.datasetSection")} description={t("settings.datasetSectionDescription")}>
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={6}>
-                      <Autocomplete freeSolo options={catalog.datasets.map((dataset) => dataset.name)} value={form.datasetTrainingName} onInputChange={(event, value) => setForm((current) => ({ ...current, datasetTrainingName: value }))} renderInput={(params) => <TextField {...params} sx={fieldSx(darkMode)} label="Training Dataset" helperText={helperForDataset(selectedTraining)} fullWidth />} />
+                      <Autocomplete freeSolo options={catalog.datasets.map((dataset) => dataset.name)} value={form.datasetTrainingName} onInputChange={(event, value) => setForm((current) => ({ ...current, datasetTrainingName: value }))} renderInput={(params) => <TextField {...params} sx={fieldSx(darkMode)} label={t("settings.trainingDataset")} helperText={helperForDataset(selectedTraining)} fullWidth />} />
                     </Grid>
                     <Grid item xs={12} md={6}>
-                      <Autocomplete freeSolo options={catalog.datasets.map((dataset) => dataset.name)} value={form.datasetTestingName} onInputChange={(event, value) => setForm((current) => ({ ...current, datasetTestingName: value }))} renderInput={(params) => <TextField {...params} sx={fieldSx(darkMode)} label="Testing Dataset" helperText={helperForDataset(selectedTesting)} fullWidth />} />
+                      <Autocomplete freeSolo options={catalog.datasets.map((dataset) => dataset.name)} value={form.datasetTestingName} onInputChange={(event, value) => setForm((current) => ({ ...current, datasetTestingName: value }))} renderInput={(params) => <TextField {...params} sx={fieldSx(darkMode)} label={t("settings.testingDataset")} helperText={helperForDataset(selectedTesting)} fullWidth />} />
                     </Grid>
                   </Grid>
                   <Divider sx={{ my: 2 }} />
-                  <MDTypography variant="button" fontWeight="medium">Suggested pairs from shared folder</MDTypography>
+                  <MDTypography variant="button" fontWeight="medium">{t("settings.suggestedPairs")}</MDTypography>
                   <Stack direction="row" spacing={1} mt={1.5} flexWrap="wrap" useFlexGap>
                     {catalog.suggestedPairs.map((pair) => {
                       const selected = form.datasetTrainingName === pair.trainingName && form.datasetTestingName === pair.testingName;
@@ -363,35 +400,35 @@ function Settings() {
                         />
                       );
                     })}
-                    {!loadingDatasets && !catalog.suggestedPairs.length ? <Chip label="No suggested pairs" variant="outlined" sx={chipSx(darkMode)} /> : null}
+                    {!loadingDatasets && !catalog.suggestedPairs.length ? <Chip label={t("settings.noSuggestedPairs")} variant="outlined" sx={chipSx(darkMode)} /> : null}
                   </Stack>
                 </SettingsSection>
               </Grid>
               <Grid item xs={12} lg={5}>
                 <Stack spacing={3}>
-                  <SettingsSection darkMode={darkMode} title="Shared dataset catalog" description={catalog.directory || "Waiting for the shared folder scan..."}>
-                    <MDTypography variant="caption" display="block">{loadingDatasets ? "Loading..." : `${catalog.datasets.length} file(s) found`}</MDTypography>
-                    <MDTypography variant="caption" display="block">{`Formats: ${(catalog.summary?.availableFormats || []).join(", ") || "--"}`}</MDTypography>
-                    <MDTypography variant="caption" display="block">{`Total size: ${catalog.summary?.totalSizeLabel || "--"}`}</MDTypography>
-                    <MDTypography variant="caption" display="block">{`Families: ${catalog.summary?.familyCount || 0}`}</MDTypography>
-                    <MDTypography variant="caption" display="block">{`Instances: ${catalog.summary?.totalInstances || 0}`}</MDTypography>
+                  <SettingsSection darkMode={darkMode} title={t("settings.sharedDatasetCatalog")} description={catalog.directory || t("settings.waitingSharedScan")}>
+                    <MDTypography variant="caption" display="block">{loadingDatasets ? t("common.loading") : t("settings.filesFound", { count: catalog.datasets.length })}</MDTypography>
+                    <MDTypography variant="caption" display="block">{t("settings.formatsSummary", { value: (catalog.summary?.availableFormats || []).join(", ") || "--" })}</MDTypography>
+                    <MDTypography variant="caption" display="block">{t("settings.totalSizeSummary", { value: catalog.summary?.totalSizeLabel || "--" })}</MDTypography>
+                    <MDTypography variant="caption" display="block">{t("settings.familiesSummary", { value: catalog.summary?.familyCount || 0 })}</MDTypography>
+                    <MDTypography variant="caption" display="block">{t("settings.instancesSummary", { value: catalog.summary?.totalInstances || 0 })}</MDTypography>
                     <Stack direction="row" spacing={1} mt={1.5} flexWrap="wrap" useFlexGap>
                       {catalog.datasets.slice(0, 8).map((dataset) => <Chip key={dataset.name} label={dataset.name} size="small" variant="outlined" sx={chipSx(darkMode)} />)}
                     </Stack>
                   </SettingsSection>
-                  <SettingsSection darkMode={darkMode} title="Execution summary" description="Review the next launch before it enters the queue.">
+                  <SettingsSection darkMode={darkMode} title={t("settings.executionSummary")} description={t("settings.reviewNextLaunch")}>
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                       {form.algorithms.map((algorithm) => <Chip key={algorithm} label={algorithm} color="info" size="small" />)}
                     </Stack>
                     <MDBox mt={1.25}>
-                      <MDTypography variant="caption" display="block">{`Classifier: ${form.classifier}`}</MDTypography>
-                      <MDTypography variant="caption" display="block">{`Neighborhood: ${form.neighborhoodStrategy}`}</MDTypography>
-                      <MDTypography variant="caption" display="block">{`Neighborhood max iterations: ${form.neighborhoodMaxIterations}`}</MDTypography>
-                      <MDTypography variant="caption" display="block">{`BitFlip max iterations: ${form.bitFlipMaxIterations}`}</MDTypography>
-                      <MDTypography variant="caption" display="block">{`IWSS max iterations: ${form.iwssMaxIterations}`}</MDTypography>
-                      <MDTypography variant="caption" display="block">{`IWSSR max iterations: ${form.iwssrMaxIterations}`}</MDTypography>
-                      <MDTypography variant="caption" display="block">{`Training: ${form.datasetTrainingName || "--"}`}</MDTypography>
-                      <MDTypography variant="caption" display="block">{`Testing: ${form.datasetTestingName || "--"}`}</MDTypography>
+                      <MDTypography variant="caption" display="block">{t("settings.classifierSummary", { value: form.classifier })}</MDTypography>
+                      <MDTypography variant="caption" display="block">{t("settings.neighborhoodSummary", { value: form.neighborhoodStrategy })}</MDTypography>
+                      <MDTypography variant="caption" display="block">{t("settings.neighborhoodIterationsSummary", { value: form.neighborhoodMaxIterations })}</MDTypography>
+                      <MDTypography variant="caption" display="block">{t("settings.bitFlipIterationsSummary", { value: form.bitFlipMaxIterations })}</MDTypography>
+                      <MDTypography variant="caption" display="block">{t("settings.iwssIterationsSummary", { value: form.iwssMaxIterations })}</MDTypography>
+                      <MDTypography variant="caption" display="block">{t("settings.iwssrIterationsSummary", { value: form.iwssrMaxIterations })}</MDTypography>
+                      <MDTypography variant="caption" display="block">{t("settings.trainingSummary", { value: form.datasetTrainingName || "--" })}</MDTypography>
+                      <MDTypography variant="caption" display="block">{t("settings.testingSummary", { value: form.datasetTestingName || "--" })}</MDTypography>
                     </MDBox>
                   </SettingsSection>
                 </Stack>
@@ -404,22 +441,131 @@ function Settings() {
               </Grid>
               <Grid item xs={12} lg={8}>
                 <Stack spacing={3}>
-                  <SettingsSection darkMode={darkMode} title="Local services" description="Endpoints exposed by the API gateway for dispatch.">
+                  <SettingsSection darkMode={darkMode} title={t("settings.localServices")} description={t("settings.localServicesDescription")}>
                     {services.map((service) => <MDBox key={service.key} mb={1.25}><MDTypography variant="button" fontWeight="medium">{service.label}</MDTypography><MDTypography variant="caption" display="block">{service.url}</MDTypography></MDBox>)}
-                    {loadingServices ? <MDTypography variant="caption">Loading local services...</MDTypography> : null}
+                    {loadingServices ? <MDTypography variant="caption">{t("settings.loadingLocalServices")}</MDTypography> : null}
                   </SettingsSection>
-                  <SettingsSection darkMode={darkMode} title={t("settings.lastDispatch")} description="Most recent queued launch created from this browser session.">
-                    {lastDispatch ? <Stack spacing={1}><MDTypography variant="caption">{`Request ID: ${lastDispatch.requestId}`}</MDTypography><MDTypography variant="caption">{`Requested at: ${formatDateTime(lastDispatch.requestedAt)}`}</MDTypography><MDTypography variant="caption">{`Queue state: ${lastDispatch.queueState || "--"}`}</MDTypography><MDTypography variant="caption">{`Algorithms: ${(lastDispatch.algorithms || []).join(", ")}`}</MDTypography></Stack> : loadingDatasets ? <CircularProgress size={18} /> : <MDTypography variant="button">{t("settings.noDispatchYet")}</MDTypography>}
+                  <SettingsSection darkMode={darkMode} title={t("settings.lastDispatch")} description={t("settings.lastDispatchDescription")}>
+                    {lastDispatch ? <Stack spacing={1}><MDTypography variant="caption">{`${t("settings.requestId")}: ${lastDispatch.requestId}`}</MDTypography><MDTypography variant="caption">{`${t("settings.requestedAt")}: ${formatDateTime(lastDispatch.requestedAt)}`}</MDTypography><MDTypography variant="caption">{`${t("settings.queueState")}: ${lastDispatch.queueState || "--"}`}</MDTypography><MDTypography variant="caption">{`${t("settings.algorithms")}: ${(lastDispatch.algorithms || []).join(", ")}`}</MDTypography></Stack> : <MDTypography variant="button">{t("settings.noDispatchYet")}</MDTypography>}
                   </SettingsSection>
                 </Stack>
               </Grid>
               <Grid item xs={12} lg={4}>
                 <Stack spacing={3}>
                   <SettingsSection darkMode={darkMode} title={t("settings.resetMonitorCardTitle")} description={t("settings.resetMonitorCardDescription")}>
-                    <MDBox display="flex" gap={1.5} flexWrap="wrap">
-                      <MDButton variant="gradient" color="error" onClick={handleResetMonitor}>{t("settings.resetMonitorButton")}</MDButton>
-                      <MDButton variant="outlined" color="info" onClick={() => { clearGraspNotifications(); toast.success(t("settings.clearBrowserStateSuccess")); }}>{t("settings.clearBrowserStateButton")}</MDButton>
-                    </MDBox>
+                    <Stack spacing={1.5}>
+                      <Card
+                        variant="outlined"
+                        sx={{
+                          ...cardSx(darkMode),
+                          p: 2,
+                          borderColor: darkMode ? "rgba(96,165,250,0.28)" : "rgba(59,130,246,0.18)",
+                          boxShadow: "none",
+                        }}
+                      >
+                        <MDTypography variant="button" fontWeight="medium">
+                          {t("settings.clearBrowserStateButton")}
+                        </MDTypography>
+                        <MDTypography variant="caption" display="block" mt={0.75} mb={1.5}>
+                          {t("settings.browserResetScope")}
+                        </MDTypography>
+                        <MDButton
+                          variant="outlined"
+                          color="info"
+                          disabled={resettingMonitor || resettingEnvironment}
+                          onClick={() => {
+                            clearGraspNotifications();
+                            toast.success(t("settings.clearBrowserStateSuccess"));
+                          }}
+                        >
+                          {t("settings.clearBrowserStateButton")}
+                        </MDButton>
+                      </Card>
+
+                      <Card
+                        variant="outlined"
+                        sx={{
+                          ...cardSx(darkMode),
+                          p: 2,
+                          borderColor: darkMode ? "rgba(245,158,11,0.3)" : "rgba(245,158,11,0.2)",
+                          boxShadow: "none",
+                        }}
+                      >
+                        <MDTypography variant="button" fontWeight="medium">
+                          {t("settings.resetMonitorButton")}
+                        </MDTypography>
+                        <MDTypography variant="caption" display="block" mt={0.75} mb={1.5}>
+                          {t("settings.resetMonitorScope")}
+                        </MDTypography>
+                        <MDButton
+                          variant="gradient"
+                          color="warning"
+                          onClick={handleResetMonitor}
+                          disabled={resettingEnvironment || resettingMonitor}
+                        >
+                          {resettingMonitor ? t("settings.resetMonitorRunning") : t("settings.resetMonitorButton")}
+                        </MDButton>
+                      </Card>
+
+                      <Card
+                        variant="outlined"
+                        sx={{
+                          ...cardSx(darkMode),
+                          p: 2,
+                          borderColor: "rgba(239,68,68,0.35)",
+                          background: darkMode
+                            ? "linear-gradient(180deg, rgba(49,18,24,0.38) 0%, rgba(29,18,31,0.24) 100%)"
+                            : "linear-gradient(180deg, rgba(255,251,251,0.98) 0%, rgba(255,245,245,0.96) 100%)",
+                          boxShadow: "none",
+                        }}
+                      >
+                        <MDBox
+                          display="flex"
+                          justifyContent="space-between"
+                          alignItems={{ xs: "flex-start", sm: "center" }}
+                          flexDirection={{ xs: "column", sm: "row" }}
+                          gap={1}
+                        >
+                          <MDTypography variant="button" fontWeight="medium">
+                            {t("settings.fullResetButton")}
+                          </MDTypography>
+                          <Chip
+                            label={t("settings.fullResetBadge")}
+                            color="error"
+                            size="small"
+                            variant="outlined"
+                            sx={chipSx(darkMode)}
+                          />
+                        </MDBox>
+                        <MDTypography variant="caption" display="block" mt={0.75} mb={1.5}>
+                          {t("settings.fullResetScope")}
+                        </MDTypography>
+                        <MDBox
+                          sx={{
+                            mb: 1.5,
+                            p: 1.25,
+                            borderRadius: 2,
+                            border: "1px solid rgba(239,68,68,0.22)",
+                            background: darkMode ? "rgba(127,29,29,0.18)" : "rgba(254,242,242,0.92)",
+                          }}
+                        >
+                          <MDTypography variant="caption" fontWeight="medium" display="block">
+                            {t("settings.fullResetOnlyLabel")}
+                          </MDTypography>
+                          <MDTypography variant="caption" display="block" mt={0.5}>
+                            {t("settings.fullResetWarning")}
+                          </MDTypography>
+                        </MDBox>
+                        <MDButton
+                          variant="outlined"
+                          color="error"
+                          disabled={resettingEnvironment || resettingMonitor}
+                          onClick={() => setFullResetDialogOpen(true)}
+                        >
+                          {resettingEnvironment ? t("settings.fullResetRunning") : t("settings.fullResetButton")}
+                        </MDButton>
+                      </Card>
+                    </Stack>
                   </SettingsSection>
                 </Stack>
               </Grid>
@@ -427,7 +573,7 @@ function Settings() {
 
             <MDBox mt={4} display="flex" gap={1.5} flexWrap="wrap">
               <MDButton type="submit" variant="gradient" color="info" disabled={submitting}>
-                {submitting ? t("settings.submitting") : "Queue execution"}
+                {submitting ? t("settings.submitting") : t("settings.queueExecution")}
               </MDButton>
               <MDButton variant="outlined" color="secondary" onClick={() => setForm({ ...defaultExecutionForm, datasetTrainingName: catalog.suggestedPairs[0]?.trainingName || "", datasetTestingName: catalog.suggestedPairs[0]?.testingName || "" })}>
                 {t("common.reset")}
@@ -436,6 +582,41 @@ function Settings() {
           </MDBox>
         </Card>
       </MDBox>
+      <Dialog
+        open={fullResetDialogOpen}
+        onClose={closeFullResetDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>{t("settings.fullResetDialogTitle")}</DialogTitle>
+        <DialogContent dividers>
+          <MDTypography variant="button" display="block">
+            {t("settings.fullResetDialogMessage")}
+          </MDTypography>
+          <MDBox component="ul" pl={3} mb={0} mt={1.5}>
+            <li>
+              <MDTypography variant="caption">{t("settings.fullResetImpactDocker")}</MDTypography>
+            </li>
+            <li>
+              <MDTypography variant="caption">{t("settings.fullResetImpactKafka")}</MDTypography>
+            </li>
+            <li>
+              <MDTypography variant="caption">{t("settings.fullResetImpactMonitor")}</MDTypography>
+            </li>
+            <li>
+              <MDTypography variant="caption">{t("settings.fullResetImpactMetrics")}</MDTypography>
+            </li>
+          </MDBox>
+        </DialogContent>
+        <DialogActions>
+          <MDButton variant="text" color="secondary" onClick={closeFullResetDialog} disabled={resettingEnvironment}>
+            {t("common.cancel")}
+          </MDButton>
+          <MDButton variant="gradient" color="error" onClick={handleResetEnvironment} disabled={resettingEnvironment}>
+            {resettingEnvironment ? t("settings.fullResetRunning") : t("settings.fullResetConfirmButton")}
+          </MDButton>
+        </DialogActions>
+      </Dialog>
       <Footer />
     </DashboardLayout>
   );

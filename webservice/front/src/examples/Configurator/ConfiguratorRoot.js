@@ -21,16 +21,14 @@ export default styled(Drawer)(({ theme, ownerState }) => {
   const { boxShadows, functions, transitions } = theme;
   const { openConfigurator } = ownerState;
 
-  const configuratorWidth = 360;
+  const configuratorWidth = "min(360px, 100vw)";
   const { lg } = boxShadows;
   const { pxToRem } = functions;
 
   // drawer styles when openConfigurator={true}
   const drawerOpenStyles = () => ({
-    width: configuratorWidth,
-    left: "initial",
-    right: 0,
-    transition: transitions.create("right", {
+    transform: "translateX(0)",
+    transition: transitions.create("transform", {
       easing: transitions.easing.sharp,
       duration: transitions.duration.short,
     }),
@@ -38,9 +36,8 @@ export default styled(Drawer)(({ theme, ownerState }) => {
 
   // drawer styles when openConfigurator={false}
   const drawerCloseStyles = () => ({
-    left: "initial",
-    right: pxToRem(-350),
-    transition: transitions.create("all", {
+    transform: "translateX(100%)",
+    transition: transitions.create("transform", {
       easing: transitions.easing.sharp,
       duration: transitions.duration.short,
     }),
@@ -48,12 +45,18 @@ export default styled(Drawer)(({ theme, ownerState }) => {
 
   return {
     "& .MuiDrawer-paper": {
+      width: configuratorWidth,
+      maxWidth: "100vw",
       height: "100vh",
       margin: 0,
       padding: `0 ${pxToRem(10)}`,
       borderRadius: 0,
       boxShadow: lg,
       overflowY: "auto",
+      overflowX: "hidden",
+      boxSizing: "border-box",
+      left: "auto",
+      right: 0,
       ...(openConfigurator ? drawerOpenStyles() : drawerCloseStyles()),
     },
   };

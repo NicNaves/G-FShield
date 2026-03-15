@@ -149,7 +149,10 @@ function RunDetails() {
         { Header: t("runDetails.topic"), accessor: "topic", align: "left" },
         { Header: t("runDetails.localSearch"), accessor: "localSearch", align: "left" },
         { Header: t("runDetails.neighborhood"), accessor: "neighborhood", align: "left" },
+        { Header: t("runDetails.iteration"), accessor: "iteration", align: "left" },
         { Header: t("runDetails.f1Score"), accessor: "f1Score", align: "left" },
+        { Header: t("runDetails.delta"), accessor: "delta", align: "left" },
+        { Header: t("runDetails.sizes"), accessor: "sizes", align: "left" },
         { Header: t("runDetails.features"), accessor: "features", align: "left" },
       ],
       rows: history.map((entry) => ({
@@ -158,7 +161,10 @@ function RunDetails() {
         topic: entry.topic || "--",
         localSearch: entry.localSearch || "--",
         neighborhood: entry.neighborhood || "--",
+        iteration: entry.iterationLocalSearch ?? entry.iterationNeighborhood ?? "--",
         f1Score: formatCompactPercent(entry.f1Score),
+        delta: formatMetric(entry.scoreDelta, " pts"),
+        sizes: `Sol ${entry.solutionSize ?? ((entry.solutionFeatures || []).length)} / RCL ${entry.rclSize ?? ((entry.rclFeatures || []).length)}`,
         features: formatFeatureSubset(entry.solutionFeatures, 8),
       })),
     }),
@@ -266,7 +272,7 @@ function RunDetails() {
                         {t("runDetails.timeline")}
                       </MDTypography>
                       <MDTypography variant="button" color="text">
-                        {`${run.rclAlgorithm || "GRASP-FS"} / ${run.classifier || "--"} / ${history.length} checkpoints`}
+                        {`${run.rclAlgorithm || "GRASP-FS"} / ${run.classifier || "--"} / ${t("runDetails.checkpoints", { count: history.length })}`}
                       </MDTypography>
                       <MDBox mt={3} height="340px">
                         <Line data={timelineData} options={timelineOptions} />
@@ -296,7 +302,7 @@ function RunDetails() {
                         </MDTypography>
 
                         <MDTypography variant="caption" color="text" mt={1}>
-                          Seed
+                          {t("runDetails.seed")}
                         </MDTypography>
                         <MDTypography variant="button" color="dark">
                           {shortenSeed(run.seedId)}
@@ -317,6 +323,22 @@ function RunDetails() {
                         </MDTypography>
                         <MDTypography variant="button" color="dark">
                           {formatDateTime(run.createdAt)}
+                        </MDTypography>
+
+                        <MDTypography variant="caption" color="text" mt={1}>
+                          {t("runDetails.rclMetadata")}
+                        </MDTypography>
+                        <MDTypography variant="button" color="dark">
+                          {`${run.rclAlgorithm || "--"} | RCL ${run.rclSize ?? ((run.rclFeatures || run.rclfeatures || []).length)} | Sol ${run.solutionSize ?? ((run.solutionFeatures || []).length)}`}
+                        </MDTypography>
+
+                        <MDTypography variant="caption" color="text" mt={1}>
+                          {t("runDetails.searchPlan")}
+                        </MDTypography>
+                        <MDTypography variant="button" color="dark">
+                          {Array.isArray(run.enabledLocalSearches) && run.enabledLocalSearches.length
+                            ? run.enabledLocalSearches.join(", ")
+                            : "--"}
                         </MDTypography>
                       </Stack>
 
@@ -376,7 +398,7 @@ function RunDetails() {
                     {t("runDetails.historyTable")}
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    {history.length > 0 ? `${history.length} persisted records loaded.` : t("runDetails.noHistory")}
+                    {history.length > 0 ? t("runDetails.persistedRecordsLoaded", { count: history.length }) : t("runDetails.noHistory")}
                   </MDTypography>
                 </MDBox>
                 <DataTable

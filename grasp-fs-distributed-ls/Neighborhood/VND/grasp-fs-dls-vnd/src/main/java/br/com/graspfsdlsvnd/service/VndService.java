@@ -8,6 +8,7 @@ import br.com.graspfsdlsvnd.producer.KafkaIwssProducer;
 import br.com.graspfsdlsvnd.producer.KafkaIwssrProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -17,6 +18,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class VndService {
+
+    @Value("${vnd.max.iterations:10}")
+    private int defaultMaxIterations;
 
     private final KafkaBitFlipProducer bitFlipProducer;
     private final KafkaIwssProducer kafkaIwssProducer;
@@ -28,15 +32,18 @@ public class VndService {
         LocalSearch effectiveLocalSearch = localSearch != null && sequence.contains(localSearch)
                 ? localSearch
                 : sequence.get(0);
+        int dispatchBudget = resolveDispatchBudget(data, sequence);
 
         data.setNeighborhood("VND");
         int currentIteration = data.getIterationNeighborhood() != null ? data.getIterationNeighborhood() : 0;
-        data.setIterationNeighborhood(currentIteration + 1);
+        int nextIteration = currentIteration + 1;
+        data.setIterationNeighborhood(nextIteration);
 
         log.info(
-                "vnd dispatch seedId={} iterationNeighborhood={} selectedSearch={} availableSearches={} currentBestF1={}",
+                "vnd dispatch seedId={} dispatchStep={}/{} selectedSearch={} availableSearches={} currentBestF1={}",
                 data.getSeedId(),
-                data.getIterationNeighborhood(),
+                nextIteration,
+                dispatchBudget,
                 effectiveLocalSearch,
                 sequence,
                 data.getF1Score()
@@ -50,47 +57,78 @@ public class VndService {
         }
     }
 
-    public DataSolution callNextService(DataSolution bestSolution, DataSolution incoming) {
+    public DataSolution callNextService(DataSolution bestSolution, DataSolution incoming, boolean allowContinuation) {
         List<LocalSearch> sequence = resolveEnabledLocalSearches(incoming);
+        int dispatchBudget = resolveDispatchBudget(incoming, sequence);
+        int currentStep = incoming.getIterationNeighborhood() != null ? incoming.getIterationNeighborhood() : 0;
+        boolean improved = scoreOf(incoming) > scoreOf(bestSolution);
+        DataSolution updatedBest = improved ? incoming : bestSolution;
 
         log.info(
-                "vnd result seedId={} incomingSearch={} incomingF1={} bestF1={} availableSearches={}",
+                "vnd result seedId={} incomingSearch={} incomingF1={} bestF1={} improved={} dispatchStep={}/{} availableSearches={}",
                 incoming.getSeedId(),
                 incoming.getLocalSearch(),
                 scoreOf(incoming),
                 scoreOf(bestSolution),
+                improved,
+                currentStep,
+                dispatchBudget,
                 sequence
         );
 
-        if (scoreOf(incoming) > scoreOf(bestSolution)) {
+        if (improved) {
+            if (allowContinuation) {
+                log.info(
+                        "vnd improvement seedId={} previousBestF1={} newBestF1={} restartingCycle=true remainingDispatches={}",
+                        incoming.getSeedId(),
+                        scoreOf(bestSolution),
+                        scoreOf(incoming),
+                        Math.max(dispatchBudget - currentStep, 0)
+                );
+                kafkaInitialSolutionProducer.send(incoming);
+            } else {
+                log.info(
+                        "vnd improvement seedId={} previousBestF1={} newBestF1={} restartingCycle=false reason=dispatch-budget-exhausted",
+                        incoming.getSeedId(),
+                        scoreOf(bestSolution),
+                        scoreOf(incoming)
+                );
+            }
+            return updatedBest;
+        }
+
+        if (!allowContinuation) {
             log.info(
-                    "vnd improvement seedId={} previousBestF1={} newBestF1={} restartingCycle=true",
+                    "vnd cycle completed seedId={} lastSearch={} dispatchStep={}/{} finalBestF1={}",
                     incoming.getSeedId(),
-                    scoreOf(bestSolution),
-                    scoreOf(incoming)
+                    incoming.getLocalSearch(),
+                    currentStep,
+                    dispatchBudget,
+                    scoreOf(updatedBest)
             );
-            kafkaInitialSolutionProducer.send(incoming);
-            return incoming;
+            return updatedBest;
         }
 
         LocalSearch nextLocalSearch = nextLocalSearch(sequence, incoming.getLocalSearch());
         log.info(
-                "vnd continuing seedId={} currentSearch={} nextSearch={} sequenceSize={}",
+                "vnd continuing seedId={} currentSearch={} nextSearch={} dispatchStep={}/{} sequenceSize={}",
                 incoming.getSeedId(),
                 incoming.getLocalSearch(),
                 nextLocalSearch,
+                currentStep,
+                dispatchBudget,
                 sequence.size()
         );
         doVnd(incoming, nextLocalSearch);
 
-        return bestSolution;
+        return updatedBest;
     }
 
     private float scoreOf(DataSolution data) {
         return data.getF1Score() != null ? data.getF1Score() : 0.0F;
     }
 
-    private List<LocalSearch> resolveEnabledLocalSearches(DataSolution data) {
+    public List<LocalSearch> resolveEnabledLocalSearches(DataSolution data) {
         List<LocalSearch> resolved = new ArrayList<>();
 
         if (data.getEnabledLocalSearches() != null) {
@@ -117,6 +155,18 @@ public class VndService {
         }
 
         return resolved;
+    }
+
+    public int resolveDispatchBudget(DataSolution data) {
+        return resolveDispatchBudget(data, resolveEnabledLocalSearches(data));
+    }
+
+    private int resolveDispatchBudget(DataSolution data, List<LocalSearch> sequence) {
+        int configuredCycles = data.getNeighborhoodMaxIterations() != null && data.getNeighborhoodMaxIterations() > 0
+                ? data.getNeighborhoodMaxIterations()
+                : defaultMaxIterations;
+        int searchesPerCycle = Math.max(sequence.size(), 1);
+        return Math.max(configuredCycles * searchesPerCycle, searchesPerCycle);
     }
 
     private LocalSearch nextLocalSearch(List<LocalSearch> sequence, LocalSearch currentLocalSearch) {

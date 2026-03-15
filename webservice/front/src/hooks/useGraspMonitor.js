@@ -140,7 +140,7 @@ export default function useGraspMonitor(limit = 100) {
       return;
     }
 
-    if (!["INITIAL_SOLUTION_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(incomingRun.topic)) {
+    if (!["INITIAL_SOLUTION_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(incomingRun.topic)) {
       return;
     }
 
@@ -190,8 +190,10 @@ export default function useGraspMonitor(limit = 100) {
         setLoading(true);
         setError("");
 
+        const historyWindow = Math.max(200, Math.min(limit, 500));
+
         const [runsResponse, eventsResponse, summaryResponse] = await Promise.all([
-          getMonitorRuns(limit, 30),
+          getMonitorRuns(limit, historyWindow),
           getMonitorEvents(limit),
           getMonitorSummary(limit, limit),
         ]);
@@ -252,7 +254,7 @@ export default function useGraspMonitor(limit = 100) {
         if ((payload.type === "kafka.update" || payload.type === "kafka.progress")
           && payload.payload?.seedId
           && !cancelled) {
-          if (["INITIAL_SOLUTION_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(payload.payload.topic)) {
+          if (["INITIAL_SOLUTION_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(payload.payload.topic)) {
             notifyIfImproved(payload.payload);
           } else {
             rememberObservedScore(payload.payload);

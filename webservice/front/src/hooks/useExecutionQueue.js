@@ -7,7 +7,11 @@ export default function useExecutionQueue(limit = 25, refreshMs = 4000) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadLaunches = useCallback(async () => {
+  const loadLaunches = useCallback(async ({ showLoading = false } = {}) => {
+    if (showLoading) {
+      setLoading(true);
+    }
+
     try {
       const nextLaunches = await getExecutionLaunches(limit);
       setLaunches(nextLaunches);
@@ -16,6 +20,10 @@ export default function useExecutionQueue(limit = 25, refreshMs = 4000) {
     } catch (requestError) {
       setError(requestError.message || "Unable to load the execution queue.");
       throw requestError;
+    } finally {
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   }, [limit]);
 
@@ -24,7 +32,9 @@ export default function useExecutionQueue(limit = 25, refreshMs = 4000) {
 
     const load = async () => {
       try {
-        setLoading(true);
+        if (!cancelled) {
+          setLoading(true);
+        }
         const nextLaunches = await getExecutionLaunches(limit);
         if (!cancelled) {
           setLaunches(nextLaunches);
@@ -44,7 +54,7 @@ export default function useExecutionQueue(limit = 25, refreshMs = 4000) {
     load();
 
     const interval = window.setInterval(() => {
-      load().catch(() => undefined);
+      loadLaunches().catch(() => undefined);
     }, refreshMs);
 
     return () => {
@@ -68,7 +78,7 @@ export default function useExecutionQueue(limit = 25, refreshMs = 4000) {
     launches,
     loading,
     error,
-    refresh: loadLaunches,
+    refresh: () => loadLaunches({ showLoading: true }),
     cancelLaunch,
   };
 }

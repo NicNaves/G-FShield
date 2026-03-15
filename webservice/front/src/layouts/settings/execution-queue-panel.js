@@ -25,9 +25,11 @@ import {
   shortenSeed,
 } from "utils/graspFormatters";
 import { toast } from "react-toastify";
+import useI18n from "hooks/useI18n";
 
 function ExecutionQueuePanel() {
   const [controller] = useMaterialUIController();
+  const { t } = useI18n();
   const { darkMode } = controller;
   const { launches, loading, error, cancelLaunch, refresh } = useExecutionQueue(25, 4000);
   const [selectedRequestId, setSelectedRequestId] = useState("");
@@ -83,13 +85,13 @@ function ExecutionQueuePanel() {
   const tableData = useMemo(
     () => ({
       columns: [
-        { Header: "Request", accessor: "request", align: "left" },
-        { Header: "Queue state", accessor: "queueState", align: "left" },
-        { Header: "Status", accessor: "status", align: "left" },
-        { Header: "Requested at", accessor: "requestedAt", align: "left" },
-        { Header: "Datasets", accessor: "datasets", align: "left" },
-        { Header: "Dispatch", accessor: "dispatch", align: "left" },
-        { Header: "Actions", accessor: "actions", align: "left" },
+        { Header: t("queue.request"), accessor: "request", align: "left" },
+        { Header: t("queue.queueState"), accessor: "queueState", align: "left" },
+        { Header: t("queue.status"), accessor: "status", align: "left" },
+        { Header: t("queue.requestedAt"), accessor: "requestedAt", align: "left" },
+        { Header: t("queue.datasets"), accessor: "datasets", align: "left" },
+        { Header: t("queue.dispatch"), accessor: "dispatch", align: "left" },
+        { Header: t("queue.actions"), accessor: "actions", align: "left" },
       ],
       rows: launches.map((launch) => ({
         request: (
@@ -130,7 +132,19 @@ function ExecutionQueuePanel() {
         ),
         requestedAt: formatDateTime(launch.requestedAt),
         datasets: `${launch.params?.datasetTrainingName || "--"} -> ${launch.params?.datasetTestingName || "--"}`,
-        dispatch: `${launch.dispatchCount || 0}/${launch.algorithms?.length || 0}`,
+        dispatch: (
+          <Stack spacing={0.25}>
+            <MDTypography variant="caption" sx={{ color: darkMode ? "#f8fafc !important" : undefined }}>
+              {`${launch.dispatchCount || 0}/${launch.algorithms?.length || 0}`}
+            </MDTypography>
+            <MDTypography variant="caption" sx={{ color: darkMode ? "rgba(226,232,240,0.78) !important" : undefined }}>
+              {t("queue.pipelineCoverage", {
+                current: launch.completedSeedCount || 0,
+                total: launch.expectedSeedCount || 0,
+              })}
+            </MDTypography>
+          </Stack>
+        ),
         actions: (
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <MDButton
@@ -139,7 +153,7 @@ function ExecutionQueuePanel() {
               size="small"
               onClick={() => setSelectedRequestId(launch.requestId)}
             >
-              Summary
+              {t("queue.summary")}
             </MDButton>
             {launch.canCancel ? (
               <MDButton
@@ -149,24 +163,24 @@ function ExecutionQueuePanel() {
                 onClick={async () => {
                   try {
                     await cancelLaunch(launch.requestId);
-                    toast.success("Execution cancellation requested.");
+                    toast.success(t("queue.cancelRequested"));
                   } catch (requestError) {
-                    toast.error(requestError.message || "Unable to cancel the execution.");
+                    toast.error(requestError.message || t("queue.cancelError"));
                   }
                 }}
               >
-                Cancel
+                {t("queue.cancel")}
               </MDButton>
             ) : (
               <MDTypography variant="caption" sx={{ color: darkMode ? "rgba(226,232,240,0.78) !important" : undefined }}>
-                {launch.queueState === "dispatched" ? "Already submitted" : "Closed"}
+                {launch.queueState === "dispatched" ? t("queue.alreadySubmitted") : t("queue.closed")}
               </MDTypography>
             )}
           </Stack>
         ),
       })),
     }),
-    [cancelLaunch, darkMode, launches, selectedRequestId]
+    [cancelLaunch, darkMode, launches, selectedRequestId, t]
   );
 
   return (
@@ -189,15 +203,15 @@ function ExecutionQueuePanel() {
         >
           <MDBox>
             <MDTypography variant="h6" sx={{ color: darkMode ? "#f8fafc !important" : undefined }}>
-              Execution Queue
+              {t("queue.title")}
             </MDTypography>
             <MDTypography variant="button" sx={{ color: darkMode ? "rgba(226,232,240,0.78) !important" : undefined }}>
-              Queue, dispatch progress, and best-effort cancellation for launches submitted by the webservice.
+              {t("queue.subtitle")}
             </MDTypography>
           </MDBox>
 
           <MDButton variant="outlined" color="info" size="small" onClick={() => refresh().catch(() => undefined)}>
-            Refresh
+            {t("queue.refresh")}
           </MDButton>
         </MDBox>
 
@@ -208,10 +222,10 @@ function ExecutionQueuePanel() {
         ) : null}
 
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap mt={2}>
-          <Chip label={`${summary.queued} queued`} color="info" size="small" variant="outlined" />
-          <Chip label={`${summary.dispatching} dispatching`} color="warning" size="small" variant="outlined" />
-          <Chip label={`${summary.dispatched} dispatched`} color="success" size="small" variant="outlined" />
-          <Chip label={`${summary.cancelled} cancelled`} color="error" size="small" variant="outlined" />
+          <Chip label={`${summary.queued} ${t("queue.queued")}`} color="info" size="small" variant="outlined" />
+          <Chip label={`${summary.dispatching} ${t("queue.dispatching")}`} color="warning" size="small" variant="outlined" />
+          <Chip label={`${summary.dispatched} ${t("queue.dispatched")}`} color="success" size="small" variant="outlined" />
+          <Chip label={`${summary.cancelled} ${t("queue.cancelled")}`} color="error" size="small" variant="outlined" />
         </Stack>
       </MDBox>
 
@@ -238,10 +252,10 @@ function ExecutionQueuePanel() {
         >
           <MDBox>
             <MDTypography variant="h6" sx={{ color: darkMode ? "#f8fafc !important" : undefined }}>
-              Request Summary
+              {t("queue.requestSummary")}
             </MDTypography>
             <MDTypography variant="button" sx={{ color: darkMode ? "rgba(226,232,240,0.78) !important" : undefined }}>
-              Persisted parameters and dispatch metadata for the selected launch.
+              {t("queue.requestSummarySubtitle")}
             </MDTypography>
           </MDBox>
           {selectedLaunch ? (
@@ -266,12 +280,15 @@ function ExecutionQueuePanel() {
                   height: "100%",
                 }}
               >
-                <MDTypography variant="button" fontWeight="medium">Request metadata</MDTypography>
-                <MDTypography variant="caption" display="block" mt={1}>{`Request ID: ${selectedLaunch.requestId}`}</MDTypography>
-                <MDTypography variant="caption" display="block">{`Requested at: ${formatDateTime(selectedLaunch.requestedAt)}`}</MDTypography>
-                <MDTypography variant="caption" display="block">{`Queue state: ${selectedLaunch.queueState || "--"}`}</MDTypography>
-                <MDTypography variant="caption" display="block">{`Dispatch coverage: ${selectedLaunch.dispatchCount || 0}/${selectedAlgorithms.length || 0}`}</MDTypography>
-                <MDTypography variant="caption" display="block">{`Completed at: ${formatDateTime(selectedLaunch.completedAt || selectedLaunch.dispatchedAt)}`}</MDTypography>
+                <MDTypography variant="button" fontWeight="medium">{t("queue.requestMetadata")}</MDTypography>
+                <MDTypography variant="caption" display="block" mt={1}>{`${t("settings.requestId")}: ${selectedLaunch.requestId}`}</MDTypography>
+                <MDTypography variant="caption" display="block">{`${t("settings.requestedAt")}: ${formatDateTime(selectedLaunch.requestedAt)}`}</MDTypography>
+                <MDTypography variant="caption" display="block">{`${t("queue.queueState")}: ${selectedLaunch.queueState || "--"}`}</MDTypography>
+                <MDTypography variant="caption" display="block">{t("queue.dispatchCoverage", { current: selectedLaunch.dispatchCount || 0, total: selectedAlgorithms.length || 0 })}</MDTypography>
+                <MDTypography variant="caption" display="block">{t("queue.pipelineCoverage", { current: selectedLaunch.completedSeedCount || 0, total: selectedLaunch.expectedSeedCount || 0 })}</MDTypography>
+                <MDTypography variant="caption" display="block">{t("queue.pipelineObserved", { value: selectedLaunch.observedSeedCount || 0 })}</MDTypography>
+                <MDTypography variant="caption" display="block">{t("queue.lastResultAt", { value: formatDateTime(selectedLaunch.lastResultAt || selectedLaunch.dispatchedAt) })}</MDTypography>
+                <MDTypography variant="caption" display="block">{t("queue.completedAt", { value: formatDateTime(selectedLaunch.completedAt || selectedLaunch.dispatchedAt) })}</MDTypography>
               </MDBox>
             </Grid>
             <Grid item xs={12} md={6} lg={3}>
@@ -284,11 +301,11 @@ function ExecutionQueuePanel() {
                   height: "100%",
                 }}
               >
-                <MDTypography variant="button" fontWeight="medium">Datasets and classifier</MDTypography>
-                <MDTypography variant="caption" display="block" mt={1}>{`Training: ${selectedLaunch.params?.datasetTrainingName || "--"}`}</MDTypography>
-                <MDTypography variant="caption" display="block">{`Testing: ${selectedLaunch.params?.datasetTestingName || "--"}`}</MDTypography>
-                <MDTypography variant="caption" display="block">{`Classifier: ${selectedLaunch.params?.classifier || "--"}`}</MDTypography>
-                <MDTypography variant="caption" display="block">{`Neighborhood: ${neighborhoodLabelByKey.get(selectedLaunch.params?.neighborhoodStrategy) || selectedLaunch.params?.neighborhoodStrategy || "--"}`}</MDTypography>
+                <MDTypography variant="button" fontWeight="medium">{t("queue.datasetsClassifier")}</MDTypography>
+                <MDTypography variant="caption" display="block" mt={1}>{`${t("settings.training")}: ${selectedLaunch.params?.datasetTrainingName || "--"}`}</MDTypography>
+                <MDTypography variant="caption" display="block">{`${t("settings.testing")}: ${selectedLaunch.params?.datasetTestingName || "--"}`}</MDTypography>
+                <MDTypography variant="caption" display="block">{t("queue.classifier", { value: selectedLaunch.params?.classifier || "--" })}</MDTypography>
+                <MDTypography variant="caption" display="block">{t("queue.neighborhood", { value: neighborhoodLabelByKey.get(selectedLaunch.params?.neighborhoodStrategy) || selectedLaunch.params?.neighborhoodStrategy || "--" })}</MDTypography>
               </MDBox>
             </Grid>
             <Grid item xs={12} md={6} lg={3}>
@@ -301,11 +318,11 @@ function ExecutionQueuePanel() {
                   height: "100%",
                 }}
               >
-                <MDTypography variant="button" fontWeight="medium">Construction budget</MDTypography>
-                <MDTypography variant="caption" display="block" mt={1}>{`Max generations: ${selectedLaunch.params?.maxGenerations ?? "--"}`}</MDTypography>
-                <MDTypography variant="caption" display="block">{`RCL cutoff: ${selectedLaunch.params?.rclCutoff ?? "--"}`}</MDTypography>
-                <MDTypography variant="caption" display="block">{`Sample size: ${selectedLaunch.params?.sampleSize ?? "--"}`}</MDTypography>
-                <MDTypography variant="caption" display="block">{`Neighborhood iterations: ${selectedLaunch.params?.neighborhoodMaxIterations ?? "--"}`}</MDTypography>
+                <MDTypography variant="button" fontWeight="medium">{t("queue.constructionBudget")}</MDTypography>
+                <MDTypography variant="caption" display="block" mt={1}>{t("queue.maxGenerations", { value: selectedLaunch.params?.maxGenerations ?? "--" })}</MDTypography>
+                <MDTypography variant="caption" display="block">{t("queue.rclCutoff", { value: selectedLaunch.params?.rclCutoff ?? "--" })}</MDTypography>
+                <MDTypography variant="caption" display="block">{t("queue.sampleSize", { value: selectedLaunch.params?.sampleSize ?? "--" })}</MDTypography>
+                <MDTypography variant="caption" display="block">{t("queue.neighborhoodIterations", { value: selectedLaunch.params?.neighborhoodMaxIterations ?? "--" })}</MDTypography>
               </MDBox>
             </Grid>
             <Grid item xs={12} md={6} lg={3}>
@@ -318,11 +335,11 @@ function ExecutionQueuePanel() {
                   height: "100%",
                 }}
               >
-                <MDTypography variant="button" fontWeight="medium">Local-search budget</MDTypography>
-                <MDTypography variant="caption" display="block" mt={1}>{`BitFlip iterations: ${selectedLaunch.params?.bitFlipMaxIterations ?? "--"}`}</MDTypography>
-                <MDTypography variant="caption" display="block">{`IWSS iterations: ${selectedLaunch.params?.iwssMaxIterations ?? "--"}`}</MDTypography>
-                <MDTypography variant="caption" display="block">{`IWSSR iterations: ${selectedLaunch.params?.iwssrMaxIterations ?? "--"}`}</MDTypography>
-                <MDTypography variant="caption" display="block">{`Submitted algorithms: ${selectedExecutions.length || 0}`}</MDTypography>
+                <MDTypography variant="button" fontWeight="medium">{t("queue.localSearchBudget")}</MDTypography>
+                <MDTypography variant="caption" display="block" mt={1}>{t("queue.bitFlipIterations", { value: selectedLaunch.params?.bitFlipMaxIterations ?? "--" })}</MDTypography>
+                <MDTypography variant="caption" display="block">{t("queue.iwssIterations", { value: selectedLaunch.params?.iwssMaxIterations ?? "--" })}</MDTypography>
+                <MDTypography variant="caption" display="block">{t("queue.iwssrIterations", { value: selectedLaunch.params?.iwssrMaxIterations ?? "--" })}</MDTypography>
+                <MDTypography variant="caption" display="block">{t("queue.submittedAlgorithms", { value: selectedExecutions.length || 0 })}</MDTypography>
               </MDBox>
             </Grid>
             <Grid item xs={12} lg={6}>
@@ -335,12 +352,12 @@ function ExecutionQueuePanel() {
                   minHeight: "100%",
                 }}
               >
-                <MDTypography variant="button" fontWeight="medium">RCL algorithms</MDTypography>
+                <MDTypography variant="button" fontWeight="medium">{t("queue.rclAlgorithms")}</MDTypography>
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap mt={1.5}>
                   {selectedAlgorithms.map((algorithm) => (
                     <Chip key={algorithm} label={algorithmLabelByKey.get(algorithm) || algorithm} color="info" size="small" />
                   ))}
-                  {!selectedAlgorithms.length ? <Chip label="No algorithms selected" size="small" variant="outlined" /> : null}
+                  {!selectedAlgorithms.length ? <Chip label={t("queue.noAlgorithmsSelected")} size="small" variant="outlined" /> : null}
                 </Stack>
               </MDBox>
             </Grid>
@@ -354,12 +371,12 @@ function ExecutionQueuePanel() {
                   minHeight: "100%",
                 }}
               >
-                <MDTypography variant="button" fontWeight="medium">Local-search services</MDTypography>
+                <MDTypography variant="button" fontWeight="medium">{t("queue.localSearchServices")}</MDTypography>
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap mt={1.5}>
                   {selectedLocalSearches.map((search) => (
                     <Chip key={search} label={localSearchLabelByKey.get(search) || search} color="success" size="small" />
                   ))}
-                  {!selectedLocalSearches.length ? <Chip label="No local-search services selected" size="small" variant="outlined" /> : null}
+                  {!selectedLocalSearches.length ? <Chip label={t("queue.noLocalSearchSelected")} size="small" variant="outlined" /> : null}
                 </Stack>
               </MDBox>
             </Grid>
@@ -373,7 +390,7 @@ function ExecutionQueuePanel() {
                     background: darkMode ? "rgba(15,23,42,0.24)" : "rgba(248,250,252,0.9)",
                   }}
                 >
-                  <MDTypography variant="button" fontWeight="medium">Dispatch notes</MDTypography>
+                  <MDTypography variant="button" fontWeight="medium">{t("queue.dispatchNotes")}</MDTypography>
                   {selectedLaunch.note ? <MDTypography variant="caption" display="block" mt={1}>{selectedLaunch.note}</MDTypography> : null}
                   {selectedLaunch.error ? <MDTypography variant="caption" display="block" color="error" mt={selectedLaunch.note ? 0.75 : 1}>{selectedLaunch.error}</MDTypography> : null}
                 </MDBox>
@@ -382,7 +399,7 @@ function ExecutionQueuePanel() {
           </Grid>
         ) : (
           <MDTypography variant="button" sx={{ color: darkMode ? "rgba(226,232,240,0.78) !important" : undefined }}>
-            No execution launches available yet.
+            {t("queue.noLaunches")}
           </MDTypography>
         )}
       </MDBox>
@@ -390,7 +407,7 @@ function ExecutionQueuePanel() {
       {loading ? (
         <MDBox px={3} pb={3}>
           <MDTypography variant="caption" sx={{ color: darkMode ? "rgba(226,232,240,0.78) !important" : undefined }}>
-            Loading execution queue...
+            {t("queue.loading")}
           </MDTypography>
         </MDBox>
       ) : null}

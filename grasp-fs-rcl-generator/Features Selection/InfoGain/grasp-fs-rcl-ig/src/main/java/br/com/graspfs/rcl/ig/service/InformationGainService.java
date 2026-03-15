@@ -16,6 +16,7 @@ import java.io.BufferedWriter;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Random;
+import java.util.UUID;
 
 @Service
 public class InformationGainService {
@@ -60,21 +61,38 @@ public class InformationGainService {
     public DataSolution GenerationSolutions(DataSolution rcl, int cutoff, BufferedWriter writer,
                                             Instances trainingDataset, Instances testingDataset,
                                             AbstractClassifier classifier) throws Exception {
+        DataSolution candidate = DataSolution.builder()
+                .seedId(UUID.randomUUID())
+                .solutionFeatures(new ArrayList<>())
+                .rclfeatures(rcl.getRclfeatures() != null ? new ArrayList<>(rcl.getRclfeatures()) : new ArrayList<>())
+                .neighborhood(rcl.getNeighborhood())
+                .enabledLocalSearches(rcl.getEnabledLocalSearches() != null ? new ArrayList<>(rcl.getEnabledLocalSearches()) : new ArrayList<>())
+                .neighborhoodMaxIterations(rcl.getNeighborhoodMaxIterations())
+                .bitFlipMaxIterations(rcl.getBitFlipMaxIterations())
+                .iwssMaxIterations(rcl.getIwssMaxIterations())
+                .iwssrMaxIterations(rcl.getIwssrMaxIterations())
+                .iterationNeighborhood(rcl.getIterationNeighborhood())
+                .classfier(rcl.getClassfier())
+                .rclAlgorithm(rcl.getRclAlgorithm())
+                .localSearch(rcl.getLocalSearch())
+                .runnigTime(rcl.getRunnigTime())
+                .iterationLocalSearch(rcl.getIterationLocalSearch())
+                .trainingFileName(rcl.getTrainingFileName())
+                .testingFileName(rcl.getTestingFileName())
+                .build();
         Random random = new Random();
         long startTime = System.currentTimeMillis();
 
-        ArrayList<Integer> rclFeatures = new ArrayList<>(rcl.getRclfeatures());
+        ArrayList<Integer> rclFeatures = new ArrayList<>(candidate.getRclfeatures());
         ArrayList<Integer> solutionFeatures = new ArrayList<>();
 
-        // Gera solução aleatória da RCL
         for (int i = 0; i < cutoff && !rclFeatures.isEmpty(); i++) {
             int index = random.nextInt(rclFeatures.size());
             solutionFeatures.add(rclFeatures.remove(index));
         }
 
-        rcl.setSolutionFeatures(solutionFeatures);
+        candidate.setSolutionFeatures(solutionFeatures);
 
-        // Coleta de métricas
         MetricsCollector collector = new MetricsCollector();
         Thread monitor = new Thread(collector);
         monitor.start();
@@ -89,41 +107,38 @@ public class InformationGainService {
         collector.stop();
         monitor.join();
 
-        rcl.setF1Score(result.getF1Score());
-        rcl.setAccuracy(result.getAccuracy());
-        rcl.setPrecision(result.getPrecision());
-        rcl.setRecall(result.getRecall());
-        rcl.setRunnigTime(System.currentTimeMillis() - startTime);
+        candidate.setF1Score(result.getF1Score());
+        candidate.setAccuracy(result.getAccuracy());
+        candidate.setPrecision(result.getPrecision());
+        candidate.setRecall(result.getRecall());
+        candidate.setRunnigTime(System.currentTimeMillis() - startTime);
 
-        logger.info("Solução gerada - RCL: {} | Solução: {} | F1: {}",
-                rcl.getRclfeatures(), solutionFeatures, rcl.getF1Score());
+        logger.info("SoluÃ§Ã£o gerada - RCL: {} | SoluÃ§Ã£o: {} | F1: {}",
+                candidate.getRclfeatures(), solutionFeatures, candidate.getF1Score());
 
-        // Coleta final formatada
         float avgCpu = collector.getAvgCpu();
         float avgMemory = collector.getAvgMemory();
         float avgMemoryPercent = collector.getAvgMemoryPercent();
-        rcl.setCpuUsage(Float.isFinite(avgCpu) ? avgCpu : 0.0F);
-        rcl.setMemoryUsage(Float.isFinite(avgMemory) ? avgMemory : 0.0F);
-        rcl.setMemoryUsagePercent(Float.isFinite(avgMemoryPercent) ? avgMemoryPercent : 0.0F);
+        candidate.setCpuUsage(Float.isFinite(avgCpu) ? avgCpu : 0.0F);
+        candidate.setMemoryUsage(Float.isFinite(avgMemory) ? avgMemory : 0.0F);
+        candidate.setMemoryUsagePercent(Float.isFinite(avgMemoryPercent) ? avgMemoryPercent : 0.0F);
 
-        // Formata todos os valores para escrita
         String solutionStr = solutionFeatures.toString().replaceAll("[\\r\\n;]", ",");
-        String f1 = String.format(Locale.US, "%.4f", rcl.getF1Score());
-        String acc = String.format(Locale.US, "%.4f", rcl.getAccuracy());
-        String prec = String.format(Locale.US, "%.4f", rcl.getPrecision());
-        String rec = String.format(Locale.US, "%.4f", rcl.getRecall());
-        String time = String.valueOf(rcl.getRunnigTime());
+        String f1 = String.format(Locale.US, "%.4f", candidate.getF1Score());
+        String acc = String.format(Locale.US, "%.4f", candidate.getAccuracy());
+        String prec = String.format(Locale.US, "%.4f", candidate.getPrecision());
+        String rec = String.format(Locale.US, "%.4f", candidate.getRecall());
+        String time = String.valueOf(candidate.getRunnigTime());
         String cpu = Float.isFinite(avgCpu) ? String.format(Locale.US, "%.4f", avgCpu) : "0.0000";
         String mem = Float.isFinite(avgMemory) ? String.format(Locale.US, "%.4f", avgMemory) : "0.0000";
         String memPct = Float.isFinite(avgMemoryPercent) ? String.format(Locale.US, "%.4f", avgMemoryPercent) : "0.0000";
 
-        // Escreve linha no CSV
         writer.write(String.join(";",
             solutionStr, f1, acc, prec, rec, time, cpu, mem, memPct,
-            rcl.getClassfier(), rcl.getTrainingFileName(), rcl.getTestingFileName()
+            candidate.getClassfier(), candidate.getTrainingFileName(), candidate.getTestingFileName()
         ));
         writer.newLine();
 
-        return rcl;
+        return candidate;
     }
 }

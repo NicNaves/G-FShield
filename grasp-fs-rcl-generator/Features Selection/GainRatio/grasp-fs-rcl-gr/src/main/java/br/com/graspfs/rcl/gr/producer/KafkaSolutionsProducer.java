@@ -20,19 +20,35 @@ public class KafkaSolutionsProducer {
         this.kafkaTemplate = kafkaTemplate;
     }
 
-    /**
-     * Envia uma instância de DataSolution para o tópico Kafka.
-     * 
-     * @param data a solução a ser enviada
-     */
     public void send(DataSolution data) {
+        logger.info(
+                "rcl publishing initial solution seedId={} algorithm={} featureCount={} rclSize={} f1={} topic={}",
+                data.getSeedId(),
+                data.getRclAlgorithm(),
+                data.getSolutionFeatures() != null ? data.getSolutionFeatures().size() : 0,
+                data.getRclfeatures() != null ? data.getRclfeatures().size() : 0,
+                data.getF1Score(),
+                TOPIC
+        );
+
         kafkaTemplate.send(TOPIC, buildKey(data), data).addCallback(
-            success -> {
-                if (success != null) {
-                    logger.info("✅ Mensagem enviada para o tópico {}: {}", TOPIC, success.getProducerRecord().value());
-                }
-            },
-            failure -> logger.error("❌ Falha ao enviar mensagem para o tópico {}: {}", TOPIC, failure.getMessage())
+                success -> {
+                    if (success != null) {
+                        logger.info(
+                                "rcl published initial solution seedId={} topic={} partition={} offset={}",
+                                data.getSeedId(),
+                                TOPIC,
+                                success.getRecordMetadata().partition(),
+                                success.getRecordMetadata().offset()
+                        );
+                    }
+                },
+                failure -> logger.error(
+                        "rcl failed to publish initial solution seedId={} topic={} message={}",
+                        data.getSeedId(),
+                        TOPIC,
+                        failure.getMessage()
+                )
         );
     }
 

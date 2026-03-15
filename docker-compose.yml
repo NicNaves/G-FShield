@@ -1,5 +1,3 @@
-version: '3.8'
-
 x-rcl-service: &rcl-service
   cpus: 1.50
   mem_limit: 1536m
@@ -11,10 +9,6 @@ x-dls-service: &dls-service
 x-neighborhood-service: &neighborhood-service
   cpus: 0.75
   mem_limit: 768m
-
-x-postgres-service: &postgres-service
-  cpus: 0.50
-  mem_limit: 512m
 
 services:
   grasp-fs-rcl-su:
@@ -32,10 +26,6 @@ services:
       - dataset_volume:/datasets
       - metrics_volume:/metrics
     depends_on:
-      postgresql:
-        condition: service_healthy
-      postgresql-2:
-        condition: service_healthy
       kafka:
         condition: service_started
   grasp-fs-rcl-rf:
@@ -53,10 +43,6 @@ services:
       - dataset_volume:/datasets
       - metrics_volume:/metrics
     depends_on:
-      postgresql:
-        condition: service_healthy
-      postgresql-2:
-        condition: service_healthy
       kafka:
         condition: service_started
   grasp-fs-rcl-ig:
@@ -74,10 +60,6 @@ services:
       - dataset_volume:/datasets
       - metrics_volume:/metrics
     depends_on:
-      postgresql:
-        condition: service_healthy
-      postgresql-2:
-        condition: service_healthy
       kafka:
         condition: service_started
   grasp-fs-rcl-gr:
@@ -95,10 +77,6 @@ services:
       - dataset_volume:/datasets
       - metrics_volume:/metrics
     depends_on:
-      postgresql:
-        condition: service_healthy
-      postgresql-2:
-        condition: service_healthy
       kafka:
         condition: service_started
   grasp-fs.dls.verify:
@@ -114,10 +92,6 @@ services:
       - dataset_volume:/datasets
       - metrics_volume:/metrics
     depends_on:
-      postgresql:
-        condition: service_healthy
-      postgresql-2:
-        condition: service_healthy
       kafka:
         condition: service_started
   grasp-fs-dls-bf:
@@ -133,10 +107,6 @@ services:
       - dataset_volume:/datasets
       - metrics_volume:/metrics
     depends_on:
-      postgresql:
-        condition: service_healthy
-      postgresql-2:
-        condition: service_healthy
       kafka:
         condition: service_started
   grasp-fs-dls-iw:
@@ -152,10 +122,6 @@ services:
       - dataset_volume:/datasets
       - metrics_volume:/metrics
     depends_on:
-      postgresql:
-        condition: service_healthy
-      postgresql-2:
-        condition: service_healthy
       kafka:
         condition: service_started
   grasp-fs-dls-iwr:
@@ -171,10 +137,6 @@ services:
       - dataset_volume:/datasets
       - metrics_volume:/metrics
     depends_on:
-      postgresql:
-        condition: service_healthy
-      postgresql-2:
-        condition: service_healthy
       kafka:
         condition: service_started
   grasp-fs-dls-rvnd:
@@ -190,10 +152,6 @@ services:
       - dataset_volume:/datasets
       - metrics_volume:/metrics
     depends_on:
-      postgresql:
-        condition: service_healthy
-      postgresql-2:
-        condition: service_healthy
       kafka:
         condition: service_started
   grasp-fs-dls-vnd:
@@ -209,10 +167,6 @@ services:
       - dataset_volume:/datasets
       - metrics_volume:/metrics
     depends_on:
-      postgresql:
-        condition: service_healthy
-      postgresql-2:
-        condition: service_healthy
       kafka:
         condition: service_started
   zookeeper:
@@ -250,89 +204,20 @@ services:
     depends_on:
       - zookeeper
 
-  postgresql:
-    <<: *postgres-service
-    image: postgres:14
-    hostname: postgresql
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    environment:
-      PGDATA: "/var/lib/postgresql/data"
-      POSTGRES_DB: "conduktor-console"
-      POSTGRES_USER: "conduktor"
-      POSTGRES_PASSWORD: "change_me"
-      POSTGRES_HOST_AUTH_METHOD: "scram-sha-256"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U conduktor -d conduktor-console"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  postgresql-2:
-    <<: *postgres-service
-    image: postgres:14
-    hostname: postgresql-sql
-    volumes:
-      - pg_data_sql:/var/lib/postgresql/data
-    environment:
-      PGDATA: "/var/lib/postgresql/data"
-      POSTGRES_DB: "conduktor-sql"
-      POSTGRES_USER: "conduktor"
-      POSTGRES_PASSWORD: "change_me"
-      POSTGRES_HOST_AUTH_METHOD: "scram-sha-256"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U conduktor -d conduktor-sql"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  conduktor-console:
-    cpus: 0.75
-    mem_limit: 768m
-    image: conduktor/conduktor-console:1.32.0
+  kafbat-ui:
+    cpus: 0.50
+    mem_limit: 512m
+    image: ghcr.io/kafbat/kafka-ui:v1.4.2
     ports:
       - "8080:8080"
-    volumes:
-      - conduktor_data:/var/conduktor
     environment:
-      CDK_DATABASE_URL: "postgresql://conduktor:change_me@postgresql:5432/conduktor-console"
-      CDK_KAFKASQL_DATABASE_URL: "postgresql://conduktor:change_me@postgresql-sql:5432/conduktor-sql"
-      CDK_ORGANIZATION_NAME: "local-dev"
-      CDK_CLUSTERS_0_ID: "local-kafka"
-      CDK_CLUSTERS_0_NAME: "local-kafka"
-      CDK_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:29092"
-      CDK_CLUSTERS_0_COLOR: "#6A57C8"
-      CDK_CLUSTERS_0_ICON: "kafka"
-      CDK_MONITORING_CORTEX-URL: http://conduktor-monitoring:9009/
-      CDK_MONITORING_ALERT-MANAGER-URL: http://conduktor-monitoring:9010/
-      CDK_MONITORING_CALLBACK-URL: http://conduktor-console:8080/monitoring/api/
-      CDK_MONITORING_NOTIFICATIONS-CALLBACK-URL: http://localhost:8080
+      KAFKA_CLUSTERS_0_NAME: "local-kafka"
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:29092"
     depends_on:
-      postgresql:
-        condition: service_healthy
-      postgresql-2:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-
-  conduktor-monitoring:
-    cpus: 0.50
-    mem_limit: 384m
-    image: conduktor/conduktor-console-cortex:1.32.0
-    environment:
-      CDK_CONSOLE-URL: "http://conduktor-console:8080"
-    depends_on:
-      postgresql:
-        condition: service_healthy
-      postgresql-2:
-        condition: service_healthy
       kafka:
         condition: service_started
 
 volumes:
-  pg_data: {}
-  pg_data_sql: {}
-  conduktor_data: {}
   dataset_volume:
     driver: local
     driver_opts:

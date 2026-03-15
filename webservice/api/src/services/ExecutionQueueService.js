@@ -9,6 +9,7 @@ class ExecutionQueueService {
     this.pendingQueue = [];
     this.activeQueue = new Map();
     this.concurrency = Math.max(Number(process.env.GRASP_EXECUTION_QUEUE_CONCURRENCY || 1), 1);
+    this.resetVersion = 0;
   }
 
   async start() {
@@ -138,14 +139,24 @@ class ExecutionQueueService {
   }
 
   async reset() {
+    this.resetVersion += 1;
+    for (const item of this.activeQueue.values()) {
+      item.cancelRequested = true;
+      item.cancelReason = "system-reset";
+    }
     this.pendingQueue = [];
     this.activeQueue.clear();
   }
 
   async runExecution(queueItem) {
+    const runVersion = this.resetVersion;
     this.activeQueue.set(queueItem.requestId, queueItem);
 
     try {
+      if (this.isStaleRun(runVersion)) {
+        return;
+      }
+
       await executionLaunchService.updateLaunch(queueItem.requestId, {
         status: "RUNNING",
         metadataPatch: {
@@ -157,8 +168,12 @@ class ExecutionQueueService {
       });
 
       const dispatchResult = await graspGatewayService.dispatchExecution(queueItem.preparedExecution, {
-        shouldCancel: () => queueItem.cancelRequested,
+        shouldCancel: () => queueItem.cancelRequested || this.isStaleRun(runVersion),
         afterDispatch: async (execution, executions) => {
+          if (this.isStaleRun(runVersion)) {
+            return;
+          }
+
           await executionLaunchService.updateLaunch(queueItem.requestId, {
             status: "RUNNING",
             metadataPatch: {
@@ -171,6 +186,13 @@ class ExecutionQueueService {
           });
         },
       });
+
+      if (this.isStaleRun(runVersion)) {
+        logger.warn("Discarding stale queue execution after environment reset", {
+          requestId: queueItem.requestId,
+        });
+        return;
+      }
 
       if (queueItem.cancelRequested && dispatchResult.executions.length < queueItem.preparedExecution.algorithms.length) {
         await executionLaunchService.updateLaunch(queueItem.requestId, {
@@ -188,17 +210,25 @@ class ExecutionQueueService {
       }
 
       await executionLaunchService.updateLaunch(queueItem.requestId, {
-        status: "COMPLETED",
+        status: "RUNNING",
         metadataPatch: {
           queueState: "dispatched",
           dispatchedAt: new Date().toISOString(),
-          completedAt: new Date().toISOString(),
           executions: dispatchResult.executions,
           dispatchCount: dispatchResult.executions.length,
-          note: "All selected algorithms were submitted to the distributed pipeline.",
+          expectedSeedCount: dispatchResult.executions.length * Number(queueItem.preparedExecution.params?.maxGenerations || 0),
+          note: "All selected algorithms were submitted. Waiting for all generated seeds to finish the distributed pipeline.",
         },
       });
     } catch (error) {
+      if (this.isStaleRun(runVersion)) {
+        logger.warn("Ignoring queue execution failure after environment reset", {
+          requestId: queueItem.requestId,
+          error: error.message,
+        });
+        return;
+      }
+
       await executionLaunchService.updateLaunch(queueItem.requestId, {
         status: "FAILED",
         metadataPatch: {
@@ -215,9 +245,15 @@ class ExecutionQueueService {
         error: error.message,
       });
     } finally {
-      this.activeQueue.delete(queueItem.requestId);
-      this.scheduleProcessing();
+      if (!this.isStaleRun(runVersion)) {
+        this.activeQueue.delete(queueItem.requestId);
+        this.scheduleProcessing();
+      }
     }
+  }
+
+  isStaleRun(runVersion) {
+    return runVersion !== this.resetVersion;
   }
 }
 

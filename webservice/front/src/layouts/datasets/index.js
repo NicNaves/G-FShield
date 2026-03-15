@@ -81,14 +81,14 @@ function Datasets() {
       labels: datasetRows.slice(0, 6).map((entry) => entry.name.replace(".arff", "")),
       datasets: [
         {
-          label: "Size (MB)",
+          label: t("datasets.sizeMb"),
           backgroundColor: "#4361ee",
           borderRadius: 8,
           data: datasetRows.slice(0, 6).map((entry) => Number((entry.sizeBytes / 1024 / 1024).toFixed(2))),
         },
       ],
     }),
-    [datasetRows]
+    [datasetRows, t]
   );
 
   const chartOptions = useMemo(
@@ -121,12 +121,12 @@ function Datasets() {
     () => ({
       columns: [
         { Header: t("datasets.dataset"), accessor: "dataset", align: "left" },
-        { Header: "Format", accessor: "format", align: "left" },
-        { Header: "Relation", accessor: "relation", align: "left" },
+        { Header: t("datasets.format"), accessor: "format", align: "left" },
+        { Header: t("datasets.relation"), accessor: "relation", align: "left" },
         { Header: t("datasets.role"), accessor: "role", align: "left" },
-        { Header: "Attributes", accessor: "attributes", align: "left" },
-        { Header: "Instances", accessor: "instances", align: "left" },
-        { Header: "Class", accessor: "classAttribute", align: "left" },
+        { Header: t("datasets.attributes"), accessor: "attributes", align: "left" },
+        { Header: t("datasets.instances"), accessor: "instances", align: "left" },
+        { Header: t("datasets.classAttribute"), accessor: "classAttribute", align: "left" },
         { Header: t("datasets.size"), accessor: "size", align: "left" },
         { Header: t("datasets.observedRuns"), accessor: "runs", align: "left" },
         { Header: t("datasets.bestF1"), accessor: "bestF1", align: "left" },
@@ -153,7 +153,7 @@ function Datasets() {
         updated: formatRelativeTime(entry.modifiedAt),
       })),
     }),
-    [datasetRows]
+    [datasetRows, t]
   );
 
   const pageError = catalogError || runsError;
@@ -184,7 +184,7 @@ function Datasets() {
             <ComplexStatisticsCard color="info" icon="compare_arrows" title={t("datasets.suggestedPairs")} count={catalog.suggestedPairs.length} />
           </Grid>
           <Grid item xs={12} md={6} xl={3}>
-            <ComplexStatisticsCard color="success" icon="dataset" title="Total instances" count={catalog.summary?.totalInstances || 0} />
+            <ComplexStatisticsCard color="success" icon="dataset" title={t("datasets.totalInstances")} count={catalog.summary?.totalInstances || 0} />
           </Grid>
           <Grid item xs={12} md={6} xl={3}>
             <ComplexStatisticsCard color="warning" icon="folder_zip" title={t("datasets.largestFile")} count={largestDataset?.sizeLabel || "--"} />
@@ -223,19 +223,22 @@ function Datasets() {
                   <Divider sx={{ my: 2 }} />
 
                   <MDTypography variant="button" color="dark" fontWeight="medium">
-                    Catalog summary
+                    {t("datasets.catalogSummary")}
                   </MDTypography>
                   <MDTypography variant="caption" display="block" color="text" mt={1}>
-                    {`Formats: ${(catalog.summary?.availableFormats || []).join(", ") || "--"}`}
+                    {t("datasets.formatsSummary", { value: (catalog.summary?.availableFormats || []).join(", ") || "--" })}
                   </MDTypography>
                   <MDTypography variant="caption" display="block" color="text">
-                    {`Total size: ${catalog.summary?.totalSizeLabel || "--"}`}
+                    {t("datasets.totalSizeSummary", { value: catalog.summary?.totalSizeLabel || "--" })}
                   </MDTypography>
                   <MDTypography variant="caption" display="block" color="text">
-                    {`Catalogued attributes: ${catalog.summary?.totalAttributes || 0}`}
+                    {t("datasets.cataloguedAttributesSummary", { value: catalog.summary?.totalAttributes || 0 })}
                   </MDTypography>
                   <MDTypography variant="caption" display="block" color="text">
-                    {`Richest dataset: ${catalog.summary?.richestDataset?.name || "--"} (${catalog.summary?.richestDataset?.attributeCount || "--"} attrs)`}
+                    {t("datasets.richestDatasetSummary", {
+                      name: catalog.summary?.richestDataset?.name || "--",
+                      value: catalog.summary?.richestDataset?.attributeCount || "--",
+                    })}
                   </MDTypography>
 
                   <Divider sx={{ my: 2 }} />
@@ -268,7 +271,12 @@ function Datasets() {
                         {largestDataset.name}
                       </MDTypography>
                       <MDTypography variant="caption" display="block" color="text">
-                        {largestDataset.sizeLabel} | {largestDataset.attributeCount ?? "--"} attrs | {largestDataset.instanceCount ?? "--"} rows | {formatDateTime(largestDataset.modifiedAt)}
+                        {t("datasets.datasetMetaSummary", {
+                          size: largestDataset.sizeLabel,
+                          attributes: largestDataset.attributeCount ?? "--",
+                          instances: largestDataset.instanceCount ?? "--",
+                          updated: formatDateTime(largestDataset.modifiedAt),
+                        })}
                       </MDTypography>
                     </>
                   ) : (

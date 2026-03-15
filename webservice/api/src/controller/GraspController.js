@@ -3,6 +3,7 @@ const graspExecutionMonitorService = require("../services/GraspExecutionMonitorS
 const graspExecutionStoreService = require("../services/GraspExecutionStoreService");
 const datasetCatalogService = require("../services/DatasetCatalogService");
 const executionQueueService = require("../services/ExecutionQueueService");
+const environmentResetService = require("../services/EnvironmentResetService");
 const { MONITOR_SCHEMA_VERSION, graspMonitorSummaryService } = require("../services/GraspMonitorSummaryService");
 
 class GraspController {
@@ -81,7 +82,6 @@ class GraspController {
     const merged = new Map();
 
     [...liveEvents, ...storedEvents]
-      .filter((event) => !this.isProgressTopic(event?.topic))
       .forEach((event) => {
         if (!event) {
           return;
@@ -329,6 +329,19 @@ class GraspController {
       await graspExecutionStoreService.resetMonitorState();
       res.json(this.buildEnvelope({
         message: "Monitor state reset successfully.",
+        summary: graspMonitorSummaryService.summarize([], []),
+      }));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resetEnvironment(req, res, next) {
+    try {
+      const result = await environmentResetService.resetEnvironment();
+      res.json(this.buildEnvelope({
+        message: "Distributed environment reset successfully.",
+        reset: result,
         summary: graspMonitorSummaryService.summarize([], []),
       }));
     } catch (error) {

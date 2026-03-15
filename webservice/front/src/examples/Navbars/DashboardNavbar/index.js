@@ -21,7 +21,6 @@ import {
 import useI18n from "hooks/useI18n";
 
 function DashboardNavbar({ absolute, light, isMini }) {
-  const [navbarType, setNavbarType] = useState();
   const [controller, dispatch] = useMaterialUIController();
   const { miniSidenav, transparentNavbar, fixedNavbar, darkMode } = controller;
   const [openMenu, setOpenMenu] = useState(null); 
@@ -31,13 +30,9 @@ function DashboardNavbar({ absolute, light, isMini }) {
   const navigate = useNavigate();
   const { t } = useI18n();
 
-  useEffect(() => {
-    if (fixedNavbar) {
-      setNavbarType("sticky");
-    } else {
-      setNavbarType("static");
-    }
+  const navbarType = fixedNavbar ? "sticky" : "static";
 
+  useEffect(() => {
     function handleTransparentNavbar() {
       setTransparentNavbar(dispatch, (fixedNavbar && window.scrollY === 0) || !fixedNavbar);
     }

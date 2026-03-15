@@ -98,46 +98,82 @@ const buildDatasetKey = (trainingFileName, testingFileName) =>
 
 const extractEventSnapshot = (event) => {
   const snapshot = event?.payload?.payload || event?.payload || {};
+  const historyEntry = snapshot.historyEntry || {};
+  const solutionFeatures = parseFeatureList(historyEntry.solutionFeatures || snapshot.solutionFeatures);
+  const rclFeatures = parseFeatureList(historyEntry.rclFeatures || snapshot.rclFeatures || snapshot.rclfeatures);
+  const enabledLocalSearches = Array.isArray(historyEntry.enabledLocalSearches)
+    ? historyEntry.enabledLocalSearches
+    : Array.isArray(snapshot.enabledLocalSearches)
+      ? snapshot.enabledLocalSearches
+      : [];
 
   return {
     ...event,
     seedId: snapshot.seedId || event?.seedId || null,
-    topic: event?.topic || snapshot.topic || null,
-    stage: event?.stage || snapshot.stage || null,
+    topic: historyEntry.topic || event?.topic || snapshot.topic || null,
+    stage: historyEntry.stage || event?.stage || snapshot.stage || null,
     timestamp: event?.timestamp || snapshot.updatedAt || snapshot.createdAt || null,
     rclAlgorithm: snapshot.rclAlgorithm || null,
     classifier: snapshot.classifier || snapshot.classfier || null,
-    localSearch: snapshot.localSearch || null,
-    neighborhood: snapshot.neighborhood || null,
-    currentF1Score: snapshot.currentF1Score ?? snapshot.f1Score ?? null,
+    localSearch: historyEntry.localSearch || snapshot.localSearch || null,
+    neighborhood: historyEntry.neighborhood || snapshot.neighborhood || null,
+    currentF1Score: historyEntry.f1Score ?? snapshot.currentF1Score ?? snapshot.f1Score ?? null,
     bestF1Score: snapshot.bestF1Score ?? snapshot.currentF1Score ?? snapshot.f1Score ?? null,
     trainingFileName: snapshot.trainingFileName || null,
     testingFileName: snapshot.testingFileName || null,
-    solutionFeatures: parseFeatureList(snapshot.solutionFeatures),
-    memoryUsage: snapshot.memoryUsage ?? null,
-    memoryUsagePercent: snapshot.memoryUsagePercent ?? null,
-    cpuUsage: snapshot.cpuUsage ?? null,
+    iterationNeighborhood: historyEntry.iterationNeighborhood ?? snapshot.iterationNeighborhood ?? null,
+    iterationLocalSearch: historyEntry.iterationLocalSearch ?? snapshot.iterationLocalSearch ?? null,
+    previousBestF1Score: historyEntry.previousBestF1Score ?? snapshot.previousBestF1Score ?? null,
+    scoreDelta: historyEntry.scoreDelta ?? snapshot.scoreDelta ?? null,
+    improved: historyEntry.improved ?? snapshot.improved ?? null,
+    solutionFeatures,
+    rclFeatures,
+    enabledLocalSearches,
+    solutionSize: historyEntry.solutionSize ?? snapshot.solutionSize ?? solutionFeatures.length,
+    rclSize: historyEntry.rclSize ?? snapshot.rclSize ?? rclFeatures.length,
+    memoryUsage: historyEntry.memoryUsage ?? snapshot.memoryUsage ?? null,
+    memoryUsagePercent: historyEntry.memoryUsagePercent ?? snapshot.memoryUsagePercent ?? null,
+    cpuUsage: historyEntry.cpuUsage ?? snapshot.cpuUsage ?? null,
   };
 };
 
-const extractHistorySnapshot = (run, entry) => ({
-  seedId: run?.seedId || null,
-  topic: entry?.topic || null,
-  stage: entry?.stage || null,
-  timestamp: entry?.timestamp || run?.updatedAt || run?.createdAt || null,
-  rclAlgorithm: run?.rclAlgorithm || null,
-  classifier: run?.classifier || null,
-  localSearch: entry?.localSearch || run?.localSearch || null,
-  neighborhood: entry?.neighborhood || run?.neighborhood || null,
-  currentF1Score: entry?.f1Score ?? run?.currentF1Score ?? null,
-  bestF1Score: entry?.f1Score ?? run?.bestF1Score ?? run?.currentF1Score ?? null,
-  trainingFileName: run?.trainingFileName || null,
-  testingFileName: run?.testingFileName || null,
-  solutionFeatures: parseFeatureList(entry?.solutionFeatures || run?.solutionFeatures),
-  memoryUsage: entry?.memoryUsage ?? run?.memoryUsage ?? null,
-  memoryUsagePercent: entry?.memoryUsagePercent ?? run?.memoryUsagePercent ?? null,
-  cpuUsage: entry?.cpuUsage ?? run?.cpuUsage ?? null,
-});
+const extractHistorySnapshot = (run, entry) => {
+  const solutionFeatures = parseFeatureList(entry?.solutionFeatures || run?.solutionFeatures);
+  const rclFeatures = parseFeatureList(entry?.rclFeatures || run?.rclFeatures || run?.rclfeatures);
+  const enabledLocalSearches = Array.isArray(entry?.enabledLocalSearches)
+    ? entry.enabledLocalSearches
+    : Array.isArray(run?.enabledLocalSearches)
+      ? run.enabledLocalSearches
+      : [];
+
+  return {
+    seedId: run?.seedId || null,
+    topic: entry?.topic || null,
+    stage: entry?.stage || null,
+    timestamp: entry?.timestamp || run?.updatedAt || run?.createdAt || null,
+    rclAlgorithm: run?.rclAlgorithm || null,
+    classifier: run?.classifier || null,
+    localSearch: entry?.localSearch || run?.localSearch || null,
+    neighborhood: entry?.neighborhood || run?.neighborhood || null,
+    currentF1Score: entry?.f1Score ?? run?.currentF1Score ?? null,
+    bestF1Score: entry?.f1Score ?? run?.bestF1Score ?? run?.currentF1Score ?? null,
+    trainingFileName: run?.trainingFileName || null,
+    testingFileName: run?.testingFileName || null,
+    iterationNeighborhood: entry?.iterationNeighborhood ?? run?.iterationNeighborhood ?? null,
+    iterationLocalSearch: entry?.iterationLocalSearch ?? run?.iterationLocalSearch ?? null,
+    previousBestF1Score: entry?.previousBestF1Score ?? run?.previousBestF1Score ?? null,
+    scoreDelta: entry?.scoreDelta ?? run?.scoreDelta ?? null,
+    improved: entry?.improved ?? run?.improved ?? null,
+    solutionFeatures,
+    rclFeatures,
+    enabledLocalSearches,
+    solutionSize: entry?.solutionSize ?? solutionFeatures.length,
+    rclSize: entry?.rclSize ?? rclFeatures.length,
+    memoryUsage: entry?.memoryUsage ?? run?.memoryUsage ?? null,
+    memoryUsagePercent: entry?.memoryUsagePercent ?? run?.memoryUsagePercent ?? null,
+    cpuUsage: entry?.cpuUsage ?? run?.cpuUsage ?? null,
+  };
+};
 
 const getSortableDateValue = (value) => {
   const timestamp = new Date(value || 0).getTime();
@@ -154,25 +190,37 @@ const getFiniteMetric = (value) => {
   return Number.isFinite(metric) ? metric : null;
 };
 
+const averageMetric = (values = []) => {
+  const finiteValues = values.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+  if (finiteValues.length === 0) {
+    return null;
+  }
+
+  return finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length;
+};
+
 const dashboardTabDescriptions = {
-  overview: "Realtime monitoring overview focused on the selected execution and the latest improvements.",
-  performance: "Pipeline performance indicators, from initial solutions to average CPU and memory costs.",
-  algorithms: "Consolidated view by RCL algorithm, including resource footprint and final outcomes.",
-  executions: "Per-seed breakdown with initial solutions, local-search outcomes, and best-solution workflows.",
+  overview: "dashboard.tabDescOverview",
+  performance: "dashboard.tabDescPerformance",
+  algorithms: "dashboard.tabDescAlgorithms",
+  analytics: "dashboard.tabDescAnalytics",
+  executions: "dashboard.tabDescExecutions",
 };
 
 const dashboardTabs = [
-  { value: "overview", label: "Overview", icon: "space_dashboard" },
-  { value: "performance", label: "Performance", icon: "monitoring" },
-  { value: "algorithms", label: "Algorithms", icon: "hub" },
-  { value: "executions", label: "Executions", icon: "lan" },
+  { value: "overview", labelKey: "dashboard.tabOverview", icon: "space_dashboard" },
+  { value: "performance", labelKey: "dashboard.tabPerformance", icon: "monitoring" },
+  { value: "algorithms", labelKey: "dashboard.tabAlgorithms", icon: "hub" },
+  { value: "analytics", labelKey: "dashboard.tabAnalytics", icon: "analytics" },
+  { value: "executions", labelKey: "dashboard.tabExecutions", icon: "lan" },
 ];
 
 const stageLensOptions = [
-  { value: "all", label: "All stages" },
-  { value: "initial", label: "Initial solutions" },
-  { value: "local", label: "Local search finals" },
-  { value: "best", label: "Best solutions" },
+  { value: "all", labelKey: "dashboard.allStages" },
+  { value: "initial", labelKey: "dashboard.stageInitial" },
+  { value: "local", labelKey: "dashboard.stageLocal" },
+  { value: "progress", labelKey: "dashboard.stageProgress" },
+  { value: "best", labelKey: "dashboard.stageBest" },
 ];
 
 const chartColorPalettes = {
@@ -206,6 +254,25 @@ const formatWorkspaceLabel = (value = "") =>
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join(" ");
+
+const formatSearchPlan = (searches = []) => {
+  if (!Array.isArray(searches) || searches.length === 0) {
+    return "--";
+  }
+
+  return searches.join(", ");
+};
+
+const formatTopicLabel = (topic = "") =>
+  String(topic || "--")
+    .replace(/_TOPIC$/i, "")
+    .replace(/_/g, " ")
+    .trim();
+
+const resolveCount = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
 
 const formatScoreDelta = (currentValue, previousValue) => {
   const current = Number(currentValue);
@@ -495,7 +562,7 @@ function Dashboard() {
   const { t } = useI18n();
   const [controller] = useMaterialUIController();
   const { darkMode } = controller;
-  const { runs, events, loading, error, connected } = useGraspMonitor(500);
+  const { runs, events, loading, error, connected } = useGraspMonitor(2000);
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedSeedId, setSelectedSeedId] = useState("");
   const [selectedAlgorithm, setSelectedAlgorithm] = useState("all");
@@ -598,6 +665,7 @@ function Dashboard() {
       selectedStageLens === "all"
       || (selectedStageLens === "initial" && entryTopic === "INITIAL_SOLUTION_TOPIC")
       || (selectedStageLens === "local" && entryTopic === "SOLUTIONS_TOPIC")
+      || (selectedStageLens === "progress" && entryTopic === "LOCAL_SEARCH_PROGRESS_TOPIC")
       || (selectedStageLens === "best" && entryTopic === "BEST_SOLUTION_TOPIC");
     const normalizedStatus = String(
       entry.status || (entryTopic === "BEST_SOLUTION_TOPIC" ? "completed" : "running")
@@ -755,12 +823,59 @@ function Dashboard() {
     );
   }, [monitorSnapshots]);
 
+  const localSearchProgressEvents = useMemo(
+    () =>
+      monitorSnapshots
+        .filter((event) => event.topic === "LOCAL_SEARCH_PROGRESS_TOPIC" && event.seedId)
+        .sort((left, right) => getSortableDateValue(right.timestamp) - getSortableDateValue(left.timestamp)),
+    [monitorSnapshots]
+  );
+
+  const rawTopicMetrics = useMemo(() => {
+    const grouped = new Map();
+
+    monitorSnapshots.forEach((event) => {
+      const topic = event.topic || "UNKNOWN_TOPIC";
+      const current = grouped.get(topic) || {
+        topic,
+        count: 0,
+        uniqueSeeds: new Set(),
+        scores: [],
+        bestScore: Number.NEGATIVE_INFINITY,
+      };
+
+      current.count += 1;
+
+      if (event.seedId) {
+        current.uniqueSeeds.add(event.seedId);
+      }
+
+      const score = getFiniteMetric(event.bestF1Score ?? event.currentF1Score);
+      if (score !== null) {
+        current.scores.push(score);
+        current.bestScore = Math.max(current.bestScore, score);
+      }
+
+      grouped.set(topic, current);
+    });
+
+    return [...grouped.values()]
+      .map((entry) => ({
+        topic: entry.topic,
+        count: entry.count,
+        uniqueSeedCount: entry.uniqueSeeds.size,
+        averageScore: averageMetric(entry.scores),
+        bestScore: Number.isFinite(entry.bestScore) ? entry.bestScore : null,
+      }))
+      .sort((left, right) => right.count - left.count);
+  }, [monitorSnapshots]);
+
   const improvementEvents = useMemo(() => {
     const bestBySeed = new Map();
 
     return [...monitorSnapshots]
       .filter((event) =>
-        ["INITIAL_SOLUTION_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(event.topic)
+        ["INITIAL_SOLUTION_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(event.topic)
       )
       .sort((left, right) => getSortableDateValue(left.timestamp) - getSortableDateValue(right.timestamp))
       .reduce((nextEvents, event) => {
@@ -769,7 +884,7 @@ function Dashboard() {
         bestBySeed.set(event.seedId, Math.max(previous ?? Number.NEGATIVE_INFINITY, score));
 
         if (
-          ["INITIAL_SOLUTION_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(event.topic)
+          ["INITIAL_SOLUTION_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(event.topic)
           && previous !== undefined
           && score > previous
         ) {
@@ -954,12 +1069,34 @@ function Dashboard() {
       completedRuns,
       initialSolutions: initialSolutionEvents.length,
       localSearchOutcomes: localSearchOutcomeEvents.length,
+      progressSnapshots: localSearchProgressEvents.length,
       bestSolutions: bestSolutionRuns.length,
       bestRun,
       datasetPairs: datasetPairs.size,
       algorithms: new Set(filteredRuns.map((run) => run.rclAlgorithm).filter(Boolean)).size,
     };
-  }, [filteredRuns, initialSolutionEvents.length, localSearchOutcomeEvents.length, bestSolutionRuns.length]);
+  }, [
+    filteredRuns,
+    initialSolutionEvents.length,
+    localSearchOutcomeEvents.length,
+    localSearchProgressEvents.length,
+    bestSolutionRuns.length,
+  ]);
+
+  const analyticsOverview = useMemo(() => {
+    const uniqueSeeds = new Set(monitorSnapshots.map((event) => event.seedId).filter(Boolean));
+    const initialScores = monitorSnapshots
+      .filter((event) => event.topic === "INITIAL_SOLUTION_TOPIC")
+      .map((event) => event.bestF1Score ?? event.currentF1Score);
+
+    return {
+      rawSnapshots: monitorSnapshots.length,
+      rawEvents: filteredSnapshotEvents.length,
+      uniqueSeeds: uniqueSeeds.size,
+      topics: rawTopicMetrics.length,
+      avgInitialF1: averageMetric(initialScores),
+    };
+  }, [filteredSnapshotEvents.length, monitorSnapshots, rawTopicMetrics.length]);
 
   const bestAlgorithmOutcome = useMemo(
     () => finalRunsByAlgorithm[0]?.bestRun || null,
@@ -1024,7 +1161,6 @@ function Dashboard() {
     }
 
     return [...featuredRun.history]
-      .filter((entry) => entry.topic !== "LOCAL_SEARCH_PROGRESS_TOPIC")
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
       .map((entry, index) => ({
         ...entry,
@@ -1450,6 +1586,31 @@ function Dashboard() {
     };
   }, [resourceAveragesByAlgorithm]);
 
+  const rawTopicVolumeChartData = useMemo(() => {
+    if (!rawTopicMetrics.length) {
+      return buildEmptyBarData("Topic volume");
+    }
+
+    const labels = rawTopicMetrics.map((entry) => formatTopicLabel(entry.topic));
+    const palette = getBarPaletteForLabels(labels, "search");
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: "Visible snapshots",
+          data: rawTopicMetrics.map((entry) => entry.count),
+          backgroundColor: palette.backgroundColor,
+          hoverBackgroundColor: palette.hoverBackgroundColor,
+          borderColor: palette.borderColor,
+          borderWidth: 1,
+          borderRadius: 8,
+          borderSkipped: false,
+        },
+      ],
+    };
+  }, [rawTopicMetrics]);
+
   const resourceSummaryTableData = useMemo(
     () => ({
       columns: [
@@ -1602,11 +1763,14 @@ function Dashboard() {
         { Header: "RCL", accessor: "algorithm", align: "left" },
         { Header: "Initial Solution", accessor: "solution", align: "left" },
         { Header: "Initial F1", accessor: "initialF1", align: "left" },
+        { Header: "RCL / Solution Size", accessor: "sizes", align: "left" },
+        { Header: "Search Plan", accessor: "searchPlan", align: "left" },
         { Header: "Best After Search", accessor: "bestAfterSearch", align: "left" },
         { Header: "Dataset", accessor: "dataset", align: "left" },
       ],
       rows: initialSolutionEvents.map((event) => {
         const linkedBestRun = preferredRunBySeed.get(event.seedId);
+        const initialScore = event.bestF1Score ?? event.currentF1Score;
 
         return {
           timestamp: (
@@ -1637,13 +1801,29 @@ function Dashboard() {
             </MDBox>
           ),
           initialF1: formatCompactPercent(event.bestF1Score ?? event.currentF1Score),
+          sizes: `RCL ${resolveCount(event.rclSize, event.rclFeatures?.length || 0)} / Sol ${resolveCount(event.solutionSize, event.solutionFeatures?.length || 0)}`,
+          searchPlan: (
+            <MDBox>
+              <MDTypography variant="button" fontWeight="medium" color="dark">
+                {formatSearchPlan(event.enabledLocalSearches)}
+              </MDTypography>
+              <MDTypography variant="caption" color="text">
+                {event.neighborhood || "--"}
+              </MDTypography>
+            </MDBox>
+          ),
           bestAfterSearch: (
-            <Chip
-              label={formatCompactPercent(linkedBestRun?.bestF1Score)}
-              color="info"
-              size="small"
-              variant="outlined"
-            />
+            <MDBox>
+              <Chip
+                label={formatCompactPercent(linkedBestRun?.bestF1Score)}
+                color="info"
+                size="small"
+                variant="outlined"
+              />
+              <MDTypography variant="caption" display="block" color="text" mt={0.5}>
+                {formatScoreDelta(linkedBestRun?.bestF1Score, initialScore)}
+              </MDTypography>
+            </MDBox>
           ),
           dataset: `${event.trainingFileName || "--"} -> ${event.testingFileName || "--"}`,
         };
@@ -1657,26 +1837,41 @@ function Dashboard() {
       columns: [
         { Header: "Search", accessor: "search", align: "left" },
         { Header: "Algorithm", accessor: "algorithm", align: "left" },
+        { Header: "Iteration", accessor: "iteration", align: "left" },
         { Header: "Solution", accessor: "solution", align: "left" },
         { Header: "Local F1", accessor: "localF1", align: "left" },
+        { Header: "Delta vs initial", accessor: "deltaInitial", align: "left" },
         { Header: "Final Best", accessor: "finalBest", align: "left" },
         { Header: "Seed", accessor: "seed", align: "left" },
       ],
       rows: localSearchOutcomeEvents.map((event) => {
         const linkedBestRun = preferredRunBySeed.get(event.seedId);
+        const initialEvent = initialEventBySeed.get(event.seedId);
+        const localScore = event.bestF1Score ?? event.currentF1Score;
 
         return {
           search: event.searchLabel,
           algorithm: event.rclAlgorithm || "--",
-          solution: formatFeatureSubset(event.solutionFeatures, 10),
+          iteration: event.iterationLocalSearch ?? "--",
+          solution: (
+            <MDBox>
+              <MDTypography variant="button" fontWeight="medium" color="dark">
+                {formatFeatureSubset(event.solutionFeatures, 10)}
+              </MDTypography>
+              <MDTypography variant="caption" color="text">
+                {`Sol ${resolveCount(event.solutionSize, event.solutionFeatures?.length || 0)} / RCL ${resolveCount(event.rclSize, event.rclFeatures?.length || 0)}`}
+              </MDTypography>
+            </MDBox>
+          ),
           localF1: (
             <Chip
-              label={formatCompactPercent(event.bestF1Score ?? event.currentF1Score)}
+              label={formatCompactPercent(localScore)}
               color="success"
               size="small"
               variant="outlined"
             />
           ),
+          deltaInitial: formatScoreDelta(localScore, initialEvent?.bestF1Score ?? initialEvent?.currentF1Score),
           finalBest: formatCompactPercent(linkedBestRun?.bestF1Score),
           seed: (
             <MDTypography
@@ -1693,7 +1888,175 @@ function Dashboard() {
         };
       }),
     }),
-    [localSearchOutcomeEvents, preferredRunBySeed]
+    [initialEventBySeed, localSearchOutcomeEvents, preferredRunBySeed]
+  );
+
+  const localSearchProgressTableData = useMemo(
+    () => ({
+      columns: [
+        { Header: "Search", accessor: "search", align: "left" },
+        { Header: "Algorithm", accessor: "algorithm", align: "left" },
+        { Header: "Iteration", accessor: "iteration", align: "left" },
+        { Header: "Candidate", accessor: "candidate", align: "left" },
+        { Header: "F1", accessor: "f1", align: "left" },
+        { Header: "Delta", accessor: "delta", align: "left" },
+        { Header: "Seed", accessor: "seed", align: "left" },
+      ],
+      rows: localSearchProgressEvents.map((event) => ({
+        search: event.localSearch || event.neighborhood || "--",
+        algorithm: event.rclAlgorithm || "--",
+        iteration: event.iterationLocalSearch ?? "--",
+        candidate: (
+          <MDBox>
+            <MDTypography variant="button" fontWeight="medium" color="dark">
+              {formatFeatureSubset(event.solutionFeatures, 10)}
+            </MDTypography>
+            <MDTypography variant="caption" color="text">
+              {`Sol ${resolveCount(event.solutionSize, event.solutionFeatures?.length || 0)} / RCL ${resolveCount(event.rclSize, event.rclFeatures?.length || 0)}`}
+            </MDTypography>
+          </MDBox>
+        ),
+        f1: formatCompactPercent(event.bestF1Score ?? event.currentF1Score),
+        delta: formatScoreDelta(
+          event.bestF1Score ?? event.currentF1Score,
+          event.previousBestF1Score
+        ),
+        seed: (
+          <MDTypography
+            component={Link}
+            to={`/dashboard/runs/${event.seedId}`}
+            variant="button"
+            fontWeight="medium"
+            color="info"
+            sx={{ textDecoration: "none" }}
+          >
+            {shortenSeed(event.seedId)}
+          </MDTypography>
+        ),
+      })),
+    }),
+    [localSearchProgressEvents]
+  );
+
+  const rawTopicTableData = useMemo(
+    () => ({
+      columns: [
+        { Header: "Topic", accessor: "topic", align: "left" },
+        { Header: "Snapshots", accessor: "count", align: "left" },
+        { Header: "Unique Seeds", accessor: "uniqueSeeds", align: "left" },
+        { Header: "Avg F1", accessor: "avgScore", align: "left" },
+        { Header: "Best F1", accessor: "bestScore", align: "left" },
+      ],
+      rows: rawTopicMetrics.map((entry) => ({
+        topic: (
+          <MDBox>
+            <MDTypography variant="button" fontWeight="medium" color="dark">
+              {formatTopicLabel(entry.topic)}
+            </MDTypography>
+            <MDTypography variant="caption" color="text">
+              {entry.topic}
+            </MDTypography>
+          </MDBox>
+        ),
+        count: entry.count,
+        uniqueSeeds: entry.uniqueSeedCount,
+        avgScore: formatCompactPercent(entry.averageScore),
+        bestScore: (
+          <Chip
+            label={formatCompactPercent(entry.bestScore)}
+            color="info"
+            size="small"
+            variant="outlined"
+          />
+        ),
+      })),
+    }),
+    [rawTopicMetrics]
+  );
+
+  const rawSolutionFeedTableData = useMemo(
+    () => ({
+      columns: [
+        { Header: "Time", accessor: "timestamp", align: "left" },
+        { Header: "Topic", accessor: "topic", align: "left" },
+        { Header: "Algorithm", accessor: "algorithm", align: "left" },
+        { Header: "Search / Stage", accessor: "search", align: "left" },
+        { Header: "Solution", accessor: "solution", align: "left" },
+        { Header: "F1", accessor: "score", align: "left" },
+        { Header: "Delta", accessor: "delta", align: "left" },
+        { Header: "Seed", accessor: "seed", align: "left" },
+        { Header: "Dataset", accessor: "dataset", align: "left" },
+      ],
+      rows: monitorSnapshots.map((event) => ({
+        timestamp: (
+          <MDBox>
+            <MDTypography variant="button" fontWeight="medium" color="dark">
+              {formatShortTime(event.timestamp)}
+            </MDTypography>
+            <MDTypography variant="caption" color="text">
+              {formatRelativeTime(event.timestamp)}
+            </MDTypography>
+          </MDBox>
+        ),
+        topic: (
+          <MDBox>
+            <MDTypography variant="button" fontWeight="medium" color="dark">
+              {formatTopicLabel(event.topic)}
+            </MDTypography>
+            <MDTypography variant="caption" color="text">
+              {getStageLabel(event.stage)}
+            </MDTypography>
+          </MDBox>
+        ),
+        algorithm: event.rclAlgorithm || "--",
+        search: (
+          <MDBox>
+            <MDTypography variant="button" fontWeight="medium" color="dark">
+              {event.localSearch || event.neighborhood || "--"}
+            </MDTypography>
+            <MDTypography variant="caption" color="text">
+              {`Iter ${event.iterationLocalSearch ?? "--"}`}
+            </MDTypography>
+          </MDBox>
+        ),
+        solution: (
+          <MDBox>
+            <MDTypography variant="button" fontWeight="medium" color="dark">
+              {formatFeatureSubset(event.solutionFeatures, 10)}
+            </MDTypography>
+            <MDTypography variant="caption" color="text">
+              {`Sol ${resolveCount(event.solutionSize, event.solutionFeatures?.length || 0)} / RCL ${resolveCount(event.rclSize, event.rclFeatures?.length || 0)}`}
+            </MDTypography>
+          </MDBox>
+        ),
+        score: (
+          <Chip
+            label={formatCompactPercent(event.bestF1Score ?? event.currentF1Score)}
+            color="success"
+            size="small"
+            variant="outlined"
+          />
+        ),
+        delta: formatScoreDelta(
+          event.bestF1Score ?? event.currentF1Score,
+          event.previousBestF1Score
+        ),
+        seed: event.seedId ? (
+          <MDTypography
+            component={Link}
+            to={`/dashboard/runs/${event.seedId}`}
+            variant="button"
+            fontWeight="medium"
+            color="info"
+            sx={{ textDecoration: "none" }}
+          >
+            {shortenSeed(event.seedId)}
+          </MDTypography>
+        ) : "--",
+        dataset: `${event.trainingFileName || "--"} -> ${event.testingFileName || "--"}`,
+      })),
+    }),
+    [monitorSnapshots]
   );
 
   const bestSolutionsDetailedTableData = useMemo(
@@ -1744,42 +2107,54 @@ function Dashboard() {
     () => ({
       columns: [
         { Header: "Algorithm", accessor: "algorithm", align: "left" },
+        { Header: "Initial Seeds", accessor: "initialSeeds", align: "left" },
         { Header: "Final Search", accessor: "search", align: "left" },
         { Header: "Best Run", accessor: "bestRun", align: "left" },
         { Header: "Best F1-Score", accessor: "bestF1Score", align: "left" },
+        { Header: "Gain vs initial", accessor: "gain", align: "left" },
         { Header: "Solutions", accessor: "solutions", align: "left" },
         { Header: "Dataset", accessor: "dataset", align: "left" },
       ],
-      rows: finalRunsByAlgorithm.map((entry) => ({
-        algorithm: entry.algorithm,
-        search: entry.bestRun?.localSearch || entry.bestRun?.neighborhood || "--",
-        bestRun: (
-          <MDBox>
+      rows: finalRunsByAlgorithm.map((entry) => {
+        const initialSeedCount = initialSolutionEvents.filter((event) => event.rclAlgorithm === entry.algorithm).length;
+        const linkedInitial = initialEventBySeed.get(entry.bestRun?.seedId);
+
+        return {
+          algorithm: entry.algorithm,
+          initialSeeds: initialSeedCount,
+          search: entry.bestRun?.localSearch || entry.bestRun?.neighborhood || "--",
+          bestRun: (
+            <MDBox>
+              <MDTypography variant="button" fontWeight="medium" color="dark">
+                {formatFeatureSubset(entry.bestRun?.solutionFeatures, 10)}
+              </MDTypography>
+              <MDTypography variant="caption" color="text">
+                {shortenSeed(entry.bestRun?.seedId)}
+              </MDTypography>
+            </MDBox>
+          ),
+          bestF1Score: (
+            <Chip
+              label={formatCompactPercent(entry.bestRun?.bestF1Score)}
+              color="success"
+              size="small"
+              variant="outlined"
+            />
+          ),
+          gain: formatScoreDelta(
+            entry.bestRun?.bestF1Score,
+            linkedInitial?.bestF1Score ?? linkedInitial?.currentF1Score
+          ),
+          solutions: (
             <MDTypography variant="button" fontWeight="medium" color="dark">
-              {formatFeatureSubset(entry.bestRun?.solutionFeatures, 10)}
+              {entry.runCount}
             </MDTypography>
-            <MDTypography variant="caption" color="text">
-              {shortenSeed(entry.bestRun?.seedId)}
-            </MDTypography>
-          </MDBox>
-        ),
-        bestF1Score: (
-          <Chip
-            label={formatCompactPercent(entry.bestRun?.bestF1Score)}
-            color="success"
-            size="small"
-            variant="outlined"
-          />
-        ),
-        solutions: (
-          <MDTypography variant="button" fontWeight="medium" color="dark">
-            {entry.runCount}
-          </MDTypography>
-        ),
-        dataset: `${entry.bestRun?.trainingFileName || "--"} -> ${entry.bestRun?.testingFileName || "--"}`,
-      })),
+          ),
+          dataset: `${entry.bestRun?.trainingFileName || "--"} -> ${entry.bestRun?.testingFileName || "--"}`,
+        };
+      }),
     }),
-    [finalRunsByAlgorithm]
+    [finalRunsByAlgorithm, initialEventBySeed, initialSolutionEvents]
   );
 
   return (
@@ -1794,16 +2169,16 @@ function Dashboard() {
 
         <Grid container spacing={3}>
           <Grid item xs={12} md={6} xl={3}>
-            <ComplexStatisticsCard color="dark" icon="rocket_launch" title="Initial Solutions" count={overview.initialSolutions} />
+            <ComplexStatisticsCard color="dark" icon="rocket_launch" title={t("dashboard.statInitialSolutions")} count={overview.initialSolutions} />
           </Grid>
           <Grid item xs={12} md={6} xl={3}>
-            <ComplexStatisticsCard color="info" icon="tune" title="Local Search Finals" count={overview.localSearchOutcomes} />
+            <ComplexStatisticsCard color="info" icon="tune" title={t("dashboard.statLocalSearchFinals")} count={overview.localSearchOutcomes} />
           </Grid>
           <Grid item xs={12} md={6} xl={3}>
             <ComplexStatisticsCard
               color="success"
               icon="insights"
-              title="Best Final F1-Score"
+              title={t("dashboard.statBestFinalF1")}
               count={formatCompactPercent(bestAlgorithmOutcome?.bestF1Score)}
             />
           </Grid>
@@ -1811,7 +2186,7 @@ function Dashboard() {
             <ComplexStatisticsCard
               color="warning"
               icon="emoji_events"
-              title="Best Solutions"
+              title={t("dashboard.statBestSolutions")}
               count={overview.bestSolutions}
             />
           </Grid>
@@ -1833,7 +2208,7 @@ function Dashboard() {
                     {t("dashboard.workspaceTitle")}
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    {activeTab === "overview" ? t("dashboard.workspaceSubtitle") : dashboardTabDescriptions[activeTab]}
+                    {activeTab === "overview" ? t("dashboard.workspaceSubtitle") : t(dashboardTabDescriptions[activeTab])}
                   </MDTypography>
                 </MDBox>
 
@@ -1847,8 +2222,14 @@ function Dashboard() {
                     variant="outlined"
                   />
                   <Chip
-                    label={`${filteredSnapshotEvents.length} monitor snapshots`}
+                    label={`${analyticsOverview.rawEvents} live events`}
                     color="warning"
+                    size="small"
+                    variant="outlined"
+                  />
+                  <Chip
+                    label={`${analyticsOverview.rawSnapshots} visible snapshots`}
+                    color="success"
                     size="small"
                     variant="outlined"
                   />
@@ -1864,7 +2245,7 @@ function Dashboard() {
                     onClick={activeFilterCount > 0 ? resetWorkspaceFilters : undefined}
                   />
                   <Chip
-                    label={connected ? "Realtime connected" : "Offline snapshot"}
+                    label={connected ? t("dashboard.realtimeConnected") : t("dashboard.offlineSnapshot")}
                     color={connected ? "success" : "warning"}
                     size="small"
                     variant="outlined"
@@ -1885,17 +2266,17 @@ function Dashboard() {
                           {t("dashboard.dataScopeSubtitle")}
                         </MDTypography>
                       </MDBox>
-                      <Chip label="Base" color="info" size="small" variant="outlined" />
+                      <Chip label={t("dashboard.filterBase")} color="info" size="small" variant="outlined" />
                     </MDBox>
 
                     <Grid container spacing={2}>
                       <Grid item xs={12}>
                         <FormControl size="small" fullWidth>
-                          <InputLabel id="selected-algorithm-label">Algorithm</InputLabel>
+                          <InputLabel id="selected-algorithm-label">{t("dashboard.filterAlgorithm")}</InputLabel>
                           <Select
                             labelId="selected-algorithm-label"
                             value={selectedAlgorithm}
-                            label="Algorithm"
+                            label={t("dashboard.filterAlgorithm")}
                             onChange={(event) => setSelectedAlgorithm(event.target.value)}
                           >
                             <MenuItem value="all">{t("dashboard.allAlgorithms")}</MenuItem>
@@ -1910,11 +2291,11 @@ function Dashboard() {
 
                       <Grid item xs={12}>
                         <FormControl size="small" fullWidth>
-                          <InputLabel id="selected-dataset-label">Dataset</InputLabel>
+                          <InputLabel id="selected-dataset-label">{t("dashboard.filterDataset")}</InputLabel>
                           <Select
                             labelId="selected-dataset-label"
                             value={selectedDataset}
-                            label="Dataset"
+                            label={t("dashboard.filterDataset")}
                             onChange={(event) => setSelectedDataset(event.target.value)}
                           >
                             <MenuItem value="all">{t("dashboard.allDatasets")}</MenuItem>
@@ -1941,22 +2322,22 @@ function Dashboard() {
                           {t("dashboard.pipelineLensSubtitle")}
                         </MDTypography>
                       </MDBox>
-                      <Chip label="Monitor" color="warning" size="small" variant="outlined" />
+                      <Chip label={t("dashboard.filterMonitor")} color="warning" size="small" variant="outlined" />
                     </MDBox>
 
                     <Grid container spacing={2}>
                       <Grid item xs={12} md={4}>
                         <FormControl size="small" fullWidth>
-                          <InputLabel id="selected-stage-lens-label">Stage</InputLabel>
+                          <InputLabel id="selected-stage-lens-label">{t("dashboard.filterStage")}</InputLabel>
                           <Select
                             labelId="selected-stage-lens-label"
                             value={selectedStageLens}
-                            label="Stage"
+                            label={t("dashboard.filterStage")}
                             onChange={(event) => setSelectedStageLens(event.target.value)}
                           >
                             {stageLensOptions.map((option) => (
                               <MenuItem key={option.value} value={option.value}>
-                                {option.label}
+                                {t(option.labelKey)}
                               </MenuItem>
                             ))}
                           </Select>
@@ -1965,11 +2346,11 @@ function Dashboard() {
 
                       <Grid item xs={12} md={4}>
                         <FormControl size="small" fullWidth>
-                          <InputLabel id="selected-run-status-label">Status</InputLabel>
+                          <InputLabel id="selected-run-status-label">{t("dashboard.filterStatus")}</InputLabel>
                           <Select
                             labelId="selected-run-status-label"
                             value={selectedRunStatus}
-                            label="Status"
+                            label={t("dashboard.filterStatus")}
                             onChange={(event) => setSelectedRunStatus(event.target.value)}
                           >
                             <MenuItem value="all">{t("dashboard.allStatuses")}</MenuItem>
@@ -1984,11 +2365,11 @@ function Dashboard() {
 
                       <Grid item xs={12} md={4}>
                         <FormControl size="small" fullWidth>
-                          <InputLabel id="selected-search-label">Search / Neighborhood</InputLabel>
+                          <InputLabel id="selected-search-label">{t("dashboard.filterSearch")}</InputLabel>
                           <Select
                             labelId="selected-search-label"
                             value={selectedSearch}
-                            label="Search / Neighborhood"
+                            label={t("dashboard.filterSearch")}
                             onChange={(event) => setSelectedSearch(event.target.value)}
                           >
                             <MenuItem value="all">{t("dashboard.allSearches")}</MenuItem>
@@ -2015,7 +2396,7 @@ function Dashboard() {
                           {t("dashboard.executionFocusSubtitle")}
                         </MDTypography>
                       </MDBox>
-                      <Chip label="Focus" color="secondary" size="small" variant="outlined" />
+                      <Chip label={t("dashboard.filterFocus")} color="secondary" size="small" variant="outlined" />
                     </MDBox>
 
                     <FormControl size="small" fullWidth>
@@ -2081,7 +2462,7 @@ function Dashboard() {
                   gap={1.5}
                 >
                   <MDTypography variant="button" color="text">
-                    {`${initialSolutionEvents.length} initial solutions, ${localSearchOutcomeEvents.length} local-search finals, and ${bestSolutionRuns.length} best solutions under the current filters`}
+                    {`${initialSolutionEvents.length} initial solutions, ${localSearchProgressEvents.length} progress snapshots, ${localSearchOutcomeEvents.length} local-search finals, and ${bestSolutionRuns.length} best solutions under the current filters`}
                   </MDTypography>
                   {activeFilterCount > 0 ? (
                     <Chip
@@ -2119,7 +2500,7 @@ function Dashboard() {
                   <Tab
                     key={tab.value}
                     value={tab.value}
-                    label={tab.label}
+                    label={t(tab.labelKey)}
                     icon={<Icon fontSize="small">{tab.icon}</Icon>}
                     iconPosition="start"
                     sx={{
@@ -2154,18 +2535,18 @@ function Dashboard() {
                       >
                         <MDBox>
                           <MDTypography variant="h5" color="dark">
-                            Full Execution Timeline
+                            {t("dashboard.fullExecutionTimeline")}
                           </MDTypography>
                           <MDTypography variant="button" color="text">
                             {featuredRun
-                          ? `${featuredRun.rclAlgorithm || "GRASP-FS"} / ${featuredRun.classifier || "--"} / ${fullHistory.length} persisted checkpoints`
-                          : "Waiting for monitor events"}
+                          ? `${featuredRun.rclAlgorithm || "GRASP-FS"} / ${featuredRun.classifier || "--"} / ${t("dashboard.persistedCheckpoints", { count: fullHistory.length })}`
+                          : t("dashboard.waitingMonitorEvents")}
                           </MDTypography>
                         </MDBox>
 
                         <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ xs: "stretch", md: "center" }}>
                           <Chip
-                            label={connected ? "Realtime connected" : "Offline snapshot"}
+                            label={connected ? t("dashboard.realtimeConnected") : t("dashboard.offlineSnapshot")}
                             color={connected ? "success" : "warning"}
                             size="small"
                             variant="outlined"
@@ -2185,10 +2566,10 @@ function Dashboard() {
                   <Card sx={{ height: "100%" }}>
                     <MDBox p={3}>
                       <MDTypography variant="h6" color="dark">
-                        Resource Pressure
+                        {t("dashboard.resourcePressure")}
                       </MDTypography>
                       <MDTypography variant="button" color="text">
-                        CPU and memory across the persisted checkpoints of the selected execution.
+                        {t("dashboard.resourcePressureSubtitle")}
                       </MDTypography>
                       <MDBox height="300px" mt={2}>
                         <Line data={resourceChartData} options={resourceChartOptions} />
@@ -2201,10 +2582,10 @@ function Dashboard() {
                   <Card sx={{ height: "100%" }}>
                     <MDBox p={3}>
                       <MDTypography variant="h6" color="dark">
-                        Feature Frequency
+                        {t("dashboard.featureFrequency")}
                       </MDTypography>
                       <MDTypography variant="button" color="text">
-                        Most frequent features across the currently visible best solutions.
+                        {t("dashboard.featureFrequencySubtitle")}
                       </MDTypography>
                       <MDBox height="300px" mt={2}>
                         <Bar data={featureFrequencyChartData} options={featureFrequencyChartOptions} />
@@ -2219,7 +2600,7 @@ function Dashboard() {
               <Card sx={{ height: "100%" }}>
                     <MDBox p={3}>
                       <MDTypography variant="h6" color="dark" mb={0.5}>
-                        Live Run Details
+                        {t("dashboard.liveRunDetails")}
                       </MDTypography>
                       <MDTypography variant="button" color="text">
                         {featuredRun
@@ -2244,7 +2625,7 @@ function Dashboard() {
                                 }}
                               >
                                 <MDTypography variant="caption" color="text" fontWeight="medium">
-                                  Seed / Stage
+                                  {t("dashboard.seedStage")}
                                 </MDTypography>
                                 <MDTypography variant="button" display="block" color="dark" fontWeight="medium">
                                   {shortenSeed(featuredRun.seedId)}
@@ -2267,13 +2648,13 @@ function Dashboard() {
                                 }}
                               >
                                 <MDTypography variant="caption" color="text" fontWeight="medium">
-                                  Current / Best F1
+                                  {t("dashboard.currentBestF1")}
                                 </MDTypography>
                                 <MDTypography variant="button" display="block" color="dark" fontWeight="medium">
                                   {formatCompactPercent(featuredRun.bestF1Score)}
                                 </MDTypography>
                                 <MDTypography variant="caption" color="text">
-                                  Current {formatCompactPercent(featuredRun.currentF1Score)}
+                                  {t("dashboard.currentLabel", { value: formatCompactPercent(featuredRun.currentF1Score) })}
                                 </MDTypography>
                               </MDBox>
                             </Grid>
@@ -2290,13 +2671,13 @@ function Dashboard() {
                                 }}
                               >
                                 <MDTypography variant="caption" color="text" fontWeight="medium">
-                                  History loaded
+                                  {t("dashboard.historyLoaded")}
                                 </MDTypography>
                                 <MDTypography variant="button" display="block" color="dark" fontWeight="medium">
-                                  {fullHistory.length} checkpoints
+                                  {t("dashboard.persistedCheckpoints", { count: fullHistory.length })}
                                 </MDTypography>
                                 <MDTypography variant="caption" color="text">
-                                  Persisted in the monitor
+                                  {t("dashboard.persistedInMonitor")}
                                 </MDTypography>
                               </MDBox>
                             </Grid>
@@ -2313,7 +2694,7 @@ function Dashboard() {
                                 }}
                               >
                                 <MDTypography variant="caption" color="text" fontWeight="medium">
-                                  Updated at
+                                  {t("dashboard.updatedAtLabel")}
                                 </MDTypography>
                                 <MDTypography variant="button" display="block" color="dark" fontWeight="medium">
                                   {formatDateTime(featuredRun.updatedAt)}
@@ -2336,7 +2717,7 @@ function Dashboard() {
                             }}
                           >
                             <MDTypography variant="button" fontWeight="medium" color="dark" mb={1}>
-                              Resource Snapshot
+                              {t("dashboard.resourceSnapshot")}
                             </MDTypography>
 
                             <MDBox mb={2}>
@@ -2401,7 +2782,7 @@ function Dashboard() {
                             play_circle
                           </Icon>
                           <MDTypography variant="button" display="block" color="text">
-                            Start an execution from the Settings page to follow the results here.
+                            {t("dashboard.startExecutionHint")}
                           </MDTypography>
                         </MDBox>
                       )}
@@ -2430,7 +2811,7 @@ function Dashboard() {
 
                         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                           <Chip
-                            label={`${improvementSummary.total} improvements`}
+                            label={t("dashboard.improvementCount", { count: improvementSummary.total })}
                             color="success"
                             size="small"
                             variant="outlined"
@@ -2463,7 +2844,7 @@ function Dashboard() {
                           }}
                         >
                           <MDTypography variant="caption" color="text" fontWeight="medium">
-                            Latest improvement
+                            {t("dashboard.latestImprovement")}
                           </MDTypography>
                           <MDBox
                             display="flex"
@@ -2521,7 +2902,7 @@ function Dashboard() {
                               color="info"
                               size="small"
                             >
-                              Open run
+                              {t("dashboard.openRun")}
                             </MDButton>
                           </MDBox>
                         </MDBox>
@@ -2649,10 +3030,10 @@ function Dashboard() {
               <Card sx={{ height: "100%" }}>
                 <MDBox p={3}>
                   <MDTypography variant="h6" color="dark">
-                    Initial Solutions by Algorithm
+                    {t("dashboard.performanceInitialSolutionsByAlgorithm")}
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    How many initial seeds each RCL algorithm generated in the current slice.
+                    {t("dashboard.performanceInitialSolutionsSubtitle")}
                   </MDTypography>
                   <MDBox height="300px" mt={2}>
                     <Bar data={initialSolutionsChartData} options={finalSolutionsChartOptions} />
@@ -2665,10 +3046,10 @@ function Dashboard() {
               <Card sx={{ height: "100%" }}>
                 <MDBox p={3}>
                   <MDTypography variant="h6" color="dark">
-                    Local Search Performance
+                    {t("dashboard.performanceLocalSearchPerformance")}
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    Best final score achieved by each local-search service.
+                    {t("dashboard.performanceLocalSearchPerformanceSubtitle")}
                   </MDTypography>
                   <MDBox height="300px" mt={2}>
                     <Bar data={localSearchPerformanceChartData} options={finalSolutionsChartOptions} />
@@ -2681,10 +3062,10 @@ function Dashboard() {
               <Card sx={{ height: "100%" }}>
                 <MDBox p={3}>
                   <MDTypography variant="h6" color="dark">
-                    Best Results by Algorithm
+                    {t("dashboard.performanceBestResultsByAlgorithm")}
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    Best consolidated best-solution result for each RCL algorithm.
+                    {t("dashboard.performanceBestResultsSubtitle")}
                   </MDTypography>
                   <MDBox height="300px" mt={2}>
                     <Bar data={finalSolutionsChartData} options={finalSolutionsChartOptions} />
@@ -2697,10 +3078,10 @@ function Dashboard() {
               <Card sx={{ height: "100%" }}>
                 <MDBox p={3}>
                   <MDTypography variant="h6" color="dark">
-                    Stage Distribution
+                    {t("dashboard.performanceStageDistribution")}
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    Distribution across initial solution, local-search final, and best solution stages.
+                    {t("dashboard.performanceStageDistributionSubtitle")}
                   </MDTypography>
                   <MDBox height="300px" mt={2}>
                     <Doughnut data={stageDistributionChartData} options={stageDistributionOptions} />
@@ -2713,10 +3094,10 @@ function Dashboard() {
               <Card sx={{ height: "100%" }}>
                 <MDBox p={3}>
                   <MDTypography variant="h6" color="dark">
-                    Average CPU by Algorithm
+                    {t("dashboard.performanceAverageCpuByAlgorithm")}
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    Average CPU usage across persisted snapshots for each RCL algorithm.
+                    {t("dashboard.performanceAverageCpuSubtitle")}
                   </MDTypography>
                   <MDBox height="300px" mt={2}>
                     <Bar data={averageCpuChartData} options={finalSolutionsChartOptions} />
@@ -2729,10 +3110,10 @@ function Dashboard() {
               <Card sx={{ height: "100%" }}>
                 <MDBox p={3}>
                   <MDTypography variant="h6" color="dark">
-                    Average Memory by Algorithm
+                    {t("dashboard.performanceAverageMemoryByAlgorithm")}
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    Average memory percentage observed across persisted snapshots.
+                    {t("dashboard.performanceAverageMemorySubtitle")}
                   </MDTypography>
                   <MDBox height="300px" mt={2}>
                     <Bar data={averageMemoryChartData} options={finalSolutionsChartOptions} />
@@ -2759,13 +3140,13 @@ function Dashboard() {
                 >
                   <MDBox>
                     <MDTypography variant="h6" color="dark">
-                      Resource Footprint by Algorithm
+                      {t("dashboard.algorithmResourceFootprintTitle")}
                     </MDTypography>
                     <MDTypography variant="button" color="text">
-                      Consolidated CPU and memory averages from persisted snapshots by algorithm.
+                      {t("dashboard.algorithmResourceFootprintSubtitle")}
                     </MDTypography>
                   </MDBox>
-                  <Chip label={`${resourceAveragesByAlgorithm.length} algorithms`} color="info" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.algorithmsCount", { count: resourceAveragesByAlgorithm.length })} color="info" size="small" variant="outlined" />
                 </MDBox>
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 860 } }}>
                   <DataTable
@@ -2773,6 +3154,110 @@ function Dashboard() {
                     entriesPerPage={false}
                     canSearch
                     showTotalEntries={false}
+                    noEndBorder
+                  />
+                </MDBox>
+              </Card>
+            </Grid>
+          </Grid>
+        </MDBox>
+        ) : null}
+
+        {activeTab === "analytics" ? (
+        <MDBox mt={4}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6} xl={3}>
+              <ComplexStatisticsCard color="dark" icon="travel_explore" title={t("dashboard.analyticsVisibleSnapshots")} count={analyticsOverview.rawSnapshots} />
+            </Grid>
+            <Grid item xs={12} md={6} xl={3}>
+              <ComplexStatisticsCard color="info" icon="topic" title={t("dashboard.analyticsLiveEvents")} count={analyticsOverview.rawEvents} />
+            </Grid>
+            <Grid item xs={12} md={6} xl={3}>
+              <ComplexStatisticsCard color="success" icon="fingerprint" title={t("dashboard.analyticsUniqueSeeds")} count={analyticsOverview.uniqueSeeds} />
+            </Grid>
+            <Grid item xs={12} md={6} xl={3}>
+              <ComplexStatisticsCard
+                color="warning"
+                icon="query_stats"
+                title={t("dashboard.analyticsAvgInitialF1")}
+                count={formatCompactPercent(analyticsOverview.avgInitialF1)}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Card sx={{ height: "100%" }}>
+                <MDBox p={3}>
+                  <MDTypography variant="h6" color="dark">
+                    {t("dashboard.topicVolumeTitle")}
+                  </MDTypography>
+                  <MDTypography variant="button" color="text">
+                    {t("dashboard.topicVolumeSubtitle")}
+                  </MDTypography>
+                  <MDBox height="320px" mt={2}>
+                    <Bar data={rawTopicVolumeChartData} options={finalSolutionsChartOptions} />
+                  </MDBox>
+                </MDBox>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Card sx={{ height: "100%" }}>
+                <MDBox
+                  p={3}
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems={{ xs: "flex-start", md: "center" }}
+                  flexDirection={{ xs: "column", md: "row" }}
+                  gap={1.5}
+                >
+                  <MDBox>
+                    <MDTypography variant="h6" color="dark">
+                      {t("dashboard.topicSummaryTitle")}
+                    </MDTypography>
+                    <MDTypography variant="button" color="text">
+                      {t("dashboard.topicSummarySubtitle")}
+                    </MDTypography>
+                  </MDBox>
+                  <Chip label={t("dashboard.topicsCount", { count: rawTopicMetrics.length })} color="info" size="small" variant="outlined" />
+                </MDBox>
+                <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 720 } }}>
+                  <DataTable
+                    table={rawTopicTableData}
+                    entriesPerPage={false}
+                    canSearch
+                    showTotalEntries={false}
+                    noEndBorder
+                  />
+                </MDBox>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Card>
+                <MDBox
+                  p={3}
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems={{ xs: "flex-start", md: "center" }}
+                  flexDirection={{ xs: "column", md: "row" }}
+                  gap={1.5}
+                >
+                  <MDBox>
+                    <MDTypography variant="h6" color="dark">
+                      {t("dashboard.visibleSolutionFeedTitle")}
+                    </MDTypography>
+                    <MDTypography variant="button" color="text">
+                      {t("dashboard.visibleSolutionFeedSubtitle")}
+                    </MDTypography>
+                  </MDBox>
+                  <Chip label={t("dashboard.rowsCount", { count: monitorSnapshots.length })} color="secondary" size="small" variant="outlined" />
+                </MDBox>
+                <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 1180 } }}>
+                  <DataTable
+                    table={rawSolutionFeedTableData}
+                    entriesPerPage={{ defaultValue: 10, entries: [10, 20, 30] }}
+                    canSearch
+                    showTotalEntries
                     noEndBorder
                   />
                 </MDBox>
@@ -2801,13 +3286,13 @@ function Dashboard() {
                 >
                   <MDBox>
                     <MDTypography variant="h6" color="dark">
-                      Initial Solutions
+                      {t("dashboard.executionsInitialSolutionsTitle")}
                     </MDTypography>
                     <MDTypography variant="button" color="text">
-                      Initial solutions produced by the RCL stage and the best score achieved afterward.
+                      {t("dashboard.executionsInitialSolutionsSubtitle")}
                     </MDTypography>
                   </MDBox>
-                  <Chip label={`${initialSolutionEvents.length} rows`} color="info" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.rowsCount", { count: initialSolutionEvents.length })} color="info" size="small" variant="outlined" />
                 </MDBox>
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 720 } }}>
                   <DataTable
@@ -2833,18 +3318,50 @@ function Dashboard() {
                 >
                   <MDBox>
                     <MDTypography variant="h6" color="dark">
-                      Local Search Outcomes
+                      {t("dashboard.executionsLocalSearchOutcomesTitle")}
                     </MDTypography>
                     <MDTypography variant="button" color="text">
-                      Best final result found by each local-search service for each seed.
+                      {t("dashboard.executionsLocalSearchOutcomesSubtitle")}
                     </MDTypography>
                   </MDBox>
-                  <Chip label={`${localSearchOutcomeEvents.length} rows`} color="success" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.rowsCount", { count: localSearchOutcomeEvents.length })} color="success" size="small" variant="outlined" />
                 </MDBox>
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 720 } }}>
                   <DataTable
                     table={localSearchTableData}
                     entriesPerPage={{ defaultValue: 6, entries: [6, 10, 15] }}
+                    canSearch
+                    showTotalEntries
+                    noEndBorder
+                  />
+                </MDBox>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Card sx={{ height: "100%" }}>
+                <MDBox
+                  p={3}
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems={{ xs: "flex-start", md: "center" }}
+                  flexDirection={{ xs: "column", md: "row" }}
+                  gap={1.5}
+                >
+                  <MDBox>
+                    <MDTypography variant="h6" color="dark">
+                      {t("dashboard.executionsLocalSearchProgressTitle")}
+                    </MDTypography>
+                    <MDTypography variant="button" color="text">
+                      {t("dashboard.executionsLocalSearchProgressSubtitle")}
+                    </MDTypography>
+                  </MDBox>
+                  <Chip label={t("dashboard.rowsCount", { count: localSearchProgressEvents.length })} color="secondary" size="small" variant="outlined" />
+                </MDBox>
+                <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 920 } }}>
+                  <DataTable
+                    table={localSearchProgressTableData}
+                    entriesPerPage={{ defaultValue: 8, entries: [8, 12, 20] }}
                     canSearch
                     showTotalEntries
                     noEndBorder
@@ -2865,13 +3382,13 @@ function Dashboard() {
                 >
                   <MDBox>
                     <MDTypography variant="h6" color="dark">
-                      Best Solutions Workflow
+                      {t("dashboard.executionsBestWorkflowTitle")}
                     </MDTypography>
                     <MDTypography variant="button" color="text">
-                      Full best-solution path, including RCL, neighborhood, and local searches used.
+                      {t("dashboard.executionsBestWorkflowSubtitle")}
                     </MDTypography>
                   </MDBox>
-                  <Chip label={`${bestSolutionRuns.length} rows`} color="warning" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.rowsCount", { count: bestSolutionRuns.length })} color="warning" size="small" variant="outlined" />
                 </MDBox>
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 1080 } }}>
                   <DataTable
@@ -2903,13 +3420,13 @@ function Dashboard() {
                 >
                   <MDBox>
                     <MDTypography variant="h6" color="dark">
-                      Best Solutions by Algorithm
+                      {t("dashboard.algorithmsBestSolutionsByAlgorithmTitle")}
                     </MDTypography>
                     <MDTypography variant="button" color="text">
-                      {`Each row below comes directly from BEST_SOLUTION_TOPIC. Total visible final solutions: ${bestSolutionRuns.length}`}
+                      {t("dashboard.algorithmsBestSolutionsByAlgorithmSubtitle", { count: bestSolutionRuns.length })}
                     </MDTypography>
                   </MDBox>
-                  <Chip label={`${bestSolutionRuns.length} finals`} color="warning" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.finalsCount", { count: bestSolutionRuns.length })} color="warning" size="small" variant="outlined" />
                 </MDBox>
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 1120 } }}>
                   <DataTable
@@ -2935,13 +3452,13 @@ function Dashboard() {
                 >
                   <MDBox>
                     <MDTypography variant="h6" color="dark">
-                      Best Outcome by Algorithm
+                      {t("dashboard.algorithmsBestOutcomeTitle")}
                     </MDTypography>
                     <MDTypography variant="button" color="text">
-                      Consolidated table with the best visible final result per algorithm.
+                      {t("dashboard.algorithmsBestOutcomeSubtitle")}
                     </MDTypography>
                   </MDBox>
-                  <Chip label={`${finalRunsByAlgorithm.length} algorithms`} color="secondary" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.algorithmsCount", { count: finalRunsByAlgorithm.length })} color="secondary" size="small" variant="outlined" />
                 </MDBox>
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 980 } }}>
                   <DataTable

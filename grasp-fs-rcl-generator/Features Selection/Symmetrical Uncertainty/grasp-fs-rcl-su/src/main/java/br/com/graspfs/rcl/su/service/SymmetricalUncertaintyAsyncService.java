@@ -114,8 +114,27 @@ public class SymmetricalUncertaintyAsyncService {
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(METRICS_FILE_NAME, true))) {
                 for (int generation = 0; generation < maxGenerations; generation++) {
                     long generationStartedAt = System.currentTimeMillis();
-                    suService.GenerationSolutions(dataSolution, sampleSize, writer, trainingDataset, testingDataset, classifier);
-                    suProducer.send(dataSolution);
+                    DataSolution generatedSolution = suService.GenerationSolutions(
+                            dataSolution,
+                            sampleSize,
+                            writer,
+                            trainingDataset,
+                            testingDataset,
+                            classifier
+                    );
+                    logger.info(
+                            "requestId={} generation={} algorithm={} seedId={} featureCount={} rclSize={} neighborhood={} enabledSearches={} f1={}",
+                            requestId,
+                            generation + 1,
+                            generatedSolution.getRclAlgorithm(),
+                            generatedSolution.getSeedId(),
+                            generatedSolution.getSolutionFeatures() != null ? generatedSolution.getSolutionFeatures().size() : 0,
+                            generatedSolution.getRclfeatures() != null ? generatedSolution.getRclfeatures().size() : 0,
+                            generatedSolution.getNeighborhood(),
+                            generatedSolution.getEnabledLocalSearches(),
+                            generatedSolution.getF1Score()
+                    );
+                    suProducer.send(generatedSolution);
                     logger.info(
                             "requestId={} Generation {} processed and published elapsedMs={}",
                             requestId, generation + 1, System.currentTimeMillis() - generationStartedAt

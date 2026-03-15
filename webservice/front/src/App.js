@@ -83,12 +83,6 @@ export default function App() {
   }, [dispatch, auth.token]);
 
   // Reage a mudanças no estado de autenticação
-  useEffect(() => {
-    if ((AUTH_DISABLED || auth.token) && pathname === "/authentication/sign-in") {
-      window.location.href = "/dashboard";
-    }
-  }, [auth.token, pathname]);
-
   useMemo(() => {
     const cacheRtl = createCache({
       key: "rtl",
@@ -116,6 +110,12 @@ export default function App() {
   useEffect(() => {
     document.body.setAttribute("dir", direction);
   }, [direction]);
+
+  useEffect(() => {
+    const nextTheme = darkMode ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", nextTheme);
+    document.body.setAttribute("data-theme", nextTheme);
+  }, [darkMode]);
 
   useEffect(() => {
     document.documentElement.scrollTop = 0;
@@ -155,15 +155,21 @@ export default function App() {
       alignItems="center"
       width="3.25rem"
       height="3.25rem"
-      bgColor="white"
       shadow="sm"
       borderRadius="50%"
       position="fixed"
       right="2rem"
       bottom="2rem"
       zIndex={99}
-      color="dark"
-      sx={{ cursor: "pointer" }}
+      color={darkMode ? "white" : "dark"}
+      sx={{
+        cursor: "pointer",
+        background: darkMode
+          ? "linear-gradient(180deg, rgba(32,41,64,0.98) 0%, rgba(26,32,53,0.98) 100%)"
+          : "#ffffff",
+        border: darkMode ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(15,23,42,0.08)",
+        boxShadow: darkMode ? "0 18px 28px rgba(2,6,23,0.34)" : undefined,
+      }}
       onClick={handleConfiguratorOpen}
     >
       <Icon fontSize="small" color="inherit">
@@ -175,7 +181,7 @@ export default function App() {
   return (
     
       <ThemeProvider theme={darkMode ? themeDark : theme}>
-        <ToastContainer />
+        <ToastContainer theme={darkMode ? "dark" : "light"} />
         <CssBaseline />
         {layout === "dashboard" && (
           <>
@@ -193,7 +199,14 @@ export default function App() {
           </>
         )}
         <Routes>
-          <Route path="/authentication/sign-in" element={<Login />} />
+          <Route
+            path="/"
+            element={<Navigate to={AUTH_DISABLED || auth.token ? "/dashboard" : "/authentication/sign-in"} replace />}
+          />
+          <Route
+            path="/authentication/sign-in"
+            element={AUTH_DISABLED || auth.token ? <Navigate to="/dashboard" replace /> : <Login />}
+          />
           <Route path="/authentication/sign-up" element={<SignUp />} />
           {getRoutes(routes)}
           <Route path="*" element={<Navigate to={AUTH_DISABLED ? "/dashboard" : "/authentication/sign-in"} />} />

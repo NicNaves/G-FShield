@@ -15,8 +15,8 @@ class GraspExecutionMonitorService {
     this.events = [];
     this.historyLimit = Math.max(Number(process.env.GRASP_MONITOR_HISTORY_LIMIT || 500), 1);
     this.eventLimit = Math.max(Number(process.env.GRASP_MONITOR_EVENT_LIMIT || 300), 1);
-    this.persistProgressEvents = String(process.env.GRASP_PERSIST_PROGRESS_EVENTS || "false").toLowerCase() === "true";
-    this.exposeProgressEvents = String(process.env.GRASP_EXPOSE_PROGRESS_EVENTS || "false").toLowerCase() === "true";
+    this.persistProgressEvents = String(process.env.GRASP_PERSIST_PROGRESS_EVENTS || "true").toLowerCase() === "true";
+    this.exposeProgressEvents = String(process.env.GRASP_EXPOSE_PROGRESS_EVENTS || "true").toLowerCase() === "true";
   }
 
   isProgressTopic(topic) {
@@ -123,6 +123,28 @@ class GraspExecutionMonitorService {
     return this.startPromise;
   }
 
+  async stop() {
+    const activeConsumer = this.consumer;
+
+    this.started = false;
+    this.startPromise = null;
+    this.consumer = null;
+    this.kafka = null;
+
+    if (!activeConsumer) {
+      return;
+    }
+
+    try {
+      await activeConsumer.disconnect();
+      logger.info("Monitor Kafka interrompido");
+    } catch (error) {
+      logger.warn("Falha ao interromper monitor Kafka", {
+        error: error.message,
+      });
+    }
+  }
+
   async connect() {
     try {
       this.kafka = new Kafka({
@@ -173,6 +195,7 @@ class GraspExecutionMonitorService {
       });
 
       this.started = true;
+      this.startPromise = null;
       logger.info("Monitor Kafka iniciado", { brokers: kafkaBrokers, topics: monitorTopics, fromBeginning });
     } catch (error) {
       logger.error("Falha ao iniciar monitor Kafka", { error: error.message, brokers: kafkaBrokers });
@@ -214,19 +237,6 @@ class GraspExecutionMonitorService {
     const stage = this.resolveStage(topic, payload);
     const eventType = topic === "LOCAL_SEARCH_PROGRESS_TOPIC" ? "kafka.progress" : "kafka.update";
     const status = topic === "BEST_SOLUTION_TOPIC" ? "completed" : "running";
-    const historyEntry = {
-      timestamp: now,
-      stage,
-      topic,
-      f1Score: this.numberOrNull(payload.f1Score),
-      cpuUsage: this.numberOrNull(payload.cpuUsage),
-      memoryUsage: this.numberOrNull(payload.memoryUsage),
-      memoryUsagePercent: this.numberOrNull(payload.memoryUsagePercent),
-      localSearch: payload.localSearch || null,
-      neighborhood: payload.neighborhood || null,
-      solutionFeatures: payload.solutionFeatures || [],
-    };
-    const shouldTrackProgress = !this.isProgressTopic(topic) || this.exposeProgressEvents;
 
     const current = this.runs.get(seedId) || {
       seedId,
@@ -237,6 +247,39 @@ class GraspExecutionMonitorService {
     };
 
     const incomingF1 = this.numberOrNull(payload.f1Score);
+    const previousBestF1Score = this.numberOrNull(current.bestF1Score);
+    const scoreDelta = incomingF1 === null || previousBestF1Score === null
+      ? null
+      : incomingF1 - previousBestF1Score;
+    const improved = incomingF1 !== null && (previousBestF1Score === null || incomingF1 > previousBestF1Score);
+    const solutionFeatures = this.cloneList(payload.solutionFeatures, current.solutionFeatures);
+    const rclFeatures = this.cloneList(payload.rclfeatures || payload.rclFeatures, current.rclfeatures || current.rclFeatures);
+    const enabledLocalSearches = this.cloneList(payload.enabledLocalSearches, current.enabledLocalSearches);
+    const solutionSize = solutionFeatures.length;
+    const rclSize = rclFeatures.length;
+    const historyEntry = {
+      timestamp: now,
+      stage,
+      topic,
+      eventType,
+      f1Score: incomingF1,
+      previousBestF1Score,
+      scoreDelta,
+      improved,
+      cpuUsage: this.numberOrNull(payload.cpuUsage),
+      memoryUsage: this.numberOrNull(payload.memoryUsage),
+      memoryUsagePercent: this.numberOrNull(payload.memoryUsagePercent),
+      localSearch: payload.localSearch || null,
+      neighborhood: payload.neighborhood || null,
+      iterationNeighborhood: payload.iterationNeighborhood ?? null,
+      iterationLocalSearch: payload.iterationLocalSearch ?? null,
+      solutionSize,
+      rclSize,
+      solutionFeatures,
+      rclFeatures,
+      enabledLocalSearches,
+    };
+    const shouldTrackProgress = !this.isProgressTopic(topic) || this.exposeProgressEvents;
     const nextBestF1 = incomingF1 === null
       ? current.bestF1Score
       : Math.max(current.bestF1Score ?? Number.NEGATIVE_INFINITY, incomingF1);
@@ -263,6 +306,21 @@ class GraspExecutionMonitorService {
         : (payload.neighborhood || current.neighborhood || null),
       trainingFileName: payload.trainingFileName || current.trainingFileName || null,
       testingFileName: payload.testingFileName || current.testingFileName || null,
+      enabledLocalSearches: preserveFinalSnapshot
+        ? current.enabledLocalSearches || enabledLocalSearches
+        : enabledLocalSearches,
+      neighborhoodMaxIterations: preserveFinalSnapshot
+        ? current.neighborhoodMaxIterations ?? payload.neighborhoodMaxIterations ?? null
+        : (payload.neighborhoodMaxIterations ?? current.neighborhoodMaxIterations ?? null),
+      bitFlipMaxIterations: preserveFinalSnapshot
+        ? current.bitFlipMaxIterations ?? payload.bitFlipMaxIterations ?? null
+        : (payload.bitFlipMaxIterations ?? current.bitFlipMaxIterations ?? null),
+      iwssMaxIterations: preserveFinalSnapshot
+        ? current.iwssMaxIterations ?? payload.iwssMaxIterations ?? null
+        : (payload.iwssMaxIterations ?? current.iwssMaxIterations ?? null),
+      iwssrMaxIterations: preserveFinalSnapshot
+        ? current.iwssrMaxIterations ?? payload.iwssrMaxIterations ?? null
+        : (payload.iwssrMaxIterations ?? current.iwssrMaxIterations ?? null),
       iterationNeighborhood: preserveFinalSnapshot
         ? current.iterationNeighborhood ?? payload.iterationNeighborhood ?? null
         : (payload.iterationNeighborhood ?? current.iterationNeighborhood ?? null),
@@ -287,9 +345,25 @@ class GraspExecutionMonitorService {
         ? current.runnigTime ?? payload.runnigTime ?? null
         : (payload.runnigTime ?? current.runnigTime ?? null),
       solutionFeatures: preserveFinalSnapshot
-        ? current.solutionFeatures || payload.solutionFeatures || []
-        : (payload.solutionFeatures || current.solutionFeatures || []),
-      rclfeatures: payload.rclfeatures || current.rclfeatures || [],
+        ? current.solutionFeatures || solutionFeatures
+        : solutionFeatures,
+      solutionSize,
+      rclfeatures: preserveFinalSnapshot
+        ? current.rclfeatures || rclFeatures
+        : rclFeatures,
+      rclFeatures: preserveFinalSnapshot
+        ? current.rclFeatures || rclFeatures
+        : rclFeatures,
+      rclSize,
+      previousBestF1Score: preserveFinalSnapshot
+        ? current.previousBestF1Score ?? previousBestF1Score
+        : previousBestF1Score,
+      scoreDelta: preserveFinalSnapshot
+        ? current.scoreDelta ?? scoreDelta
+        : scoreDelta,
+      improved: preserveFinalSnapshot
+        ? current.improved ?? improved
+        : improved,
       updates: current.updates + 1,
       history: shouldTrackProgress
         ? [...current.history, historyEntry].slice(-this.historyLimit)
@@ -360,6 +434,18 @@ class GraspExecutionMonitorService {
 
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  cloneList(value, fallback = []) {
+    if (Array.isArray(value)) {
+      return [...value];
+    }
+
+    if (Array.isArray(fallback)) {
+      return [...fallback];
+    }
+
+    return [];
   }
 
   pushEvent(event) {

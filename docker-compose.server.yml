@@ -85,18 +85,6 @@ services:
     cpus: 2.00
     mem_limit: 2048m
 
-  postgresql:
-    cpus: 1.00
-    mem_limit: 1024m
-
-  postgresql-2:
-    cpus: 1.00
-    mem_limit: 1024m
-
-  conduktor-console:
+  kafbat-ui:
     cpus: 1.00
     mem_limit: 2048m
-
-  conduktor-monitoring:
-    cpus: 0.75
-    mem_limit: 512m
