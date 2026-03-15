@@ -1,7 +1,8 @@
 const jwt = require("jsonwebtoken");
 const { authDisabled } = require("../config/runtimeConfig");
+const userService = require("../services/UserService");
 
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
   if (authDisabled) {
     req.user = {
       id: 1,
@@ -20,7 +21,22 @@ function authMiddleware(req, res, next) {
 
   try {
     const verified = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = verified;
+    const user = await userService.getUserById(Number(verified.id));
+
+    if (!user) {
+      return res.status(401).json({ error: "Usuario nao encontrado. Faca login novamente." });
+    }
+
+    if (user.active === false) {
+      return res.status(403).json({ error: "Usuario inativo. Procure um administrador." });
+    }
+
+    req.user = {
+      ...verified,
+      id: user.id,
+      role: user.role,
+      active: user.active,
+    };
     next();
   } catch (error) {
     return res.status(401).json({ error: "Token inválido ou expirado." });

@@ -1,39 +1,96 @@
 package br.com.graspfs.ls.iwssr.util;
 
-import oshi.SystemInfo;
-import oshi.hardware.CentralProcessor;
-import oshi.hardware.GlobalMemory;
+import com.sun.management.OperatingSystemMXBean;
+
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
+import java.lang.management.MemoryUsage;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 
 public class SystemMetricsUtils {
 
-    private static final SystemInfo systemInfo = new SystemInfo();
-    private static final CentralProcessor processor = systemInfo.getHardware().getProcessor();
-    private static final GlobalMemory memory = systemInfo.getHardware().getMemory();
+    private static final OperatingSystemMXBean operatingSystemBean =
+            ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
+    private static final MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
+    private static final long MB = 1024L * 1024L;
+    private static final List<Path> MEMORY_USAGE_PATHS = List.of(
+            Path.of("/sys/fs/cgroup/memory.current"),
+            Path.of("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+    );
+    private static final List<Path> MEMORY_LIMIT_PATHS = List.of(
+            Path.of("/sys/fs/cgroup/memory.max"),
+            Path.of("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+    );
 
     public static float getCpuUsage() {
-        long[] prevTicks = processor.getSystemCpuLoadTicks();
-        try {
-            Thread.sleep(100); // breve espera para calcular corretamente a média
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        if (operatingSystemBean == null) {
+            return 0F;
         }
-        double cpuLoad = processor.getSystemCpuLoadBetweenTicks(prevTicks);
-        return (float) (cpuLoad * 100);
+
+        double cpuLoad = operatingSystemBean.getProcessCpuLoad();
+        if (cpuLoad < 0) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            cpuLoad = operatingSystemBean.getProcessCpuLoad();
+        }
+
+        return cpuLoad < 0 ? 0F : (float) (cpuLoad * 100);
     }
 
     public static float getMemoryUsageMB() {
-        long total = memory.getTotal();
-        long available = memory.getAvailable();
-        long used = total - available;
-        return used / (1024f * 1024f); // bytes para MB
+        Long containerUsageBytes = readFirstBytes(MEMORY_USAGE_PATHS);
+        if (containerUsageBytes != null) {
+            return containerUsageBytes / (float) MB;
+        }
+
+        return getJvmUsedMemoryBytes() / (float) MB;
     }
 
     public static float getMemoryTotalMB() {
-        return memory.getTotal() / (1024f * 1024f);
+        Long containerLimitBytes = readFirstBytes(MEMORY_LIMIT_PATHS);
+        if (containerLimitBytes != null && containerLimitBytes > 0) {
+            return containerLimitBytes / (float) MB;
+        }
+
+        long jvmMaxBytes = Math.max(Runtime.getRuntime().maxMemory(), 1L);
+        return jvmMaxBytes / (float) MB;
     }
 
     public static float getMemoryUsagePercent() {
-        return getMemoryUsageMB() * 100 / getMemoryTotalMB();
+        float totalMb = getMemoryTotalMB();
+        return totalMb <= 0 ? 0F : (getMemoryUsageMB() * 100F / totalMb);
+    }
+
+    private static Long readFirstBytes(List<Path> paths) {
+        for (Path path : paths) {
+            try {
+                if (!Files.exists(path)) {
+                    continue;
+                }
+
+                String raw = Files.readString(path).trim();
+                if (raw.isBlank() || "max".equalsIgnoreCase(raw)) {
+                    continue;
+                }
+
+                return Long.parseLong(raw);
+            } catch (Exception ignored) {
+                // Fall back to JVM-only metrics below.
+            }
+        }
+
+        return null;
+    }
+
+    private static long getJvmUsedMemoryBytes() {
+        MemoryUsage heapUsage = memoryBean.getHeapMemoryUsage();
+        MemoryUsage nonHeapUsage = memoryBean.getNonHeapMemoryUsage();
+        return Math.max(heapUsage.getUsed(), 0L) + Math.max(nonHeapUsage.getUsed(), 0L);
     }
 
     public static class MetricsCollector implements Runnable {
@@ -43,7 +100,7 @@ public class SystemMetricsUtils {
         private float totalCpu = 0;
         private float totalMemory = 0;
         private float totalMemoryPercent = 0;
-    
+
         public void run() {
             while (running) {
                 float cpu = SystemMetricsUtils.getCpuUsage();
@@ -62,23 +119,21 @@ public class SystemMetricsUtils {
                 }
             }
         }
-    
+
         public void stop() {
             running = false;
         }
-    
+
         public float getAvgCpu() {
             return samples == 0 ? 0 : totalCpu / samples;
         }
-    
+
         public float getAvgMemory() {
             return samples == 0 ? 0 : totalMemory / samples;
         }
-    
+
         public float getAvgMemoryPercent() {
             return samples == 0 ? 0 : totalMemoryPercent / samples;
         }
     }
-
 }
-

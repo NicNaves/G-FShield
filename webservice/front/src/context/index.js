@@ -110,6 +110,7 @@ const setLogin = (dispatch, token, role, userId) => {
   localStorage.setItem("token", token);
   localStorage.setItem("role", role || DEV_ROLE);
   localStorage.setItem("userId", userId || DEV_USER_ID);
+  sessionStorage.removeItem("gfshield-auth-redirecting");
   dispatch({ type: "LOGIN", token, role, userId });
 };
 
@@ -117,6 +118,7 @@ const setLogout = (dispatch) => {
   localStorage.removeItem("token");
   localStorage.removeItem("role");
   localStorage.removeItem("userId");
+  sessionStorage.removeItem("gfshield-auth-redirecting");
   dispatch({ type: "LOGOUT" });
 };
 

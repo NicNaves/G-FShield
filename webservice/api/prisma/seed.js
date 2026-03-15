@@ -4,18 +4,38 @@ const prisma = require("../src/lib/prisma");
 async function main() {
   const hashedPassword = await bcrypt.hash("senhaSegura123", 10);
 
-  const user = await prisma.user.upsert({
-    where: { email: "admin@admin.com" },
-    update: {},
-    create: {
+  const adminUsers = [
+    {
       name: "Admin",
       email: "admin@admin.com",
       password: hashedPassword,
       role: "ADMIN",
+      active: true,
     },
-  });
+  ];
 
-  console.log("Usuario admin GF-Shield criado:", user);
+  const users = [];
+  for (const adminUser of adminUsers) {
+    const user = await prisma.user.upsert({
+      where: { email: adminUser.email },
+      update: {
+        name: adminUser.name,
+        password: adminUser.password,
+        role: adminUser.role,
+        active: true,
+      },
+      create: adminUser,
+    });
+
+    users.push(user);
+  }
+
+  console.log("Usuarios admin GF-Shield garantidos pelo seed:", users.map((user) => ({
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    active: user.active,
+  })));
 }
 
 main()

@@ -232,6 +232,20 @@ class ExecutionLaunchService {
     };
   }
 
+  async ensureRequestedById(requestedById = null) {
+    const normalizedId = Number(requestedById);
+    if (!Number.isInteger(normalizedId) || normalizedId <= 0) {
+      return null;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: normalizedId },
+      select: { id: true },
+    });
+
+    return user?.id || null;
+  }
+
   mapLaunch(record, queuePosition = null) {
     const metadata = record.metadata && typeof record.metadata === "object" ? record.metadata : {};
     const queueState = metadata.queueState || record.status.toLowerCase();
@@ -284,12 +298,13 @@ class ExecutionLaunchService {
   }
 
   async createQueuedLaunch(preparedExecution, requestedById = null, metadata = {}) {
+    const safeRequestedById = await this.ensureRequestedById(requestedById);
     const launch = await prisma.graspExecutionLaunch.upsert({
       where: { requestId: preparedExecution.requestId },
-      update: this.buildLaunchData(preparedExecution, requestedById, metadata, "REQUESTED"),
+      update: this.buildLaunchData(preparedExecution, safeRequestedById, metadata, "REQUESTED"),
       create: {
         requestId: preparedExecution.requestId,
-        ...this.buildLaunchData(preparedExecution, requestedById, metadata, "REQUESTED"),
+        ...this.buildLaunchData(preparedExecution, safeRequestedById, metadata, "REQUESTED"),
       },
       include: {
         requestedBy: true,
@@ -314,12 +329,15 @@ class ExecutionLaunchService {
     const nextMetadata = updates.metadata
       ? updates.metadata
       : this.mergeMetadata(existing.metadata, updates.metadataPatch);
+    const safeRequestedById = updates.requestedById !== undefined
+      ? await this.ensureRequestedById(updates.requestedById)
+      : undefined;
 
     const launch = await prisma.graspExecutionLaunch.update({
       where: { requestId },
       data: {
         ...(updates.status ? { status: this.normalizeStatus(updates.status, existing.status) } : {}),
-        ...(updates.requestedById !== undefined ? { requestedById: updates.requestedById } : {}),
+        ...(safeRequestedById !== undefined ? { requestedById: safeRequestedById } : {}),
         ...(updates.algorithms ? { algorithms: updates.algorithms } : {}),
         ...(updates.params
           ? {

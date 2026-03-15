@@ -8,7 +8,6 @@ module.exports = async () => {
   await prisma.graspExecutionEvent.deleteMany();
   await prisma.graspExecutionRun.deleteMany();
   await prisma.graspExecutionLaunch.deleteMany();
-  await prisma.user.deleteMany();
 
   console.log("Banco de dados limpo para testes.");
   await prisma.$disconnect();

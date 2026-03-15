@@ -9,6 +9,10 @@ class ExecutionQueueService {
     this.pendingQueue = [];
     this.activeQueue = new Map();
     this.concurrency = Math.max(Number(process.env.GRASP_EXECUTION_QUEUE_CONCURRENCY || 1), 1);
+    this.completionPollIntervalMs = Math.max(
+      Number(process.env.GRASP_EXECUTION_QUEUE_COMPLETION_POLL_MS || 5000),
+      250
+    );
     this.resetVersion = 0;
   }
 
@@ -108,7 +112,7 @@ class ExecutionQueueService {
     }
 
     const activeItem = this.activeQueue.get(requestId);
-    if (activeItem) {
+    if (activeItem?.stage === "dispatching") {
       activeItem.cancelRequested = true;
       return executionLaunchService.updateLaunch(requestId, {
         metadataPatch: {
@@ -150,6 +154,7 @@ class ExecutionQueueService {
 
   async runExecution(queueItem) {
     const runVersion = this.resetVersion;
+    queueItem.stage = "dispatching";
     this.activeQueue.set(queueItem.requestId, queueItem);
 
     try {
@@ -220,6 +225,9 @@ class ExecutionQueueService {
           note: "All selected algorithms were submitted. Waiting for all generated seeds to finish the distributed pipeline.",
         },
       });
+
+      queueItem.stage = "monitoring";
+      await this.waitForCompletion(queueItem, runVersion);
     } catch (error) {
       if (this.isStaleRun(runVersion)) {
         logger.warn("Ignoring queue execution failure after environment reset", {
@@ -254,6 +262,28 @@ class ExecutionQueueService {
 
   isStaleRun(runVersion) {
     return runVersion !== this.resetVersion;
+  }
+
+  async waitForCompletion(queueItem, runVersion) {
+    while (!this.isStaleRun(runVersion)) {
+      const launch = await executionLaunchService.getLaunch(queueItem.requestId);
+      const status = String(launch?.status || "").toUpperCase();
+      const queueState = String(launch?.queueState || "").toLowerCase();
+
+      if (status === "COMPLETED" || status === "FAILED" || queueState === "cancelled" || queueState === "failed") {
+        return launch;
+      }
+
+      await this.sleep(this.completionPollIntervalMs);
+    }
+
+    return null;
+  }
+
+  async sleep(durationMs) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, durationMs);
+    });
   }
 }
 

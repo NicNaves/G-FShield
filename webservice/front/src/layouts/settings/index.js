@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
+import { useNavigate } from "react-router-dom";
 
 import Alert from "@mui/material/Alert";
 import Autocomplete from "@mui/material/Autocomplete";
@@ -133,6 +134,7 @@ function Settings() {
   const { t } = useI18n();
   const [controller] = useMaterialUIController();
   const { darkMode } = controller;
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("execution");
   const [form, setForm] = useState(defaultExecutionForm);
   const [services, setServices] = useState([]);
@@ -144,6 +146,7 @@ function Settings() {
   const [lastDispatch, setLastDispatch] = useState(null);
   const [error, setError] = useState("");
   const { catalog, loading: loadingDatasets, error: datasetError } = useDatasetCatalog();
+  const hasAuthSession = Boolean(controller.auth?.token && controller.auth?.userId);
 
   useEffect(() => {
     let active = true;
@@ -208,6 +211,13 @@ function Settings() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (!hasAuthSession) {
+      const message = t("settings.loginRequiredToExecute");
+      setError(message);
+      toast.error(message);
+      navigate("/authentication/sign-in");
+      return;
+    }
     if (!form.algorithms.length) return setError(t("settings.selectOneAlgorithm"));
     if (!form.datasetTrainingName || !form.datasetTestingName) return setError(t("settings.selectDatasets"));
     if (!form.localSearches.length) return setError(t("settings.selectLocalSearch"));
@@ -293,6 +303,7 @@ function Settings() {
             </MDBox>
 
             {error ? <MDBox mt={2.5}><Alert severity="error">{error}</Alert></MDBox> : null}
+            {!hasAuthSession ? <MDBox mt={2.5}><Alert severity="warning">{t("settings.loginRequiredToExecute")}</Alert></MDBox> : null}
             {!catalog.exists && !loadingDatasets ? <MDBox mt={2.5}><Alert severity="warning">{t("settings.apiFolderMissing")}</Alert></MDBox> : null}
 
             <Tabs value={activeTab} onChange={(event, value) => setActiveTab(value)} sx={{
@@ -572,7 +583,7 @@ function Settings() {
             </Grid> : null}
 
             <MDBox mt={4} display="flex" gap={1.5} flexWrap="wrap">
-              <MDButton type="submit" variant="gradient" color="info" disabled={submitting}>
+              <MDButton type="submit" variant="gradient" color="info" disabled={submitting || !hasAuthSession}>
                 {submitting ? t("settings.submitting") : t("settings.queueExecution")}
               </MDButton>
               <MDButton variant="outlined" color="secondary" onClick={() => setForm({ ...defaultExecutionForm, datasetTrainingName: catalog.suggestedPairs[0]?.trainingName || "", datasetTestingName: catalog.suggestedPairs[0]?.testingName || "" })}>

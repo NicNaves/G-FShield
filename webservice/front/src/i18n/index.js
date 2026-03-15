@@ -55,6 +55,7 @@ const translations = {
       localMode: "Local mode",
       signIn: "Sign in",
       signInError: "Unable to sign in.",
+      sessionExpired: "Your session is no longer valid. Sign in again to continue.",
       guestDescription:
         "Authentication is disabled in this environment. Continue directly as a guest user.",
       continueWithoutSignIn: "Continue without sign-in",
@@ -115,6 +116,7 @@ const translations = {
       selectOneAlgorithm: "Select at least one RCL algorithm.",
       selectDatasets: "Select the training and testing files from the shared folder.",
       selectLocalSearch: "Select at least one local-search service for the DLS.",
+      loginRequiredToExecute: "Sign in before starting an execution.",
       unableLoadServices: "Unable to load local services.",
       executionStarted: "Execution started successfully.",
       unableStartExecution: "Unable to start the execution.",
@@ -540,6 +542,7 @@ const translations = {
       localMode: "Modo local",
       signIn: "Entrar",
       signInError: "Nao foi possivel entrar.",
+      sessionExpired: "Sua sessao nao e mais valida. Entre novamente para continuar.",
       guestDescription:
         "A autenticacao esta desabilitada neste ambiente. Continue diretamente como usuario convidado.",
       continueWithoutSignIn: "Continuar sem entrar",
@@ -600,6 +603,7 @@ const translations = {
       selectOneAlgorithm: "Selecione pelo menos um algoritmo RCL.",
       selectDatasets: "Selecione os arquivos de treino e teste da pasta compartilhada.",
       selectLocalSearch: "Selecione pelo menos um servico de busca local para o DLS.",
+      loginRequiredToExecute: "Entre antes de iniciar uma execucao.",
       unableLoadServices: "Nao foi possivel carregar os servicos locais.",
       executionStarted: "Execucao iniciada com sucesso.",
       unableStartExecution: "Nao foi possivel iniciar a execucao.",
