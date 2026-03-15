@@ -40,3 +40,7 @@ Thumbs.db
 
 # Estado local dos scripts de desenvolvimento
 .local-dev/
+
+# Cache local do Maven
+.m2/
+**/.m2/
