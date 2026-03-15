@@ -64,7 +64,7 @@ GF-Shield/
 
 #### Infraestrutura e suporte
 
-- Conduktor Console: `8080`
+- Kafbat UI: `8080`
 - Kafka: `9092`
 - Zookeeper: `2181`
 - Web front-end: `3000`
@@ -138,14 +138,18 @@ Para encerrar:
 - metricas CSV ficam na pasta [`metrics`](./metrics)
 - o front persiste `token`, `role`, `userId`, `darkMode` e notificacoes em `localStorage`
 - launches da fila de execucao sao persistidas em `GraspExecutionLaunch`
+- `queueState` representa o estado do despacho; `status` representa o termino real do pipeline monitorado
 
 ### Funcionalidades recentes
 
 - fila de execucoes com cancelamento best-effort
 - pagina `Run Details` por `seedId`
 - comparacao entre execucoes no dashboard
+- aba `Analytics` com feed visivel de solucoes, volume por topico e estatisticas do monitor
 - catalogo enriquecido de datasets
 - `Request Summary` persistido em `Settings > Operations`
+- `Settings > Operations` com limpeza local, reset do monitor e reset completo do ambiente com modal de confirmacao
+- progresso de seeds esperadas x concluidas na fila de execucao
 - links clicaveis de seed nas tabelas e alerts
 
 ### Presets de recursos
@@ -241,7 +245,7 @@ GF-Shield/
 
 #### Infrastructure and support
 
-- Conduktor Console: `8080`
+- Kafbat UI: `8080`
 - Kafka: `9092`
 - Zookeeper: `2181`
 - Web front-end: `3000`
@@ -315,14 +319,18 @@ To stop everything:
 - CSV metrics are stored under [`metrics`](./metrics)
 - the front-end stores `token`, `role`, `userId`, `darkMode`, and notifications in `localStorage`
 - execution queue launches are persisted in `GraspExecutionLaunch`
+- `queueState` represents dispatch state; `status` represents real monitored pipeline completion
 
 ### Recent features
 
 - execution queue with best-effort cancellation
 - `Run Details` page by `seedId`
 - execution comparison in the dashboard
+- `Analytics` tab with visible solution feed, topic volume, and monitor statistics
 - enriched dataset catalog
 - persisted `Request Summary` under `Settings > Operations`
+- `Settings > Operations` with local cleanup, monitor reset, and full environment reset with confirmation modal
+- expected-vs-completed seed progress in the execution queue
 - clickable seed links across tables and alerts
 
 ### Resource presets

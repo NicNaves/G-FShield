@@ -38,6 +38,7 @@ Esta API fornece autenticacao, gestao de usuarios, disparo de execucao GRASP-FS,
 - `GET /api/grasp/monitor/events`
 - `GET /api/grasp/monitor/stream`
 - `POST /api/grasp/monitor/reset`
+- `POST /api/grasp/environment/reset`
 
 #### Swagger
 
@@ -59,6 +60,7 @@ O schema em modo real e pequeno e focado no GF-Shield:
 - datasets e classificador
 - estado da fila
 - historico de dispatch
+- contagem esperada, observada e concluida de seeds para reconciliar o `status` real da execucao
 
 ### Variaveis de ambiente
 
@@ -72,9 +74,14 @@ API_PORT=4000
 GRASP_DATASETS_DIR="../../datasets"
 AUTH_DISABLED=false
 MOCK_DATA_ENABLED=false
-GRASP_PERSIST_PROGRESS_EVENTS=false
-GRASP_MONITOR_HISTORY_LIMIT=500
-GRASP_MONITOR_EVENT_LIMIT=300
+GRASP_PERSIST_PROGRESS_EVENTS=true
+GRASP_EXPOSE_PROGRESS_EVENTS=true
+GRASP_MONITOR_HISTORY_LIMIT=2000
+GRASP_MONITOR_EVENT_LIMIT=2000
+GRASP_MONITOR_SNAPSHOT_LIMIT=1000
+GRASP_MONITOR_SNAPSHOT_EVENT_LIMIT=2000
+GRASP_RUN_SUMMARY_HISTORY_LIMIT=200
+GRASP_RUN_HISTORY_LIMIT=5000
 KAFKA_MONITOR_FROM_BEGINNING=true
 KAFKA_MONITOR_GROUP_ID=grasp-fs-monitor-group-replay
 ```
@@ -96,7 +103,18 @@ O monitor assina:
 - `SOLUTIONS_TOPIC`
 - `BEST_SOLUTION_TOPIC`
 
-O dashboard consome principalmente agregados e estados finais expostos pela API.
+O monitor persiste snapshots intermediarios e resultados finais. A API expoe:
+
+- runs consolidadas por `seedId`
+- eventos do feed visivel do monitor
+- resumo estatistico por topico e algoritmo
+- reconciliacao de `status` da launch com base nas seeds esperadas x concluidas
+
+### Semantica da launch
+
+- `queueState`: mostra o estado do despacho da request
+- `status`: fica `running` depois do dispatch e so muda para `completed` quando todas as seeds esperadas forem concluidas no pipeline
+- `completedAt` passa a representar a conclusao real do pipeline, nao apenas o fim do envio para os servicos RCL
 
 ## EN-US
 
@@ -136,6 +154,7 @@ This API provides authentication, user management, GRASP-FS execution dispatch, 
 - `GET /api/grasp/monitor/events`
 - `GET /api/grasp/monitor/stream`
 - `POST /api/grasp/monitor/reset`
+- `POST /api/grasp/environment/reset`
 
 #### Swagger
 
@@ -157,6 +176,7 @@ The real-mode schema is intentionally small and focused on GF-Shield:
 - datasets and classifier
 - queue state
 - dispatch history
+- expected, observed, and completed seed counters used to reconcile true execution status
 
 ### Environment variables
 
@@ -170,9 +190,14 @@ API_PORT=4000
 GRASP_DATASETS_DIR="../../datasets"
 AUTH_DISABLED=false
 MOCK_DATA_ENABLED=false
-GRASP_PERSIST_PROGRESS_EVENTS=false
-GRASP_MONITOR_HISTORY_LIMIT=500
-GRASP_MONITOR_EVENT_LIMIT=300
+GRASP_PERSIST_PROGRESS_EVENTS=true
+GRASP_EXPOSE_PROGRESS_EVENTS=true
+GRASP_MONITOR_HISTORY_LIMIT=2000
+GRASP_MONITOR_EVENT_LIMIT=2000
+GRASP_MONITOR_SNAPSHOT_LIMIT=1000
+GRASP_MONITOR_SNAPSHOT_EVENT_LIMIT=2000
+GRASP_RUN_SUMMARY_HISTORY_LIMIT=200
+GRASP_RUN_HISTORY_LIMIT=5000
 KAFKA_MONITOR_FROM_BEGINNING=true
 KAFKA_MONITOR_GROUP_ID=grasp-fs-monitor-group-replay
 ```
@@ -194,4 +219,15 @@ The monitor subscribes to:
 - `SOLUTIONS_TOPIC`
 - `BEST_SOLUTION_TOPIC`
 
-The dashboard mostly consumes final-state data and API aggregates.
+The monitor persists intermediate snapshots and final results. The API exposes:
+
+- consolidated runs by `seedId`
+- visible monitor feed events
+- statistical summaries by topic and algorithm
+- launch status reconciliation based on expected-vs-completed seeds
+
+### Launch semantics
+
+- `queueState`: request dispatch state
+- `status`: remains `running` after dispatch and only becomes `completed` when all expected seeds finish in the pipeline
+- `completedAt` represents real pipeline completion, not just the end of RCL dispatch

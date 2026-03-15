@@ -65,18 +65,27 @@ npm.cmd start
 
 ### Semantica do dashboard
 
-O dashboard e organizado em torno de tres estagios relevantes:
+O dashboard agora combina monitoramento resumido e visoes analiticas:
 
 - solucao inicial
+- progresso intermediario da busca local
 - resultado final da busca local
 - best solution
 
-A UI ignora a maior parte do ruido bruto de `LOCAL_SEARCH_PROGRESS_TOPIC` e enfatiza os estados finais mais uteis para analise.
+Nas tabelas operacionais, a UI continua priorizando os estados mais uteis. Na aba `Analytics`, o front mostra o feed visivel de solucoes sem consolidacao por seed.
+
+### Semantica da fila
+
+- `queueState`: estado de despacho da launch (`queued`, `dispatching`, `dispatched`, `cancelled`)
+- `status`: estado real do pipeline monitorado (`running` enquanto ainda faltam seeds; `completed` apenas quando todas as seeds esperadas forem concluidas)
+- o painel de fila mostra seeds esperadas, observadas e concluidas para cada launch
 
 ### Funcionalidades de operacao
 
 - `Settings > Operations`: fila de execucao com `Request Summary`
+- `Settings > Operations > Administrative reset`: limpeza local do navegador, reset do monitor e reset completo do ambiente com confirmacao em modal
 - `Dashboard > Executions`: comparacao entre runs
+- `Dashboard > Analytics`: volume por topico, resumo por topico e feed visivel de solucoes
 - `Dashboard > Run Details`: tela por `seedId`
 
 ### Estado persistido no browser
@@ -154,18 +163,27 @@ npm.cmd start
 
 ### Dashboard semantics
 
-The dashboard is organized around three meaningful stages:
+The dashboard now combines an operational monitor and analytics views:
 
 - initial solution
+- intermediate local-search progress
 - final local-search outcome
 - best solution
 
-The UI intentionally ignores most raw `LOCAL_SEARCH_PROGRESS_TOPIC` noise and emphasizes the final states that matter most to analysis.
+Operational tables still prioritize the most useful final states. The `Analytics` tab exposes the visible solution feed without per-seed consolidation.
+
+### Queue semantics
+
+- `queueState`: dispatch state for the launch (`queued`, `dispatching`, `dispatched`, `cancelled`)
+- `status`: real monitored pipeline state (`running` while seeds are still pending, `completed` only when all expected seeds finish)
+- the execution queue panel shows expected, observed, and completed seeds per launch
 
 ### Operational features
 
 - `Settings > Operations`: execution queue with `Request Summary`
+- `Settings > Operations > Administrative reset`: browser-only cleanup, monitor reset, and full environment reset with confirmation modal
 - `Dashboard > Executions`: run comparison
+- `Dashboard > Analytics`: topic volume, topic summary, and visible solution feed
 - `Dashboard > Run Details`: detail page by `seedId`
 
 ### Persisted browser state
