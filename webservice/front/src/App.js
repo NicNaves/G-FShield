@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, matchPath } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import Icon from "@mui/material/Icon";
@@ -13,11 +13,12 @@ import { CacheProvider } from "@emotion/react";
 import createCache from "@emotion/cache";
 import routes from "routes"; 
 import { useMaterialUIController, setMiniSidenav, setOpenConfigurator, setLogin } from "context";
-import logo from "assets/images/logo.png";
+import logoShield from "assets/images/logoshield.png";
 import Login from "./layouts/authentication/sign-in";
 import SignUp from "./layouts/authentication/sign-up";
 import PropTypes from "prop-types"; 
 import { AUTH_DISABLED, DEV_ROLE, DEV_TOKEN, DEV_USER_ID } from "./config/runtime";
+import useI18n from "hooks/useI18n";
 
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -64,6 +65,7 @@ export default function App() {
   const [onMouseEnter, setOnMouseEnter] = useState(false);
   const [rtlCache, setRtlCache] = useState(null);
   const { pathname } = useLocation();
+  const { t } = useI18n();
 
   // Verifica e carrega o token do localStorage na inicialização
   useEffect(() => {
@@ -121,6 +123,22 @@ export default function App() {
     document.documentElement.scrollTop = 0;
     document.scrollingElement.scrollTop = 0;
   }, [pathname]);
+
+  useEffect(() => {
+    const authTitles = {
+      "/authentication/sign-in": t("auth.signIn"),
+      "/authentication/sign-up": t("auth.createAccount"),
+    };
+
+    const matchedRoute = routes.find((route) => route.route && matchPath({ path: route.route, end: true }, pathname));
+    const routeTitle = matchedRoute?.nameKey
+      ? t(matchedRoute.nameKey)
+      : matchedRoute?.key === "run-details"
+        ? t("routes.runDetails")
+        : authTitles[pathname];
+
+    document.title = routeTitle ? `G-FShield - ${routeTitle}` : "G-FShield";
+  }, [pathname, t]);
 
   
   const visibleRoutes = useMemo(
@@ -187,7 +205,7 @@ export default function App() {
           <>
             <Sidenav
               color={sidenavColor}
-              brand={logo}
+              brand={logoShield}
               brandName=""
               routes={visibleRoutes}
               // onMouseEnter={handleOnMouseEnter}

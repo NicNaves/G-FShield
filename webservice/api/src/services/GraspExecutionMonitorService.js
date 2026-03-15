@@ -23,6 +23,63 @@ class GraspExecutionMonitorService {
     return topic === "LOCAL_SEARCH_PROGRESS_TOPIC";
   }
 
+  isTerminalRun(topic, payload = {}, currentRun = null) {
+    if (topic === "BEST_SOLUTION_TOPIC") {
+      return true;
+    }
+
+    if (topic !== "SOLUTIONS_TOPIC") {
+      return false;
+    }
+
+    const neighborhood = String(payload.neighborhood || currentRun?.neighborhood || "").trim().toUpperCase();
+    const iterationNeighborhood = this.numberOrNull(
+      payload.iterationNeighborhood ?? currentRun?.iterationNeighborhood ?? null,
+    );
+
+    if (!Number.isFinite(iterationNeighborhood)) {
+      return false;
+    }
+
+    if (neighborhood === "VND") {
+      return iterationNeighborhood >= this.resolveVndDispatchBudget(payload, currentRun);
+    }
+
+    if (neighborhood === "RVND") {
+      return iterationNeighborhood >= this.resolveNeighborhoodCycles(payload, currentRun);
+    }
+
+    return false;
+  }
+
+  resolveVndDispatchBudget(payload = {}, currentRun = null) {
+    const enabledLocalSearches = this.resolveEnabledLocalSearches(payload, currentRun);
+    const searchesPerCycle = Math.max(enabledLocalSearches.length, 1);
+    const configuredCycles = this.resolveNeighborhoodCycles(payload, currentRun);
+    return Math.max(configuredCycles * searchesPerCycle, searchesPerCycle);
+  }
+
+  resolveNeighborhoodCycles(payload = {}, currentRun = null) {
+    const configuredCycles = this.numberOrNull(
+      payload.neighborhoodMaxIterations ?? currentRun?.neighborhoodMaxIterations ?? null,
+    );
+
+    return configuredCycles && configuredCycles > 0 ? configuredCycles : 1;
+  }
+
+  resolveEnabledLocalSearches(payload = {}, currentRun = null) {
+    const configured = this.cloneList(
+      payload.enabledLocalSearches,
+      currentRun?.enabledLocalSearches || ["BIT_FLIP", "IWSS", "IWSSR"],
+    );
+
+    const normalized = configured
+      .map((entry) => String(entry || "").trim().toUpperCase())
+      .filter(Boolean);
+
+    return normalized.length ? [...new Set(normalized)] : ["BIT_FLIP", "IWSS", "IWSSR"];
+  }
+
   topicPriority(topic) {
     if (topic === "BEST_SOLUTION_TOPIC") {
       return 3;
@@ -236,7 +293,6 @@ class GraspExecutionMonitorService {
     const now = new Date().toISOString();
     const stage = this.resolveStage(topic, payload);
     const eventType = topic === "LOCAL_SEARCH_PROGRESS_TOPIC" ? "kafka.progress" : "kafka.update";
-    const status = topic === "BEST_SOLUTION_TOPIC" ? "completed" : "running";
 
     const current = this.runs.get(seedId) || {
       seedId,
@@ -245,6 +301,8 @@ class GraspExecutionMonitorService {
       history: [],
       updates: 0,
     };
+    const terminalRun = this.isTerminalRun(topic, payload, current);
+    const status = terminalRun ? "completed" : "running";
 
     const incomingF1 = this.numberOrNull(payload.f1Score);
     const previousBestF1Score = this.numberOrNull(current.bestF1Score);
@@ -283,85 +341,88 @@ class GraspExecutionMonitorService {
     const nextBestF1 = incomingF1 === null
       ? current.bestF1Score
       : Math.max(current.bestF1Score ?? Number.NEGATIVE_INFINITY, incomingF1);
+    const hasCompletedSnapshot = String(current.status || "").toLowerCase() === "completed";
     const hasFinalSnapshot = current.topic === "BEST_SOLUTION_TOPIC";
+    const preserveCompletedSnapshot = hasCompletedSnapshot && !terminalRun && topic !== "BEST_SOLUTION_TOPIC";
     const preserveFinalSnapshot = hasFinalSnapshot && topic !== "BEST_SOLUTION_TOPIC";
+    const preserveTerminalSnapshot = preserveCompletedSnapshot || preserveFinalSnapshot;
 
     const run = {
       ...current,
       seedId,
       updatedAt: now,
-      completedAt: preserveFinalSnapshot
+      completedAt: preserveTerminalSnapshot
         ? current.completedAt || now
-        : (topic === "BEST_SOLUTION_TOPIC" ? now : current.completedAt || null),
-      status: preserveFinalSnapshot ? current.status || "completed" : status,
-      stage: preserveFinalSnapshot ? current.stage || "best_solution" : stage,
-      topic: preserveFinalSnapshot ? current.topic || "BEST_SOLUTION_TOPIC" : topic,
+        : (terminalRun ? now : current.completedAt || null),
+      status: preserveTerminalSnapshot ? current.status || "completed" : status,
+      stage: preserveTerminalSnapshot ? current.stage || "best_solution" : stage,
+      topic: preserveTerminalSnapshot ? current.topic || "BEST_SOLUTION_TOPIC" : topic,
       rclAlgorithm: payload.rclAlgorithm || current.rclAlgorithm || null,
       classifier: payload.classifier || payload.classfier || current.classifier || null,
-      localSearch: preserveFinalSnapshot
+      localSearch: preserveTerminalSnapshot
         ? current.localSearch || payload.localSearch || null
         : (payload.localSearch || current.localSearch || null),
-      neighborhood: preserveFinalSnapshot
+      neighborhood: preserveTerminalSnapshot
         ? current.neighborhood || payload.neighborhood || null
         : (payload.neighborhood || current.neighborhood || null),
       trainingFileName: payload.trainingFileName || current.trainingFileName || null,
       testingFileName: payload.testingFileName || current.testingFileName || null,
-      enabledLocalSearches: preserveFinalSnapshot
+      enabledLocalSearches: preserveTerminalSnapshot
         ? current.enabledLocalSearches || enabledLocalSearches
         : enabledLocalSearches,
-      neighborhoodMaxIterations: preserveFinalSnapshot
+      neighborhoodMaxIterations: preserveTerminalSnapshot
         ? current.neighborhoodMaxIterations ?? payload.neighborhoodMaxIterations ?? null
         : (payload.neighborhoodMaxIterations ?? current.neighborhoodMaxIterations ?? null),
-      bitFlipMaxIterations: preserveFinalSnapshot
+      bitFlipMaxIterations: preserveTerminalSnapshot
         ? current.bitFlipMaxIterations ?? payload.bitFlipMaxIterations ?? null
         : (payload.bitFlipMaxIterations ?? current.bitFlipMaxIterations ?? null),
-      iwssMaxIterations: preserveFinalSnapshot
+      iwssMaxIterations: preserveTerminalSnapshot
         ? current.iwssMaxIterations ?? payload.iwssMaxIterations ?? null
         : (payload.iwssMaxIterations ?? current.iwssMaxIterations ?? null),
-      iwssrMaxIterations: preserveFinalSnapshot
+      iwssrMaxIterations: preserveTerminalSnapshot
         ? current.iwssrMaxIterations ?? payload.iwssrMaxIterations ?? null
         : (payload.iwssrMaxIterations ?? current.iwssrMaxIterations ?? null),
-      iterationNeighborhood: preserveFinalSnapshot
+      iterationNeighborhood: preserveTerminalSnapshot
         ? current.iterationNeighborhood ?? payload.iterationNeighborhood ?? null
         : (payload.iterationNeighborhood ?? current.iterationNeighborhood ?? null),
-      iterationLocalSearch: preserveFinalSnapshot
+      iterationLocalSearch: preserveTerminalSnapshot
         ? current.iterationLocalSearch ?? payload.iterationLocalSearch ?? null
         : (payload.iterationLocalSearch ?? current.iterationLocalSearch ?? null),
-      currentF1Score: preserveFinalSnapshot ? current.currentF1Score ?? incomingF1 : incomingF1,
+      currentF1Score: preserveTerminalSnapshot ? current.currentF1Score ?? incomingF1 : incomingF1,
       bestF1Score: Number.isFinite(nextBestF1) ? nextBestF1 : current.bestF1Score,
-      accuracy: preserveFinalSnapshot
+      accuracy: preserveTerminalSnapshot
         ? current.accuracy ?? this.numberOrNull(payload.accuracy)
         : this.numberOrNull(payload.accuracy),
-      precision: preserveFinalSnapshot
+      precision: preserveTerminalSnapshot
         ? current.precision ?? this.numberOrNull(payload.precision)
         : this.numberOrNull(payload.precision),
-      recall: preserveFinalSnapshot
+      recall: preserveTerminalSnapshot
         ? current.recall ?? this.numberOrNull(payload.recall)
         : this.numberOrNull(payload.recall),
       cpuUsage: this.numberOrNull(payload.cpuUsage),
       memoryUsage: this.numberOrNull(payload.memoryUsage),
       memoryUsagePercent: this.numberOrNull(payload.memoryUsagePercent),
-      runnigTime: preserveFinalSnapshot
+      runnigTime: preserveTerminalSnapshot
         ? current.runnigTime ?? payload.runnigTime ?? null
         : (payload.runnigTime ?? current.runnigTime ?? null),
-      solutionFeatures: preserveFinalSnapshot
+      solutionFeatures: preserveTerminalSnapshot
         ? current.solutionFeatures || solutionFeatures
         : solutionFeatures,
       solutionSize,
-      rclfeatures: preserveFinalSnapshot
+      rclfeatures: preserveTerminalSnapshot
         ? current.rclfeatures || rclFeatures
         : rclFeatures,
-      rclFeatures: preserveFinalSnapshot
+      rclFeatures: preserveTerminalSnapshot
         ? current.rclFeatures || rclFeatures
         : rclFeatures,
       rclSize,
-      previousBestF1Score: preserveFinalSnapshot
+      previousBestF1Score: preserveTerminalSnapshot
         ? current.previousBestF1Score ?? previousBestF1Score
         : previousBestF1Score,
-      scoreDelta: preserveFinalSnapshot
+      scoreDelta: preserveTerminalSnapshot
         ? current.scoreDelta ?? scoreDelta
         : scoreDelta,
-      improved: preserveFinalSnapshot
+      improved: preserveTerminalSnapshot
         ? current.improved ?? improved
         : improved,
       updates: current.updates + 1,

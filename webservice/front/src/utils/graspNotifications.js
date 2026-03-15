@@ -54,7 +54,12 @@ export const pushGraspNotification = (notification, limit = 12) => {
     return [];
   }
 
-  const nextNotifications = [notification, ...readRawNotifications()]
+  const nextNotifications = [
+    notification,
+    ...readRawNotifications().filter(
+      (entry) => entry?.id !== notification.id && entry?.seedId !== notification.seedId
+    ),
+  ]
     .filter(Boolean)
     .slice(0, limit);
 

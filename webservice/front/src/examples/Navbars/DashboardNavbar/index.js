@@ -4,11 +4,14 @@ import PropTypes from "prop-types";
 import AppBar from "@mui/material/AppBar";
 import Toolbar from "@mui/material/Toolbar";
 import IconButton from "@mui/material/IconButton";
+import Divider from "@mui/material/Divider";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Icon from "@mui/material/Icon";
 import Badge from "@mui/material/Badge";
 import MDBox from "components/MDBox";
+import MDButton from "components/MDButton";
+import MDTypography from "components/MDTypography";
 import Breadcrumbs from "examples/Breadcrumbs";
 import NotificationItem from "examples/Items/NotificationItem";
 import { navbar, navbarContainer, navbarRow, navbarIconButton, navbarMobileMenu } from "examples/Navbars/DashboardNavbar/styles";
@@ -16,9 +19,11 @@ import { useMaterialUIController, setTransparentNavbar, setMiniSidenav, setLogou
 import { AUTH_DISABLED, DEV_ROLE, DEV_TOKEN, DEV_USER_ID } from "../../../config/runtime";
 import {
   GRASP_NOTIFICATION_EVENT_NAME,
+  clearGraspNotifications,
   readGraspNotifications,
 } from "../../../utils/graspNotifications";
 import useI18n from "hooks/useI18n";
+import { formatCompactPercent, formatRelativeTime, shortenSeed } from "utils/graspFormatters";
 
 function DashboardNavbar({ absolute, light, isMini }) {
   const [controller, dispatch] = useMaterialUIController();
@@ -48,6 +53,10 @@ function DashboardNavbar({ absolute, light, isMini }) {
   const handleCloseMenu = () => setOpenMenu(null);
   const handleOpenNotifications = (event) => setNotificationsAnchor(event.currentTarget);
   const handleCloseNotifications = () => setNotificationsAnchor(null);
+  const handleClearNotifications = () => {
+    clearGraspNotifications();
+    handleCloseNotifications();
+  };
 
   useEffect(() => {
     const syncNotifications = () => {
@@ -109,23 +118,90 @@ function DashboardNavbar({ absolute, light, isMini }) {
         vertical: "top",
         horizontal: "right",
       }}
-      sx={{ mt: 2 }}
+      PaperProps={{
+        sx: {
+          mt: 2,
+          width: 360,
+          maxWidth: "calc(100vw - 32px)",
+          maxHeight: 440,
+          borderRadius: 2.5,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        },
+      }}
+      MenuListProps={{
+        disablePadding: true,
+        sx: {
+          display: "flex",
+          flexDirection: "column",
+          maxHeight: 440,
+          p: 0,
+        },
+      }}
     >
-      {notifications.length === 0 ? (
-        <MenuItem onClick={handleCloseNotifications}>
-          <Icon fontSize="small" sx={{ mr: 1 }}>notifications_none</Icon>
-          {t("navbar.noRecentImprovements")}
-        </MenuItem>
-      ) : (
-        notifications.slice(0, 6).map((notification) => (
-          <NotificationItem
-            key={notification.id || `${notification.seedId}-${notification.timestamp}`}
-            icon={<Icon fontSize="small">trending_up</Icon>}
-            title={notification.title}
-            onClick={handleCloseNotifications}
-          />
-        ))
-      )}
+      <MDBox
+        px={2}
+        py={1.5}
+        display="flex"
+        justifyContent="space-between"
+        alignItems="flex-start"
+        gap={1}
+        sx={{
+          position: "sticky",
+          top: 0,
+          zIndex: 1,
+          background: darkMode ? "rgba(52, 61, 86, 0.98)" : "rgba(255,255,255,0.98)",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        <MDBox>
+          <MDTypography variant="button" fontWeight="medium">
+            {t("navbar.recentImprovements")}
+          </MDTypography>
+          <MDTypography variant="caption" display="block" mt={0.25}>
+            {t("navbar.notificationsHint")}
+          </MDTypography>
+        </MDBox>
+        {notifications.length > 0 ? (
+          <MDButton variant="text" color="info" size="small" onClick={handleClearNotifications}>
+            {t("common.clearAll")}
+          </MDButton>
+        ) : null}
+      </MDBox>
+      <Divider />
+      <MDBox
+        sx={{
+          overflowY: "auto",
+          overflowX: "hidden",
+          maxHeight: 360,
+          px: 1,
+          py: 1,
+        }}
+      >
+        {notifications.length === 0 ? (
+          <MenuItem onClick={handleCloseNotifications}>
+            <Icon fontSize="small" sx={{ mr: 1 }}>notifications_none</Icon>
+            {t("navbar.noRecentImprovements")}
+          </MenuItem>
+        ) : (
+          notifications.map((notification) => (
+            <NotificationItem
+              key={notification.id || `${notification.seedId}-${notification.timestamp}`}
+              icon={<Icon fontSize="small">auto_graph</Icon>}
+              title={`${notification.algorithm || "--"} · ${formatCompactPercent(notification.score)}`}
+              subtitle={`${notification.search || notification.topic || "--"} · ${shortenSeed(notification.seedId)}`}
+              meta={formatRelativeTime(notification.timestamp)}
+              onClick={() => {
+                handleCloseNotifications();
+                if (notification.seedId) {
+                  navigate(`/dashboard/runs/${notification.seedId}`);
+                }
+              }}
+            />
+          ))
+        )}
+      </MDBox>
     </Menu>
   );
 

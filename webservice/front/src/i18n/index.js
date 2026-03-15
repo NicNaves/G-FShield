@@ -48,6 +48,8 @@ const translations = {
     navbar: {
       signOut: "Sign out",
       noRecentImprovements: "No recent improvements",
+      recentImprovements: "Recent improvements",
+      notificationsHint: "Click an item to open run details.",
     },
     auth: {
       localMode: "Local mode",
@@ -531,6 +533,8 @@ const translations = {
     navbar: {
       signOut: "Sair",
       noRecentImprovements: "Nenhuma melhoria recente",
+      recentImprovements: "Melhorias recentes",
+      notificationsHint: "Clique em um item para abrir os detalhes da execucao.",
     },
     auth: {
       localMode: "Modo local",
