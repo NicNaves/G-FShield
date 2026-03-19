@@ -17,6 +17,7 @@ import NotificationItem from "examples/Items/NotificationItem";
 import { navbar, navbarContainer, navbarRow, navbarIconButton, navbarMobileMenu } from "examples/Navbars/DashboardNavbar/styles";
 import { useMaterialUIController, setTransparentNavbar, setMiniSidenav, setLogout } from "../../../context";
 import { AUTH_DISABLED, DEV_ROLE, DEV_TOKEN, DEV_USER_ID } from "../../../config/runtime";
+import authApi from "api/auth";
 import {
   GRASP_NOTIFICATION_EVENT_NAME,
   clearGraspNotifications,
@@ -74,12 +75,20 @@ function DashboardNavbar({ absolute, light, isMini }) {
   }, []);
 
   // Função de logout
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (!AUTH_DISABLED) {
+      try {
+        await authApi.logout();
+      } catch (error) {
+        // local cleanup still happens below
+      }
+    }
+
     setLogout(dispatch);
     if (AUTH_DISABLED) {
-      localStorage.setItem("token", DEV_TOKEN);
-      localStorage.setItem("role", DEV_ROLE);
-      localStorage.setItem("userId", DEV_USER_ID);
+      sessionStorage.setItem("token", DEV_TOKEN);
+      sessionStorage.setItem("role", DEV_ROLE);
+      sessionStorage.setItem("userId", DEV_USER_ID);
       navigate("/dashboard");
       return;
     }

@@ -50,7 +50,7 @@ public class IwssService {
         data.setLocalSearch(LocalSearch.IWSS);
         int configuredMaxIterations = resolveMaxIterations(data);
         log.info(
-                "iwss start seedId={} neighborhood={} maxIterations={} featureCount={} training={} testing={}",
+                "dls start search=IWSS seedId={} neighborhood={} maxIterations={} featureCount={} training={} testing={}",
                 data.getSeedId(),
                 data.getNeighborhood(),
                 configuredMaxIterations,
@@ -76,7 +76,7 @@ public class IwssService {
                     data, writer, trainingDataset, testingDataset, classifier);
             bestSolution = updateSolution(resetDataSolution(seed, bestSolution));
             log.info(
-                    "iwss finished seedId={} bestF1={} iterationLocalSearch={} elapsedMs={}",
+                    "dls completed search=IWSS seedId={} bestF1={} iterationLocalSearch={} elapsedMs={}",
                     bestSolution.getSeedId(),
                     bestSolution.getF1Score(),
                     bestSolution.getIterationLocalSearch(),
@@ -93,6 +93,7 @@ public class IwssService {
             Instances testingDataset,
             AbstractClassifier classifier
     ) throws Exception {
+        // Keep a detached snapshot so add/remove movements do not mutate the best-so-far result.
         DataSolution bestSolution = updateSolution(dataSolution);
         DataSolution localSolutionAdd = updateSolution(dataSolution);
         double lastPublishedBestF1 = Double.NEGATIVE_INFINITY;
@@ -113,7 +114,11 @@ public class IwssService {
             if (localSolutionAdd.getF1Score() > bestSolution.getF1Score()) {
                 bestSolution = updateSolution(localSolutionAdd);
             } else {
-                log.info("Não houve melhoras!");
+                log.debug(
+                        "dls iteration search=IWSS seedId={} status=no_improvement iteration={}",
+                        dataSolution.getSeedId(),
+                        i + 1
+                );
             }
         }
 
@@ -135,20 +140,30 @@ public class IwssService {
 
         solution.getSolutionFeatures().add(solution.getRclfeatures().remove(0));
 
-        EvaluationResult Scores = MachineLearning.evaluateSolution(
+        EvaluationResult scores = MachineLearning.evaluateSolution(
                 new ArrayList<>(solution.getSolutionFeatures()),
                 new Instances(trainingDataset),
                 new Instances(testingDataset),
-                classifier);
+                classifier
+        );
 
         collector.stop();
         monitor.join();
 
-        solution.setF1Score(Scores.getF1Score());
-        solution.setAccuracy(Scores.getAccuracy());
-        solution.setRecall(Scores.getRecall());
-        solution.setPrecision(Scores.getPrecision());
-        solution.setRunnigTime(System.currentTimeMillis() - startTime);  // ✅ tempo de execução ajustado
+        solution.setF1Score(scores.getF1Score());
+        solution.setAccuracy(scores.getAccuracy());
+        solution.setRecall(scores.getRecall());
+        solution.setPrecision(scores.getPrecision());
+        solution.setRunnigTime(System.currentTimeMillis() - startTime);
+
+        log.info(
+                "dls iteration search=IWSS seedId={} iteration={}/{} f1={} featureCount={}",
+                solution.getSeedId(),
+                solution.getIterationLocalSearch() + 1,
+                resolveMaxIterations(solution),
+                solution.getF1Score(),
+                solution.getSolutionFeatures().size()
+        );
 
         float avgCpu = collector.getAvgCpu();
         float avgMemory = collector.getAvgMemory();
@@ -165,6 +180,7 @@ public class IwssService {
         solution.setCpuUsage(Float.isFinite(avgCpu) ? avgCpu : 0.0F);
         solution.setMemoryUsage(Float.isFinite(avgMemory) ? avgMemory : 0.0F);
         solution.setMemoryUsagePercent(Float.isFinite(avgMemoryPercent) ? avgMemoryPercent : 0.0F);
+
         writer.write(String.join(";",
                 solution.getSolutionFeatures().toString(),
                 f1Formatted,
@@ -197,7 +213,7 @@ public class IwssService {
         if (shouldPublishProgress(snapshot, iteration, totalIterations, lastPublishedBestF1)) {
             kafkaSolutionsProducer.sendProgress(snapshot);
             log.debug(
-                    "iwss progress seedId={} iteration={} f1={} reason={}",
+                    "dls progress search=IWSS seedId={} iteration={} f1={} reason={}",
                     snapshot.getSeedId(),
                     snapshot.getIterationLocalSearch(),
                     snapshot.getF1Score(),
@@ -277,6 +293,7 @@ public class IwssService {
     }
 
     private DataSolution updateSolution(DataSolution solution) {
+        // Kafka messages and neighborhood restarts must use immutable snapshots of the current state.
         return DataSolution.builder()
                 .seedId(solution.getSeedId())
                 .rclfeatures(new ArrayList<>(solution.getRclfeatures()))
@@ -320,7 +337,7 @@ public class IwssService {
             case "J48" -> new J48();
             case "NB", "NAIVEBAYES" -> new NaiveBayes();
             case "RF", "RANDOMFOREST" -> new RandomForest();
-            default -> throw new IllegalArgumentException("Classificador não suportado: " + name);
+            default -> throw new IllegalArgumentException("Classificador nao suportado: " + name);
         };
     }
 }

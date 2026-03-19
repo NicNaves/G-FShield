@@ -12,20 +12,44 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class KafkaIwssConsumer {
 
+    private static final String TOPIC = "IWSS_TOPIC";
+    private static final String SEARCH_NAME = "IWSS";
+
     private final IwssService iwssService;
 
-    @KafkaListener(topics = "IWSS_TOPIC", groupId = "myGroup", containerFactory = "jsonKafkaListenerContainer")
+    @KafkaListener(topics = TOPIC, groupId = "myGroup", containerFactory = "jsonKafkaListenerContainer")
     public void consume(DataSolution record) {
-        log.info("📥 [IWSS] Mensagem recebida: {}", record);
+        log.info(
+                "dls message received search={} topic={} seedId={} iteration={} neighborhoodIteration={} status={}",
+                SEARCH_NAME,
+                TOPIC,
+                record.getSeedId(),
+                record.getIterationLocalSearch(),
+                record.getIterationNeighborhood(),
+                record.getStatus()
+        );
 
         try {
+            // Kafka hands off the work item; the service updates the candidate solution.
             iwssService.doIwss(record);
-        } catch (IllegalArgumentException e) {
-            log.error("⚠️ Erro de argumento inválido: {}", e.getMessage(), e);
-            throw e;
-        } catch (Exception e) {
-            log.error("❌ Erro inesperado ao processar mensagem IWSS", e);
-            throw new RuntimeException("Erro ao processar mensagem no IWSS", e);
+        } catch (IllegalArgumentException ex) {
+            log.warn(
+                    "dls invalid input search={} topic={} seedId={} message={}",
+                    SEARCH_NAME,
+                    TOPIC,
+                    record.getSeedId(),
+                    ex.getMessage()
+            );
+            throw ex;
+        } catch (Exception ex) {
+            log.error(
+                    "dls processing failed search={} topic={} seedId={}",
+                    SEARCH_NAME,
+                    TOPIC,
+                    record.getSeedId(),
+                    ex
+            );
+            throw new RuntimeException("Erro ao processar mensagem no IWSS", ex);
         }
     }
 }

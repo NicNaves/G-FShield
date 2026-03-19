@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class RelieFAsyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(RelieFAsyncService.class);
+    private static final String ALGORITHM_NAME = "RELIEF";
     private static final String METRICS_FILE_NAME = "/metrics/RelieF_METRICS.csv";
     private static final String DATASET_BASE_PATH = "/datasets/";
     private static final String METRICS_HEADER = "solutionFeatures;f1Score;accuracy;precision;recall;runnigTime(ms);cpuUsage(%);memoryUsage(MB);memoryUsagePercent(%);classifier;trainingFileName;testingFileName";
@@ -55,63 +56,36 @@ public class RelieFAsyncService {
     ) {
         long requestStartedAt = System.currentTimeMillis();
         try {
-            logger.info("requestId={} Starting RF async processing", requestId);
+            logger.info("rcl async start algorithm={} requestId={}", ALGORITHM_NAME, requestId);
 
-            File trainingFile = new File(DATASET_BASE_PATH + trainingFileName);
-            File testingFile = new File(DATASET_BASE_PATH + testingFileName);
+            Instances trainingDataset = loadDataset(trainingFileName, "training", requestId);
+            Instances testingDataset = loadDataset(testingFileName, "testing", requestId);
 
+            AbstractClassifier classifier = resolveClassifier(classifierName);
             logger.info(
-                    "requestId={} Loading training dataset path={} sizeBytes={}",
-                    requestId, trainingFile.getAbsolutePath(), trainingFile.length()
-            );
-            long trainingReadStartedAt = System.currentTimeMillis();
-            Instances trainingDataset = MachineLearningUtils.lerDataset(new FileInputStream(trainingFile));
-            logger.info(
-                    "requestId={} Training dataset loaded rows={} attributes={} elapsedMs={}",
-                    requestId, trainingDataset.numInstances(), trainingDataset.numAttributes(),
-                    System.currentTimeMillis() - trainingReadStartedAt
+                    "rcl classifier ready algorithm={} requestId={} classifier={}",
+                    ALGORITHM_NAME,
+                    requestId,
+                    classifier.getClass().getSimpleName()
             );
 
-            logger.info(
-                    "requestId={} Loading testing dataset path={} sizeBytes={}",
-                    requestId, testingFile.getAbsolutePath(), testingFile.length()
-            );
-            long testingReadStartedAt = System.currentTimeMillis();
-            Instances testingDataset = MachineLearningUtils.lerDataset(new FileInputStream(testingFile));
-            logger.info(
-                    "requestId={} Testing dataset loaded rows={} attributes={} elapsedMs={}",
-                    requestId, testingDataset.numInstances(), testingDataset.numAttributes(),
-                    System.currentTimeMillis() - testingReadStartedAt
-            );
-
-            AbstractClassifier classifier = switch (classifierName.toUpperCase(Locale.ROOT)) {
-                case "J48" -> new J48();
-                case "NB", "NAIVEBAYES" -> new NaiveBayes();
-                case "RF", "RANDOMFOREST" -> new RandomForest();
-                default -> throw new IllegalArgumentException("Classificador nao suportado: " + classifierName);
-            };
-            logger.info("requestId={} Classifier resolved classifier={}", requestId, classifier.getClass().getSimpleName());
-
-            logger.info("requestId={} Building initial RF solution", requestId);
+            // This seed template is reused to create each stochastic generation sent to Kafka.
             DataSolution dataSolution = relieFService.doRelief(
                     trainingDataset, rclCutoff, classifier, trainingFileName, testingFileName
             );
-            dataSolution.setNeighborhood(resolveNeighborhoodStrategy(neighborhoodStrategy));
-            dataSolution.setEnabledLocalSearches(resolveLocalSearches(localSearches));
-            dataSolution.setNeighborhoodMaxIterations(neighborhoodMaxIterations);
-            dataSolution.setBitFlipMaxIterations(bitFlipMaxIterations);
-            dataSolution.setIwssMaxIterations(iwssMaxIterations);
-            dataSolution.setIwssrMaxIterations(iwssrMaxIterations);
+            configureNeighborhood(dataSolution, neighborhoodStrategy, localSearches,
+                    neighborhoodMaxIterations, bitFlipMaxIterations, iwssMaxIterations, iwssrMaxIterations);
             logger.info(
-                    "requestId={} Initial RF solution ready featureCount={} neighborhood={} localSearchCount={}",
+                    "rcl seed template ready algorithm={} requestId={} featureCount={} neighborhood={} enabledSearches={}",
+                    ALGORITHM_NAME,
                     requestId,
                     dataSolution.getSolutionFeatures() != null ? dataSolution.getSolutionFeatures().size() : 0,
                     dataSolution.getNeighborhood(),
-                    dataSolution.getEnabledLocalSearches() != null ? dataSolution.getEnabledLocalSearches().size() : 0
+                    dataSolution.getEnabledLocalSearches()
             );
 
             ensureMetricsHeader(isFirstTime);
-            logger.info("requestId={} Metrics header ready file={}", requestId, METRICS_FILE_NAME);
+            logger.info("rcl metrics ready algorithm={} requestId={} file={}", ALGORITHM_NAME, requestId, METRICS_FILE_NAME);
 
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(METRICS_FILE_NAME, true))) {
                 for (int generation = 0; generation < maxGenerations; generation++) {
@@ -124,11 +98,12 @@ public class RelieFAsyncService {
                             testingDataset,
                             classifier
                     );
+
                     logger.info(
-                            "requestId={} generation={} algorithm={} seedId={} featureCount={} rclSize={} neighborhood={} enabledSearches={} f1={}",
+                            "rcl generation ready algorithm={} requestId={} generation={} seedId={} featureCount={} rclSize={} neighborhood={} enabledSearches={} f1={}",
+                            ALGORITHM_NAME,
                             requestId,
                             generation + 1,
-                            generatedSolution.getRclAlgorithm(),
                             generatedSolution.getSeedId(),
                             generatedSolution.getSolutionFeatures() != null ? generatedSolution.getSolutionFeatures().size() : 0,
                             generatedSolution.getRclfeatures() != null ? generatedSolution.getRclfeatures().size() : 0,
@@ -138,20 +113,78 @@ public class RelieFAsyncService {
                     );
                     reliefProducer.send(generatedSolution);
                     logger.info(
-                            "requestId={} Generation {} processed and published elapsedMs={}",
-                            requestId, generation + 1, System.currentTimeMillis() - generationStartedAt
+                            "rcl generation published algorithm={} requestId={} generation={} seedId={} elapsedMs={}",
+                            ALGORITHM_NAME,
+                            requestId,
+                            generation + 1,
+                            generatedSolution.getSeedId(),
+                            System.currentTimeMillis() - generationStartedAt
                     );
                 }
             }
 
             logger.info(
-                    "requestId={} RF async processing finished totalElapsedMs={}",
-                    requestId, System.currentTimeMillis() - requestStartedAt
+                    "rcl async completed algorithm={} requestId={} elapsedMs={}",
+                    ALGORITHM_NAME,
+                    requestId,
+                    System.currentTimeMillis() - requestStartedAt
             );
-
-        } catch (Exception e) {
-            logger.error("requestId={} Error during RF async processing", requestId, e);
+        } catch (Exception ex) {
+            logger.error("rcl async failed algorithm={} requestId={}", ALGORITHM_NAME, requestId, ex);
         }
+    }
+
+    private Instances loadDataset(String fileName, String datasetType, String requestId) throws IOException {
+        File datasetFile = new File(DATASET_BASE_PATH + fileName);
+        logger.info(
+                "rcl dataset loading algorithm={} requestId={} datasetType={} path={} sizeBytes={}",
+                ALGORITHM_NAME,
+                requestId,
+                datasetType,
+                datasetFile.getAbsolutePath(),
+                datasetFile.length()
+        );
+
+        long startedAt = System.currentTimeMillis();
+        try (FileInputStream inputStream = new FileInputStream(datasetFile)) {
+            Instances dataset = MachineLearningUtils.lerDataset(inputStream);
+            logger.info(
+                    "rcl dataset loaded algorithm={} requestId={} datasetType={} rows={} attributes={} elapsedMs={}",
+                    ALGORITHM_NAME,
+                    requestId,
+                    datasetType,
+                    dataset.numInstances(),
+                    dataset.numAttributes(),
+                    System.currentTimeMillis() - startedAt
+            );
+            return dataset;
+        }
+    }
+
+    private AbstractClassifier resolveClassifier(String classifierName) {
+        return switch (classifierName.toUpperCase(Locale.ROOT)) {
+            case "J48" -> new J48();
+            case "NB", "NAIVEBAYES" -> new NaiveBayes();
+            case "RF", "RANDOMFOREST" -> new RandomForest();
+            default -> throw new IllegalArgumentException("Classificador nao suportado: " + classifierName);
+        };
+    }
+
+    private void configureNeighborhood(
+            DataSolution dataSolution,
+            String neighborhoodStrategy,
+            String localSearches,
+            Integer neighborhoodMaxIterations,
+            Integer bitFlipMaxIterations,
+            Integer iwssMaxIterations,
+            Integer iwssrMaxIterations
+    ) {
+        dataSolution.setNeighborhood(resolveNeighborhoodStrategy(neighborhoodStrategy));
+        dataSolution.setEnabledLocalSearches(resolveLocalSearches(localSearches));
+        dataSolution.setNeighborhoodMaxIterations(neighborhoodMaxIterations);
+        dataSolution.setBitFlipMaxIterations(bitFlipMaxIterations);
+        dataSolution.setIwssMaxIterations(iwssMaxIterations);
+        dataSolution.setIwssrMaxIterations(iwssrMaxIterations);
     }
 
     private void ensureMetricsHeader(boolean isFirstRun) throws IOException {

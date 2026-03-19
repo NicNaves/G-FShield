@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const { authDisabled } = require("../config/runtimeConfig");
 const userService = require("../services/UserService");
+const { extractAuthToken } = require("../utils/authSession");
 
 async function authMiddleware(req, res, next) {
   if (authDisabled) {
@@ -12,15 +13,16 @@ async function authMiddleware(req, res, next) {
     return next();
   }
 
-  const token = req.headers.authorization?.split(" ")[1] || req.query?.token;
+  const token = extractAuthToken(req);
   if (!token) {
-    return res
-      .status(401)
-      .json({ error: "Acesso negado. Token não fornecido." });
+    return res.status(401).json({ error: "Acesso negado. Token nao fornecido." });
   }
 
   try {
-    const verified = jwt.verify(token, process.env.JWT_SECRET);
+    const verified = jwt.verify(token, process.env.JWT_SECRET, {
+      issuer: process.env.JWT_ISSUER || "gf-shield-webservice",
+      audience: process.env.JWT_AUDIENCE || "gf-shield-front",
+    });
     const user = await userService.getUserById(Number(verified.id));
 
     if (!user) {
@@ -37,9 +39,9 @@ async function authMiddleware(req, res, next) {
       role: user.role,
       active: user.active,
     };
-    next();
+    return next();
   } catch (error) {
-    return res.status(401).json({ error: "Token inválido ou expirado." });
+    return res.status(401).json({ error: "Token invalido ou expirado." });
   }
 }
 
@@ -50,11 +52,9 @@ function roleMiddleware(role) {
     }
 
     if (req.user.role !== role) {
-      return res
-        .status(403)
-        .json({ error: "Acesso proibido. Permissão insuficiente." });
+      return res.status(403).json({ error: "Acesso proibido. Permissao insuficiente." });
     }
-    next();
+    return next();
   };
 }
 
@@ -65,12 +65,10 @@ function anyRoleMiddleware(roles = []) {
     }
 
     if (!roles.includes(req.user.role)) {
-      return res
-        .status(403)
-        .json({ error: "Acesso proibido. Permissao insuficiente." });
+      return res.status(403).json({ error: "Acesso proibido. Permissao insuficiente." });
     }
 
-    next();
+    return next();
   };
 }
 

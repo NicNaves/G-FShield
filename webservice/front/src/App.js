@@ -8,25 +8,26 @@ import Sidenav from "examples/Sidenav";
 import Configurator from "examples/Configurator";
 import theme from "assets/theme";
 import themeDark from "assets/theme-dark";
-import rtlPlugin from "stylis-plugin-rtl";
-import { CacheProvider } from "@emotion/react";
-import createCache from "@emotion/cache";
-import routes from "routes"; 
+import routes from "routes";
 import { useMaterialUIController, setMiniSidenav, setOpenConfigurator, setLogin } from "context";
 import logoShield from "assets/images/logoshield.png";
 import Login from "./layouts/authentication/sign-in";
 import SignUp from "./layouts/authentication/sign-up";
-import PropTypes from "prop-types"; 
+import PropTypes from "prop-types";
 import { AUTH_DISABLED, DEV_ROLE, DEV_TOKEN, DEV_USER_ID } from "./config/runtime";
 import useI18n from "hooks/useI18n";
+import authApi from "./api/auth";
 
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-
-const PrivateRoute = ({ element, roles }) => {
+const PrivateRoute = ({ element, roles, authReady }) => {
   const [controller] = useMaterialUIController();
   const { auth } = controller;
+
+  if (!AUTH_DISABLED && !authReady) {
+    return null;
+  }
 
   if (!(AUTH_DISABLED || auth.token)) {
     return <Navigate to="/authentication/sign-in" replace />;
@@ -39,14 +40,15 @@ const PrivateRoute = ({ element, roles }) => {
   return element;
 };
 
-
 PrivateRoute.propTypes = {
-  element: PropTypes.node.isRequired, 
+  element: PropTypes.node.isRequired,
   roles: PropTypes.arrayOf(PropTypes.string),
+  authReady: PropTypes.bool,
 };
 
 PrivateRoute.defaultProps = {
   roles: [],
+  authReady: false,
 };
 
 export default function App() {
@@ -57,41 +59,52 @@ export default function App() {
     layout,
     openConfigurator,
     sidenavColor,
-    transparentSidenav,
-    whiteSidenav,
     darkMode,
-    auth
+    auth,
   } = controller;
   const [onMouseEnter, setOnMouseEnter] = useState(false);
-  const [rtlCache, setRtlCache] = useState(null);
+  const [authReady, setAuthReady] = useState(AUTH_DISABLED);
   const { pathname } = useLocation();
   const { t } = useI18n();
 
-  // Verifica e carrega o token do localStorage na inicialização
   useEffect(() => {
-    if (!AUTH_DISABLED && localStorage.getItem("token") === DEV_TOKEN) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("role");
-      localStorage.removeItem("userId");
+    if (AUTH_DISABLED) {
+      if (!auth.token) {
+        setLogin(dispatch, DEV_TOKEN, DEV_ROLE, DEV_USER_ID);
+      }
+      setAuthReady(true);
+      return undefined;
     }
 
-    const token = localStorage.getItem("token") || (AUTH_DISABLED ? DEV_TOKEN : null);
-    const role = localStorage.getItem("role") || (AUTH_DISABLED ? DEV_ROLE : null);
-    const userId = localStorage.getItem("userId") || (AUTH_DISABLED ? DEV_USER_ID : null);
+    let active = true;
 
-    if (token && !auth.token) {
-      setLogin(dispatch, token, role, userId);
-    }
-  }, [dispatch, auth.token]);
+    authApi.me({ skipAuthRedirect: true })
+      .then((user) => {
+        if (!active || !user?.id) {
+          return;
+        }
 
-  // Reage a mudanças no estado de autenticação
-  useMemo(() => {
-    const cacheRtl = createCache({
-      key: "rtl",
-      stylisPlugins: [rtlPlugin],
-    });
-    setRtlCache(cacheRtl);
-  }, []);
+        setLogin(dispatch, "cookie-session", user.role, user.id);
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("role");
+        sessionStorage.removeItem("userId");
+      })
+      .finally(() => {
+        if (active) {
+          setAuthReady(true);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [auth.token, dispatch]);
 
   const handleOnMouseEnter = () => {
     if (miniSidenav && !onMouseEnter) {
@@ -140,10 +153,8 @@ export default function App() {
     document.title = routeTitle ? `G-FShield - ${routeTitle}` : "G-FShield";
   }, [pathname, t]);
 
-  
   const visibleRoutes = useMemo(
-    () =>
-      routes.filter((route) => !route.roles?.length || route.roles.includes(auth.role) || AUTH_DISABLED),
+    () => routes.filter((route) => !route.roles?.length || route.roles.includes(auth.role) || AUTH_DISABLED),
     [auth.role]
   );
 
@@ -158,7 +169,7 @@ export default function App() {
           <Route
             key={route.key}
             path={route.route}
-            element={<PrivateRoute element={route.component} roles={route.roles} />}
+            element={<PrivateRoute element={route.component} roles={route.roles} authReady={authReady} />}
           />
         );
       }
@@ -196,40 +207,40 @@ export default function App() {
     </MDBox>
   );
 
+  const canResolveAuth = AUTH_DISABLED || authReady;
+
   return (
-    
-      <ThemeProvider theme={darkMode ? themeDark : theme}>
-        <ToastContainer theme={darkMode ? "dark" : "light"} />
-        <CssBaseline />
-        {layout === "dashboard" && (
-          <>
-            <Sidenav
-              color={sidenavColor}
-              brand={logoShield}
-              brandName=""
-              routes={visibleRoutes}
-              // onMouseEnter={handleOnMouseEnter}
-              // onMouseLeave={handleOnMouseLeave}
-              sx={{ position: "fixed", left: 0 }}
-            />
-            <Configurator />
-            {configsButton}
-          </>
-        )}
-        <Routes>
-          <Route
-            path="/"
-            element={<Navigate to={AUTH_DISABLED || auth.token ? "/dashboard" : "/authentication/sign-in"} replace />}
+    <ThemeProvider theme={darkMode ? themeDark : theme}>
+      <ToastContainer theme={darkMode ? "dark" : "light"} />
+      <CssBaseline />
+      {layout === "dashboard" && (
+        <>
+          <Sidenav
+            color={sidenavColor}
+            brand={logoShield}
+            brandName=""
+            routes={visibleRoutes}
+            onMouseEnter={handleOnMouseEnter}
+            onMouseLeave={handleOnMouseLeave}
+            sx={{ position: "fixed", left: 0 }}
           />
-          <Route
-            path="/authentication/sign-in"
-            element={AUTH_DISABLED || auth.token ? <Navigate to="/dashboard" replace /> : <Login />}
-          />
-          <Route path="/authentication/sign-up" element={<SignUp />} />
-          {getRoutes(routes)}
-          <Route path="*" element={<Navigate to={AUTH_DISABLED ? "/dashboard" : "/authentication/sign-in"} />} />
-        </Routes>
-      </ThemeProvider>
-   
+          <Configurator />
+          {configsButton}
+        </>
+      )}
+      <Routes>
+        <Route
+          path="/"
+          element={canResolveAuth ? <Navigate to={AUTH_DISABLED || auth.token ? "/dashboard" : "/authentication/sign-in"} replace /> : null}
+        />
+        <Route
+          path="/authentication/sign-in"
+          element={canResolveAuth ? (AUTH_DISABLED || auth.token ? <Navigate to="/dashboard" replace /> : <Login />) : null}
+        />
+        <Route path="/authentication/sign-up" element={<SignUp />} />
+        {canResolveAuth ? getRoutes(routes) : null}
+        <Route path="*" element={<Navigate to={AUTH_DISABLED || auth.token ? "/dashboard" : "/authentication/sign-in"} replace />} />
+      </Routes>
+    </ThemeProvider>
   );
 }

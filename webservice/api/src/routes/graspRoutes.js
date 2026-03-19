@@ -204,7 +204,7 @@ router.post("/environment/reset", authMiddleware, roleMiddleware("ADMIN"), (req,
  *   get:
  *     tags: [Grasp]
  *     summary: Abre stream de eventos em tempo real
- *     description: Mantem uma conexao Server-Sent Events para acompanhar a execucao em tempo real.
+ *     description: Mantem uma conexao Server-Sent Events para acompanhar a execucao em tempo real. Para o frontend web, use a sessao HTTP-only; nao envie token na query string.
  *     responses:
  *       200:
  *         description: Stream SSE iniciada com sucesso.

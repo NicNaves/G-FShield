@@ -21,6 +21,8 @@ import java.io.BufferedWriter;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Random;
@@ -49,7 +51,7 @@ public class BitFlipService {
         data.setLocalSearch(LocalSearch.BIT_FLIP);
         int configuredMaxIterations = resolveMaxIterations(data);
         log.info(
-                "bitflip start seedId={} neighborhood={} maxIterations={} featureCount={} training={} testing={}",
+                "dls start search=BIT_FLIP seedId={} neighborhood={} maxIterations={} featureCount={} training={} testing={}",
                 data.getSeedId(),
                 data.getNeighborhood(),
                 configuredMaxIterations,
@@ -58,8 +60,12 @@ public class BitFlipService {
                 data.getTestingFileName()
         );
 
+        boolean shouldWriteHeader = shouldWriteMetricsHeader();
+
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(metricsFileName, true))) {
-            escreverCabecalhoCSV(writer);
+            if (shouldWriteHeader) {
+                escreverCabecalhoCSV(writer);
+            }
             DataSolution bestSolution = flipFeatures(data, writer);
 
             bestSolution.setIterationLocalSearch(data.getIterationLocalSearch() + 1);
@@ -68,12 +74,8 @@ public class BitFlipService {
             bestSolution.setSeedId(data.getSeedId());
             bestSolution.setLocalSearch(LocalSearch.BIT_FLIP);
 
-            log.info("✅ Melhor solução: F1={} Tempo={} Features={} Iteração={}",
-                    bestSolution.getF1Score(), bestSolution.getRunnigTime(),
-                    bestSolution.getSolutionFeatures(), bestSolution.getIterationLocalSearch());
-
             log.info(
-                    "bitflip finished seedId={} bestF1={} iterationLocalSearch={} elapsedMs={}",
+                    "dls completed search=BIT_FLIP seedId={} bestF1={} iterationLocalSearch={} elapsedMs={}",
                     bestSolution.getSeedId(),
                     bestSolution.getF1Score(),
                     bestSolution.getIterationLocalSearch(),
@@ -89,6 +91,11 @@ public class BitFlipService {
         writer.newLine();
     }
 
+    private boolean shouldWriteMetricsHeader() throws IOException {
+        Path metricsPath = Path.of(metricsFileName);
+        return Files.notExists(metricsPath) || Files.size(metricsPath) == 0;
+    }
+
     private DataSolution flipFeatures(DataSolution solution, BufferedWriter writer) throws Exception {
         Random random = new Random();
         int i = 0;
@@ -101,6 +108,7 @@ public class BitFlipService {
                 new FileInputStream("/datasets/" + solution.getTestingFileName()));
 
         AbstractClassifier classifier = getClassifier(solution.getClassfier());
+        // Keep a detached snapshot so later random swaps do not mutate the best-so-far result.
         DataSolution bestSolution = updateSolution(solution);
 
         while (i < configuredMaxIterations) {
@@ -117,7 +125,7 @@ public class BitFlipService {
             Thread monitor = new Thread(collector);
             monitor.start();
 
-            EvaluationResult Scores = MachineLearning.evaluateSolution(
+            EvaluationResult scores = MachineLearning.evaluateSolution(
                     new ArrayList<>(solution.getSolutionFeatures()),
                     new Instances(trainingDataset),
                     new Instances(testingDataset),
@@ -127,20 +135,26 @@ public class BitFlipService {
             collector.stop();
             monitor.join();
 
-            solution.setF1Score(Scores.getF1Score());
-            solution.setPrecision(Scores.getPrecision());
-            solution.setAccuracy(Scores.getAccuracy());
-            solution.setRecall(Scores.getRecall());
-            solution.setRunnigTime(System.currentTimeMillis() - startTime); // ✅ Tempo de execução corrigido
+            solution.setF1Score(scores.getF1Score());
+            solution.setPrecision(scores.getPrecision());
+            solution.setAccuracy(scores.getAccuracy());
+            solution.setRecall(scores.getRecall());
+            solution.setRunnigTime(System.currentTimeMillis() - startTime);
 
-            log.info("🌀 Iteração {}: F1={} Features={} ", i, Scores.getF1Score(), solution.getSolutionFeatures());
-            log.debug("BitFlip iteration {} scored {}", i, Scores.getF1Score());
+            log.info(
+                    "dls iteration search=BIT_FLIP seedId={} iteration={}/{} f1={} featureCount={}",
+                    solution.getSeedId(),
+                    i + 1,
+                    configuredMaxIterations,
+                    scores.getF1Score(),
+                    solution.getSolutionFeatures().size()
+            );
 
             escreverLinhaCSV(writer, solution, collector);
             DataSolution progressSnapshot = updateSolution(solution);
             lastPublishedBestF1 = publishProgressIfNeeded(progressSnapshot, i, configuredMaxIterations, lastPublishedBestF1);
 
-            if (Scores.getF1Score() > bestSolution.getF1Score()) {
+            if (scores.getF1Score() > bestSolution.getF1Score()) {
                 bestSolution = updateSolution(solution);
             }
 
@@ -196,7 +210,7 @@ public class BitFlipService {
         if (shouldPublishProgress(snapshot, iteration, totalIterations, lastPublishedBestF1)) {
             kafkaSolutionsProducer.sendProgress(snapshot);
             log.debug(
-                    "bitflip progress seedId={} iteration={} f1={} reason={}",
+                    "dls progress search=BIT_FLIP seedId={} iteration={} f1={} reason={}",
                     snapshot.getSeedId(),
                     snapshot.getIterationLocalSearch(),
                     snapshot.getF1Score(),
@@ -262,6 +276,7 @@ public class BitFlipService {
     }
 
     private DataSolution updateSolution(DataSolution s) {
+        // Kafka messages and neighborhood restarts must use immutable snapshots of the current state.
         return DataSolution.builder()
                 .seedId(s.getSeedId())
                 .rclfeatures(new ArrayList<>(s.getRclfeatures()))
@@ -300,7 +315,7 @@ public class BitFlipService {
             case "J48" -> new J48();
             case "NB", "NAIVEBAYES" -> new NaiveBayes();
             case "RF", "RANDOMFOREST" -> new RandomForest();
-            default -> throw new IllegalArgumentException("Classificador não suportado: " + name);
+            default -> throw new IllegalArgumentException("Classificador nao suportado: " + name);
         };
     }
 }

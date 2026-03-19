@@ -86,10 +86,5 @@ export const startGraspExecution = async (payload) => {
 };
 
 export const createGraspMonitorStream = () => {
-  const token = localStorage.getItem("token");
-  const streamUrl = token
-    ? `${API_URL}/grasp/monitor/stream?token=${encodeURIComponent(token)}`
-    : `${API_URL}/grasp/monitor/stream`;
-
-  return new EventSource(streamUrl);
+  return new EventSource(`${API_URL}/grasp/monitor/stream`, { withCredentials: true });
 };

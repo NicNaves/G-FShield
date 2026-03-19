@@ -52,7 +52,7 @@ public class IwssrService {
         data.setIterationLocalSearch(data.getIterationLocalSearch() + 1);
         int configuredMaxIterations = resolveMaxIterations(data);
         log.info(
-                "iwssr start seedId={} neighborhood={} maxIterations={} featureCount={} training={} testing={}",
+                "dls start search=IWSSR seedId={} neighborhood={} maxIterations={} featureCount={} training={} testing={}",
                 data.getSeedId(),
                 data.getNeighborhood(),
                 configuredMaxIterations,
@@ -79,7 +79,7 @@ public class IwssrService {
                     data, trainingDataset, testingDataset, classifier);
             bestSolution = updateSolution(resetDataSolution(seed, bestSolution));
             log.info(
-                    "iwssr finished seedId={} bestF1={} iterationLocalSearch={} elapsedMs={}",
+                    "dls completed search=IWSSR seedId={} bestF1={} iterationLocalSearch={} elapsedMs={}",
                     bestSolution.getSeedId(),
                     bestSolution.getF1Score(),
                     bestSolution.getIterationLocalSearch(),
@@ -96,6 +96,7 @@ public class IwssrService {
             AbstractClassifier classifier
     ) throws Exception {
         dataSolution.setIterationLocalSearch(dataSolution.getIterationLocalSearch() + 1);
+        // Keep detached snapshots because add/replace moves mutate the same feature lists repeatedly.
         DataSolution bestSolution = updateSolution(dataSolution);
         DataSolution localSolutionAdd = updateSolution(dataSolution);
         DataSolution localSolutionReplace = updateSolution(dataSolution);
@@ -121,7 +122,12 @@ public class IwssrService {
             }
         }
 
-        log.info("IWSSR final best solution scored {}", bestSolution.getF1Score());
+        log.info(
+                "dls best snapshot search=IWSSR seedId={} bestF1={} iterationLocalSearch={}",
+                bestSolution.getSeedId(),
+                bestSolution.getF1Score(),
+                bestSolution.getIterationLocalSearch()
+        );
         return bestSolution;
     }
 
@@ -139,14 +145,14 @@ public class IwssrService {
 
         solution.getSolutionFeatures().add(solution.getRclfeatures().remove(0));
 
-        EvaluationResult Scores = evaluateWithDataset(solution, trainingDataset, testingDataset, classifier);
+        EvaluationResult scores = evaluateWithDataset(solution, trainingDataset, testingDataset, classifier);
 
         long endTime = System.currentTimeMillis();
 
-        solution.setF1Score(Scores.getF1Score());
-        solution.setAccuracy(Scores.getAccuracy());
-        solution.setPrecision(Scores.getPrecision());
-        solution.setRecall(Scores.getRecall());
+        solution.setF1Score(scores.getF1Score());
+        solution.setAccuracy(scores.getAccuracy());
+        solution.setPrecision(scores.getPrecision());
+        solution.setRecall(scores.getRecall());
         solution.setRunnigTime(endTime - startTime);
 
         collector.stop();
@@ -174,14 +180,14 @@ public class IwssrService {
             DataSolution replaced = updateSolution(solution);
             replaced.getSolutionFeatures().remove(i);
 
-            EvaluationResult Scores = evaluateWithDataset(replaced, trainingDataset, testingDataset, classifier);
+            EvaluationResult scores = evaluateWithDataset(replaced, trainingDataset, testingDataset, classifier);
 
             long endTime = System.currentTimeMillis();
 
-            replaced.setF1Score(Scores.getF1Score());
-            replaced.setAccuracy(Scores.getAccuracy());
-            replaced.setPrecision(Scores.getPrecision());
-            replaced.setRecall(Scores.getRecall());
+            replaced.setF1Score(scores.getF1Score());
+            replaced.setAccuracy(scores.getAccuracy());
+            replaced.setPrecision(scores.getPrecision());
+            replaced.setRecall(scores.getRecall());
             replaced.setRunnigTime(endTime - startTime);
 
             collector.stop();
@@ -189,9 +195,9 @@ public class IwssrService {
 
             logMetrics(replaced, collector);
 
-            if (Scores.getF1Score() > bestReplace.getF1Score()) {
+            if (scores.getF1Score() > bestReplace.getF1Score()) {
                 bestReplace = updateSolution(replaced);
-                log.debug("IWSSR found a better replacement with score {}", Scores.getF1Score());
+                log.debug("dls replacement improved search=IWSSR seedId={} f1={}", replaced.getSeedId(), scores.getF1Score());
             }
         }
 
@@ -242,23 +248,31 @@ public class IwssrService {
         solution.setMemoryUsage(Float.isFinite(avgMemory) ? avgMemory : 0.0F);
         solution.setMemoryUsagePercent(Float.isFinite(avgMemoryPercent) ? avgMemoryPercent : 0.0F);
 
+        log.info(
+                "dls iteration search=IWSSR seedId={} iteration={} f1={} featureCount={}",
+                solution.getSeedId(),
+                solution.getIterationLocalSearch(),
+                solution.getF1Score(),
+                solution.getSolutionFeatures().size()
+        );
+
         writer.write(String.join(";",
-            solution.getSolutionFeatures().toString(),
-            f1Formatted,
-            accFormatted,
-            precFormatted,
-            recFormatted,
-            String.valueOf(solution.getNeighborhood()),
-            String.valueOf(solution.getIterationNeighborhood()),
-            String.valueOf(solution.getLocalSearch()),
-            String.valueOf(solution.getIterationLocalSearch()),
-            timeFormatted,
-            cpuFormatted,
-            memFormatted,
-            memPercentFormatted,
-            solution.getClassfier(),
-            solution.getTrainingFileName(),
-            solution.getTestingFileName()
+                solution.getSolutionFeatures().toString(),
+                f1Formatted,
+                accFormatted,
+                precFormatted,
+                recFormatted,
+                String.valueOf(solution.getNeighborhood()),
+                String.valueOf(solution.getIterationNeighborhood()),
+                String.valueOf(solution.getLocalSearch()),
+                String.valueOf(solution.getIterationLocalSearch()),
+                timeFormatted,
+                cpuFormatted,
+                memFormatted,
+                memPercentFormatted,
+                solution.getClassfier(),
+                solution.getTrainingFileName(),
+                solution.getTestingFileName()
         ));
         writer.newLine();
     }
@@ -272,7 +286,7 @@ public class IwssrService {
         if (shouldPublishProgress(snapshot, iteration, totalIterations, lastPublishedBestF1)) {
             kafkaSolutionsProducer.sendProgress(snapshot);
             log.debug(
-                    "iwssr progress seedId={} iteration={} f1={} reason={}",
+                    "dls progress search=IWSSR seedId={} iteration={} f1={} reason={}",
                     snapshot.getSeedId(),
                     snapshot.getIterationLocalSearch(),
                     snapshot.getF1Score(),
@@ -338,6 +352,7 @@ public class IwssrService {
     }
 
     private DataSolution updateSolution(DataSolution solution) {
+        // Kafka messages and neighborhood restarts must use immutable snapshots of the current state.
         return DataSolution.builder()
                 .seedId(solution.getSeedId())
                 .rclfeatures(new ArrayList<>(solution.getRclfeatures()))
@@ -381,7 +396,7 @@ public class IwssrService {
             case "J48" -> new J48();
             case "NB", "NAIVEBAYES" -> new NaiveBayes();
             case "RF", "RANDOMFOREST" -> new RandomForest();
-            default -> throw new IllegalArgumentException("Classificador não suportado: " + name);
+            default -> throw new IllegalArgumentException("Classificador nao suportado: " + name);
         };
     }
 }

@@ -7,12 +7,12 @@ const MaterialUI = createContext();
 MaterialUI.displayName = "MaterialUIContext";
 
 const getStoredToken = () => {
-  const token = localStorage.getItem("token");
+  const token = sessionStorage.getItem("token");
 
   if (!AUTH_DISABLED && token === DEV_TOKEN) {
-    localStorage.removeItem("token");
-    localStorage.removeItem("role");
-    localStorage.removeItem("userId");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("role");
+    sessionStorage.removeItem("userId");
     return null;
   }
 
@@ -59,14 +59,20 @@ function reducer(state, action) {
     case "LOCALE":
       return { ...state, locale: action.value };
     case "LOGIN":
-      return { ...state, auth: { token: action.token, role: action.role, userId: action.userId } };
+      return {
+        ...state,
+        auth: {
+          token: action.token,
+          role: action.role,
+          userId: action.userId,
+        },
+      };
     case "LOGOUT":
       return { ...state, auth: { token: null, role: null, userId: null } };
     default:
       throw new Error(`Unhandled action type: ${action.type}`);
   }
 }
-
 
 function MaterialUIControllerProvider({ children }) {
   const initialState = {
@@ -83,8 +89,8 @@ function MaterialUIControllerProvider({ children }) {
     locale: getStoredLocale(),
     auth: {
       token: getStoredToken() || (AUTH_DISABLED ? DEV_TOKEN : null),
-      role: localStorage.getItem("role") || (AUTH_DISABLED ? DEV_ROLE : null),
-      userId: localStorage.getItem("userId") || (AUTH_DISABLED ? DEV_USER_ID : null),
+      role: sessionStorage.getItem("role") || (AUTH_DISABLED ? DEV_ROLE : null),
+      userId: sessionStorage.getItem("userId") || (AUTH_DISABLED ? DEV_USER_ID : null),
     },
   };
 
@@ -94,34 +100,29 @@ function MaterialUIControllerProvider({ children }) {
   return <MaterialUI.Provider value={value}>{children}</MaterialUI.Provider>;
 }
 
-
 function useMaterialUIController() {
   const context = useContext(MaterialUI);
   if (!context) {
-    throw new Error(
-      "useMaterialUIController should be used inside the MaterialUIControllerProvider."
-    );
+    throw new Error("useMaterialUIController should be used inside the MaterialUIControllerProvider.");
   }
   return context;
 }
 
-
 const setLogin = (dispatch, token, role, userId) => {
-  localStorage.setItem("token", token);
-  localStorage.setItem("role", role || DEV_ROLE);
-  localStorage.setItem("userId", userId || DEV_USER_ID);
+  sessionStorage.setItem("token", token);
+  sessionStorage.setItem("role", role || DEV_ROLE);
+  sessionStorage.setItem("userId", userId || DEV_USER_ID);
   sessionStorage.removeItem("gfshield-auth-redirecting");
   dispatch({ type: "LOGIN", token, role, userId });
 };
 
 const setLogout = (dispatch) => {
-  localStorage.removeItem("token");
-  localStorage.removeItem("role");
-  localStorage.removeItem("userId");
+  sessionStorage.removeItem("token");
+  sessionStorage.removeItem("role");
+  sessionStorage.removeItem("userId");
   sessionStorage.removeItem("gfshield-auth-redirecting");
   dispatch({ type: "LOGOUT" });
 };
-
 
 const setMiniSidenav = (dispatch, value) => dispatch({ type: "MINI_SIDENAV", value });
 const setTransparentSidenav = (dispatch, value) => dispatch({ type: "TRANSPARENT_SIDENAV", value });
@@ -161,5 +162,5 @@ export {
   setDarkMode,
   setLocale,
   setLogin,
-  setLogout, 
+  setLogout,
 };

@@ -6,7 +6,6 @@ import br.com.graspfs.rcl.su.dto.FeatureAvaliada;
 import br.com.graspfs.rcl.su.machinelearning.MachineLearning;
 import br.com.graspfs.rcl.su.util.SelectionFeaturesUtils;
 import br.com.graspfs.rcl.su.util.SystemMetricsUtils.MetricsCollector;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -24,6 +23,9 @@ public class SymmetricalUncertaintyService {
 
     private final Logger logger = LoggerFactory.getLogger(SymmetricalUncertaintyService.class);
 
+    /**
+     * Calcula o ranking de features e deixa a seed com a RCL pronta para as geracoes seguintes.
+     */
     public void rankFeatures(DataSolution rcl, Instances trainingDataset, int rclCutoff) throws Exception {
         try {
             ArrayList<FeatureAvaliada> allFeatures = new ArrayList<>();
@@ -40,25 +42,49 @@ public class SymmetricalUncertaintyService {
             }
 
             rcl.setRclfeatures(rclFeatures);
-            logger.info("RCL features definidas: {}", rclFeatures);
+            logger.info(
+                    "rcl ranking ready algorithm=SU cutoff={} selectedFeatures={} datasetAttributes={}",
+                    rclCutoff,
+                    rclFeatures.size(),
+                    trainingDataset.numAttributes()
+            );
 
         } catch (RuntimeException ex) {
-            logger.error("Erro ao calcular suRatio: {}", ex.getMessage());
+            logger.error("rcl ranking failed algorithm=SU message={}", ex.getMessage());
             throw new Exception("Erro ao calcular o ranking das features com suRatio.");
         }
     }
 
-    public DataSolution doRelief(Instances trainingDataset, int rclCutoff, AbstractClassifier classifier, String trainingFileName, String testingFileName) throws Exception {
+    public DataSolution doRelief(
+            Instances trainingDataset,
+            int rclCutoff,
+            AbstractClassifier classifier,
+            String trainingFileName,
+            String testingFileName
+    ) throws Exception {
         String classifierName = classifier.getClass().getSimpleName();
         DataSolution initialSolution = SelectionFeaturesUtils.createData(classifierName, trainingFileName, testingFileName);
         initialSolution.setRclAlgorithm("SU");
         rankFeatures(initialSolution, trainingDataset, rclCutoff);
+        logger.info(
+                "rcl seed template ready algorithm=SU classifier={} training={} testing={} rclSize={}",
+                classifierName,
+                trainingFileName,
+                testingFileName,
+                initialSolution.getRclfeatures() != null ? initialSolution.getRclfeatures().size() : 0
+        );
         return initialSolution;
     }
 
-    public DataSolution GenerationSolutions(DataSolution rcl, int cutoff, BufferedWriter writer,
-                                            Instances trainingDataset, Instances testingDataset,
-                                            AbstractClassifier classifier) throws Exception {
+    public DataSolution GenerationSolutions(
+            DataSolution rcl,
+            int cutoff,
+            BufferedWriter writer,
+            Instances trainingDataset,
+            Instances testingDataset,
+            AbstractClassifier classifier
+    ) throws Exception {
+        // Each generation starts from the same ranked template and samples a new candidate subset.
         DataSolution candidate = DataSolution.builder()
                 .seedId(UUID.randomUUID())
                 .solutionFeatures(new ArrayList<>())
@@ -78,6 +104,7 @@ public class SymmetricalUncertaintyService {
                 .trainingFileName(rcl.getTrainingFileName())
                 .testingFileName(rcl.getTestingFileName())
                 .build();
+
         Random random = new Random();
         long startTime = System.currentTimeMillis();
 
@@ -91,6 +118,7 @@ public class SymmetricalUncertaintyService {
 
         candidate.setSolutionFeatures(solutionFeatures);
 
+        // Resource metrics are collected around the exact model-evaluation window.
         MetricsCollector collector = new MetricsCollector();
         Thread monitor = new Thread(collector);
         monitor.start();
@@ -111,7 +139,15 @@ public class SymmetricalUncertaintyService {
         candidate.setRecall(result.getRecall());
         candidate.setRunnigTime(System.currentTimeMillis() - startTime);
 
-        logger.info("SoluÃ§Ã£o gerada - RCL: {} | SoluÃ§Ã£o: {} | F1: {}", candidate.getRclfeatures(), solutionFeatures, candidate.getF1Score());
+        logger.info(
+                "rcl candidate evaluated algorithm=SU seedId={} sampleSize={} featureCount={} rclSize={} f1={} elapsedMs={}",
+                candidate.getSeedId(),
+                cutoff,
+                candidate.getSolutionFeatures().size(),
+                candidate.getRclfeatures().size(),
+                candidate.getF1Score(),
+                candidate.getRunnigTime()
+        );
 
         float avgCpu = collector.getAvgCpu();
         float avgMemory = collector.getAvgMemory();
@@ -129,18 +165,18 @@ public class SymmetricalUncertaintyService {
         String memPercentFormatted = Float.isFinite(avgMemoryPercent) ? String.format(Locale.US, "%.4f", avgMemoryPercent) : "0.0000";
 
         writer.write(String.join(";",
-            candidate.getSolutionFeatures().toString(),
-            f1Formatted,
-            accFormatted,
-            precFormatted,
-            recFormatted,
-            timeFormatted,
-            cpuFormatted,
-            memFormatted,
-            memPercentFormatted,
-            candidate.getClassfier(),
-            candidate.getTrainingFileName(),
-            candidate.getTestingFileName()
+                candidate.getSolutionFeatures().toString(),
+                f1Formatted,
+                accFormatted,
+                precFormatted,
+                recFormatted,
+                timeFormatted,
+                cpuFormatted,
+                memFormatted,
+                memPercentFormatted,
+                candidate.getClassfier(),
+                candidate.getTrainingFileName(),
+                candidate.getTestingFileName()
         ));
         writer.newLine();
 

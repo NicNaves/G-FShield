@@ -3,6 +3,10 @@ const prisma = require("../lib/prisma");
 const bcrypt = require("bcrypt");
 
 class UserService {
+  constructor() {
+    this.passwordHashRounds = Math.max(Number(process.env.BCRYPT_ROUNDS || 12), 10);
+  }
+
   sanitizeRole(requestedRole, currentUser) {
     if (currentUser?.role === "ADMIN" && ["ADMIN", "VIEWER"].includes(requestedRole)) {
       return requestedRole;
@@ -49,7 +53,7 @@ class UserService {
     }
 
     
-    const hashedPassword = await bcrypt.hash(normalizedUserData.password, 10);
+    const hashedPassword = await bcrypt.hash(normalizedUserData.password, this.passwordHashRounds);
 
     
     const prismaUser = await prisma.user.create({
@@ -141,7 +145,7 @@ class UserService {
 
       
       if (dataToUpdate.password) {
-        dataToUpdate.password = await bcrypt.hash(dataToUpdate.password, 10);
+        dataToUpdate.password = await bcrypt.hash(dataToUpdate.password, this.passwordHashRounds);
       }
 
       const updatedUser = await prisma.user.update({

@@ -74,6 +74,9 @@ public class DataSolution {
     @JsonProperty("localSearch")
     private LocalSearch localSearch; // BF
 
+    @JsonProperty("status")
+    private String status;
+
     @JsonProperty("runnigTime")
     private Long runnigTime;// tempo de execução
 
@@ -88,6 +91,10 @@ public class DataSolution {
 
     
     public DataSolution() {
+    }
+
+    public String getLocalSearchName() {
+        return localSearch != null ? localSearch.name() : null;
     }
 
 }

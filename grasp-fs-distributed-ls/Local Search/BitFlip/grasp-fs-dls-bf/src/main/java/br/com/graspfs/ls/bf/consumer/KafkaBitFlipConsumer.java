@@ -12,19 +12,44 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class KafkaBitFlipConsumer {
 
+    private static final String TOPIC = "BIT_FLIP_TOPIC";
+    private static final String SEARCH_NAME = "BIT_FLIP";
+
     private final BitFlipService bitFlipService;
 
-    @KafkaListener(topics = "BIT_FLIP_TOPIC", groupId = "myGroup", containerFactory = "jsonKafkaListenerContainer")
+    @KafkaListener(topics = TOPIC, groupId = "myGroup", containerFactory = "jsonKafkaListenerContainer")
     public void consume(DataSolution record) {
-        log.info("📥 [BIT_FLIP_TOPIC] Mensagem recebida: {}", record);
+        log.info(
+                "dls message received search={} topic={} seedId={} iteration={} neighborhoodIteration={} status={}",
+                SEARCH_NAME,
+                TOPIC,
+                record.getSeedId(),
+                record.getIterationLocalSearch(),
+                record.getIterationNeighborhood(),
+                record.getStatus()
+        );
 
         try {
+            // The service owns the neighborhood logic; the consumer only marks the transport boundary.
             bitFlipService.doBitFlip(record);
         } catch (IllegalArgumentException ex) {
-            throw ex; // pode-se logar antes de relançar se desejar rastreabilidade
-        } catch (Exception e) {
-            log.error("❌ Erro ao processar BitFlip para seedId={}", record.getSeedId(), e);
-            throw new RuntimeException("Erro ao processar BitFlip", e);
+            log.warn(
+                    "dls invalid input search={} topic={} seedId={} message={}",
+                    SEARCH_NAME,
+                    TOPIC,
+                    record.getSeedId(),
+                    ex.getMessage()
+            );
+            throw ex;
+        } catch (Exception ex) {
+            log.error(
+                    "dls processing failed search={} topic={} seedId={}",
+                    SEARCH_NAME,
+                    TOPIC,
+                    record.getSeedId(),
+                    ex
+            );
+            throw new RuntimeException("Erro ao processar BitFlip", ex);
         }
     }
 }

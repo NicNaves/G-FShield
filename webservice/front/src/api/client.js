@@ -7,22 +7,13 @@ const AUTH_REDIRECT_FLAG = "gfshield-auth-redirecting";
 
 const api = axios.create({
   baseURL: API_URL,
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  return config;
+  withCredentials: true,
 });
 
 const clearStoredAuth = () => {
-  localStorage.removeItem("token");
-  localStorage.removeItem("role");
-  localStorage.removeItem("userId");
+  sessionStorage.removeItem("token");
+  sessionStorage.removeItem("role");
+  sessionStorage.removeItem("userId");
 };
 
 const shouldRedirectToLogin = (error) => {
@@ -33,9 +24,8 @@ const shouldRedirectToLogin = (error) => {
     status === 401
     || message.includes("token")
     || message.includes("usuario nao encontrado")
-    || message.includes("usuário não encontrado")
     || message.includes("faca login novamente")
-    || message.includes("faça login novamente")
+    || message.includes("sessao")
   );
 };
 
@@ -55,6 +45,10 @@ const redirectToLogin = (message) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error?.config?.skipAuthRedirect) {
+      return Promise.reject(error);
+    }
+
     if (shouldRedirectToLogin(error)) {
       redirectToLogin(
         error?.response?.data?.error || "Sua sessao expirou. Faca login novamente."
@@ -65,4 +59,5 @@ api.interceptors.response.use(
   }
 );
 
+export { clearStoredAuth };
 export default api;

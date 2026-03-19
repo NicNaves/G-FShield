@@ -6,7 +6,6 @@ import br.com.graspfs.rcl.gr.dto.FeatureAvaliada;
 import br.com.graspfs.rcl.gr.machinelearning.MachineLearning;
 import br.com.graspfs.rcl.gr.util.SelectionFeaturesUtils;
 import br.com.graspfs.rcl.gr.util.SystemMetricsUtils.MetricsCollector;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -25,7 +24,7 @@ public class GainRationService {
     private final Logger logger = LoggerFactory.getLogger(GainRationService.class);
 
     /**
-     * Executa o ranking das features com base no GainRatio e define a RCL (Restricted Candidate List).
+     * Calcula o ranking de features e deixa a seed com a RCL pronta para as geracoes seguintes.
      */
     public void rankFeatures(DataSolution solution, Instances trainingDataset, int rclCutoff) throws Exception {
         try {
@@ -43,31 +42,49 @@ public class GainRationService {
             }
 
             solution.setRclfeatures(rclFeatures);
-            logger.info("RCL features definidas: {}", rclFeatures);
+            logger.info(
+                    "rcl ranking ready algorithm=GR cutoff={} selectedFeatures={} datasetAttributes={}",
+                    rclCutoff,
+                    rclFeatures.size(),
+                    trainingDataset.numAttributes()
+            );
 
         } catch (RuntimeException ex) {
-            logger.error("Erro ao calcular GainRatio: {}", ex.getMessage());
+            logger.error("rcl ranking failed algorithm=GR message={}", ex.getMessage());
             throw new Exception("Erro ao calcular o ranking das features com GainRatio.");
         }
     }
 
-    /**
-     * Gera a solução inicial com base no dataset de treino, no valor de corte (RCL) e no classificador.
-     */
-    public DataSolution doGainRation(Instances trainingDataset, int rclCutoff, AbstractClassifier classifier, String trainingFileName, String testingFileName) throws Exception {
+    public DataSolution doGainRation(
+            Instances trainingDataset,
+            int rclCutoff,
+            AbstractClassifier classifier,
+            String trainingFileName,
+            String testingFileName
+    ) throws Exception {
         String classifierName = classifier.getClass().getSimpleName();
         DataSolution initialSolution = SelectionFeaturesUtils.createData(classifierName, trainingFileName, testingFileName);
         initialSolution.setRclAlgorithm("GR");
         rankFeatures(initialSolution, trainingDataset, rclCutoff);
+        logger.info(
+                "rcl seed template ready algorithm=GR classifier={} training={} testing={} rclSize={}",
+                classifierName,
+                trainingFileName,
+                testingFileName,
+                initialSolution.getRclfeatures() != null ? initialSolution.getRclfeatures().size() : 0
+        );
         return initialSolution;
     }
 
-    /**
-     * Gera uma nova solução a partir da RCL e avalia com machine learning.
-     */
-    public DataSolution GenerationSolutions(DataSolution rcl, int cutoff, BufferedWriter writer,
-                                            Instances trainingDataset, Instances testingDataset,
-                                            AbstractClassifier classifier) throws Exception {
+    public DataSolution GenerationSolutions(
+            DataSolution rcl,
+            int cutoff,
+            BufferedWriter writer,
+            Instances trainingDataset,
+            Instances testingDataset,
+            AbstractClassifier classifier
+    ) throws Exception {
+        // Each generation starts from the same ranked template and samples a new candidate subset.
         DataSolution candidate = DataSolution.builder()
                 .seedId(UUID.randomUUID())
                 .solutionFeatures(new ArrayList<>())
@@ -87,6 +104,7 @@ public class GainRationService {
                 .trainingFileName(rcl.getTrainingFileName())
                 .testingFileName(rcl.getTestingFileName())
                 .build();
+
         Random random = new Random();
         long startTime = System.currentTimeMillis();
 
@@ -100,6 +118,7 @@ public class GainRationService {
 
         candidate.setSolutionFeatures(solutionFeatures);
 
+        // Resource metrics are collected around the exact model-evaluation window.
         MetricsCollector collector = new MetricsCollector();
         Thread monitor = new Thread(collector);
         monitor.start();
@@ -120,7 +139,15 @@ public class GainRationService {
         candidate.setRecall(result.getRecall());
         candidate.setRunnigTime(System.currentTimeMillis() - startTime);
 
-        logger.info("SoluÃ§Ã£o gerada - RCL: {} | SoluÃ§Ã£o: {} | F1: {}", candidate.getRclfeatures(), solutionFeatures, candidate.getF1Score());
+        logger.info(
+                "rcl candidate evaluated algorithm=GR seedId={} sampleSize={} featureCount={} rclSize={} f1={} elapsedMs={}",
+                candidate.getSeedId(),
+                cutoff,
+                candidate.getSolutionFeatures().size(),
+                candidate.getRclfeatures().size(),
+                candidate.getF1Score(),
+                candidate.getRunnigTime()
+        );
 
         float avgCpu = collector.getAvgCpu();
         float avgMemory = collector.getAvgMemory();
@@ -128,6 +155,7 @@ public class GainRationService {
         candidate.setCpuUsage(Float.isFinite(avgCpu) ? avgCpu : 0.0F);
         candidate.setMemoryUsage(Float.isFinite(avgMemory) ? avgMemory : 0.0F);
         candidate.setMemoryUsagePercent(Float.isFinite(avgMemoryPercent) ? avgMemoryPercent : 0.0F);
+
         String f1Formatted = String.format(Locale.US, "%.4f", candidate.getF1Score());
         String accFormatted = String.format(Locale.US, "%.4f", candidate.getAccuracy());
         String precFormatted = String.format(Locale.US, "%.4f", candidate.getPrecision());
@@ -138,18 +166,18 @@ public class GainRationService {
         String memPercentFormatted = Float.isFinite(avgMemoryPercent) ? String.format(Locale.US, "%.4f", avgMemoryPercent) : "0.0000";
 
         writer.write(String.join(";",
-            solutionFeatures.toString(),
-            f1Formatted,
-            accFormatted,
-            precFormatted,
-            recFormatted,
-            timeFormatted,
-            cpuFormatted,
-            memFormatted,
-            memPercentFormatted,
-            candidate.getClassfier(),
-            candidate.getTrainingFileName(),
-            candidate.getTestingFileName()
+                solutionFeatures.toString(),
+                f1Formatted,
+                accFormatted,
+                precFormatted,
+                recFormatted,
+                timeFormatted,
+                cpuFormatted,
+                memFormatted,
+                memPercentFormatted,
+                candidate.getClassfier(),
+                candidate.getTrainingFileName(),
+                candidate.getTestingFileName()
         ));
         writer.newLine();
 

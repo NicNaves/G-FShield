@@ -3,7 +3,7 @@ import api from "./client";
 const login = async (email, password) => {
   try {    
     const response = await api.post("/login", {
-      email,
+      email: String(email || "").trim().toLowerCase(),
       password,
     });
     return response.data;
@@ -21,13 +21,22 @@ const register = async (payload) => {
   }
 };
 
-const me = async () => {
+const me = async (options = {}) => {
   try {
-    const response = await api.get("/me");
+    const response = await api.get("/me", options);
     return response.data;
   } catch (error) {
     throw error.response ? error.response.data : new Error("Server error");
   }
 };
 
-export default { login, register, me };
+const logout = async () => {
+  try {
+    const response = await api.post("/logout");
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : new Error("Server error");
+  }
+};
+
+export default { login, register, me, logout };

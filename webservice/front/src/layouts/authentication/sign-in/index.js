@@ -21,10 +21,11 @@ import { AUTH_DISABLED, DEV_ROLE, DEV_TOKEN, DEV_USER_ID } from "../../../config
 import useI18n from "hooks/useI18n";
 
 function Login() {
-  const [controller, dispatch] = useMaterialUIController(); 
+  const [, dispatch] = useMaterialUIController(); 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   const { t } = useI18n();
 
@@ -36,18 +37,20 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setSubmitting(true);
   
     try {
-      const data = await apiLogin.login(email, password); 
-      const { token, role, userId } = data;
+      const data = await apiLogin.login(email, password.trim() ? password : ""); 
+      const { role, userId } = data;
   
-      
-      setLogin(dispatch, token, role, userId);
+      setLogin(dispatch, "cookie-session", role, userId);
+      setPassword("");
   
-      
       navigate("/dashboard");
     } catch (err) {
-      setError(err.message || t("auth.signInError"));
+      setError(err.error || err.message || t("auth.signInError"));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -89,6 +92,7 @@ function Login() {
                     type="email"
                     label={t("auth.email")}
                     fullWidth
+                    autoComplete="username"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
@@ -98,6 +102,7 @@ function Login() {
                     type="password"
                     label={t("auth.password")}
                     fullWidth
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
@@ -109,10 +114,11 @@ function Login() {
                 variant="gradient"
                 color="info"
                 fullWidth
+                disabled={submitting}
                 type={AUTH_DISABLED ? "button" : "submit"}
                 onClick={AUTH_DISABLED ? handleGuestAccess : undefined}
               >
-                {AUTH_DISABLED ? t("auth.continueWithoutSignIn") : t("auth.signIn")}
+                {AUTH_DISABLED ? t("auth.continueWithoutSignIn") : (submitting ? `${t("auth.signIn")}...` : t("auth.signIn"))}
               </MDButton>
             </MDBox>
             {!AUTH_DISABLED && (

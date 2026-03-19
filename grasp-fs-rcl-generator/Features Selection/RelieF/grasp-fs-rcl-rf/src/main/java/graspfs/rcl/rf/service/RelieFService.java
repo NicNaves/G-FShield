@@ -6,7 +6,6 @@ import graspfs.rcl.rf.dto.FeatureAvaliada;
 import graspfs.rcl.rf.machinelearning.MachineLearning;
 import graspfs.rcl.rf.util.SelectionFeaturesUtils;
 import graspfs.rcl.rf.util.SystemMetricsUtils.MetricsCollector;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -25,6 +24,9 @@ public class RelieFService {
 
     private final Logger logger = LoggerFactory.getLogger(RelieFService.class);
 
+    /**
+     * Calcula o ranking de features e deixa a seed com a RCL pronta para as geracoes seguintes.
+     */
     public void rankFeatures(DataSolution solution, Instances trainingDataset, int rclCutoff) throws Exception {
         try {
             long rankingStartedAt = System.currentTimeMillis();
@@ -32,7 +34,7 @@ public class RelieFService {
             ReliefFAttributeEval evaluator = new ReliefFAttributeEval();
             evaluator.buildEvaluator(trainingDataset);
             logger.info(
-                    "RF evaluator ready rows={} attributes={} elapsedMs={}",
+                    "rcl evaluator ready algorithm=RF rows={} attributes={} elapsedMs={}",
                     trainingDataset.numInstances(),
                     trainingDataset.numAttributes(),
                     System.currentTimeMillis() - rankingStartedAt
@@ -44,7 +46,7 @@ public class RelieFService {
 
                 if ((i + 1) % 10 == 0 || i + 1 == trainingDataset.numAttributes()) {
                     logger.info(
-                            "RF ranking progress evaluatedAttributes={}/{} elapsedMs={}",
+                            "rcl ranking progress algorithm=RF evaluatedAttributes={}/{} elapsedMs={}",
                             i + 1,
                             trainingDataset.numAttributes(),
                             System.currentTimeMillis() - rankingStartedAt
@@ -61,30 +63,49 @@ public class RelieFService {
 
             solution.setRclfeatures(rclFeatures);
             logger.info(
-                    "RCL features definidas count={} cutoff={} elapsedMs={}",
-                    rclFeatures.size(),
+                    "rcl ranking ready algorithm=RF cutoff={} selectedFeatures={} datasetAttributes={} elapsedMs={}",
                     rclCutoff,
+                    rclFeatures.size(),
+                    trainingDataset.numAttributes(),
                     System.currentTimeMillis() - rankingStartedAt
             );
 
         } catch (RuntimeException ex) {
-            logger.error("Erro ao calcular rfRatio: {}", ex.getMessage());
+            logger.error("rcl ranking failed algorithm=RF message={}", ex.getMessage());
             throw new Exception("Erro ao calcular o ranking das features com rfRatio.");
         }
     }
 
-    public DataSolution doRelief(Instances trainingDataset, int rclCutoff, AbstractClassifier classifier, String trainingFileName, String testingFileName) throws Exception {
+    public DataSolution doRelief(
+            Instances trainingDataset,
+            int rclCutoff,
+            AbstractClassifier classifier,
+            String trainingFileName,
+            String testingFileName
+    ) throws Exception {
         String classifierName = classifier.getClass().getSimpleName();
         DataSolution initialSolution = SelectionFeaturesUtils.createData(classifierName, trainingFileName, testingFileName);
         initialSolution.setRclAlgorithm("RF");
         rankFeatures(initialSolution, trainingDataset, rclCutoff);
+        logger.info(
+                "rcl seed template ready algorithm=RF classifier={} training={} testing={} rclSize={}",
+                classifierName,
+                trainingFileName,
+                testingFileName,
+                initialSolution.getRclfeatures() != null ? initialSolution.getRclfeatures().size() : 0
+        );
         return initialSolution;
     }
 
-    public DataSolution GenerationSolutions(DataSolution rcl, int cutoff, BufferedWriter writer,
-                                            Instances trainingDataset, Instances testingDataset,
-                                            AbstractClassifier classifier) throws Exception {
-
+    public DataSolution GenerationSolutions(
+            DataSolution rcl,
+            int cutoff,
+            BufferedWriter writer,
+            Instances trainingDataset,
+            Instances testingDataset,
+            AbstractClassifier classifier
+    ) throws Exception {
+        // Each generation starts from the same ranked template and samples a new candidate subset.
         DataSolution candidate = DataSolution.builder()
                 .seedId(UUID.randomUUID())
                 .solutionFeatures(new ArrayList<>())
@@ -118,6 +139,7 @@ public class RelieFService {
 
         candidate.setSolutionFeatures(solutionFeatures);
 
+        // Resource metrics are collected around the exact model-evaluation window.
         MetricsCollector collector = new MetricsCollector();
         Thread monitor = new Thread(collector);
         monitor.start();
@@ -138,8 +160,15 @@ public class RelieFService {
         candidate.setRecall(result.getRecall());
         candidate.setRunnigTime(System.currentTimeMillis() - startTime);
 
-        logger.info("SoluÃ§Ã£o gerada - RCL: {} | SoluÃ§Ã£o: {} | F1: {}",
-                candidate.getRclfeatures(), solutionFeatures, candidate.getF1Score());
+        logger.info(
+                "rcl candidate evaluated algorithm=RF seedId={} sampleSize={} featureCount={} rclSize={} f1={} elapsedMs={}",
+                candidate.getSeedId(),
+                cutoff,
+                candidate.getSolutionFeatures().size(),
+                candidate.getRclfeatures().size(),
+                candidate.getF1Score(),
+                candidate.getRunnigTime()
+        );
 
         float avgCpu = collector.getAvgCpu();
         float avgMemory = collector.getAvgMemory();
@@ -159,8 +188,8 @@ public class RelieFService {
         String memPct = Float.isFinite(avgMemoryPercent) ? String.format(Locale.US, "%.4f", avgMemoryPercent) : "0.0000";
 
         writer.write(String.join(";",
-            solutionStr, f1, acc, prec, rec, time, cpu, mem, memPct,
-            candidate.getClassfier(), candidate.getTrainingFileName(), candidate.getTestingFileName()
+                solutionStr, f1, acc, prec, rec, time, cpu, mem, memPct,
+                candidate.getClassfier(), candidate.getTrainingFileName(), candidate.getTestingFileName()
         ));
         writer.newLine();
 

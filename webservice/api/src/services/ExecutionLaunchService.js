@@ -39,6 +39,127 @@ class ExecutionLaunchService {
     return Math.max(algorithmCount * maxGenerations, 0);
   }
 
+  numberOrNull(value) {
+    if (value === undefined || value === null || value === "") {
+      return null;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  cloneList(value, fallback = []) {
+    if (Array.isArray(value)) {
+      return [...value];
+    }
+
+    if (Array.isArray(fallback)) {
+      return [...fallback];
+    }
+
+    return [];
+  }
+
+  extractSnapshotFromEventPayload(payload) {
+    if (!payload || typeof payload !== "object") {
+      return {};
+    }
+
+    if (payload.payload && typeof payload.payload === "object") {
+      return payload.payload;
+    }
+
+    return payload;
+  }
+
+  resolveNeighborhoodCycles(snapshot = {}) {
+    const configuredCycles = this.numberOrNull(snapshot.neighborhoodMaxIterations ?? null);
+    return configuredCycles && configuredCycles > 0 ? configuredCycles : 1;
+  }
+
+  resolveEnabledLocalSearches(snapshot = {}) {
+    const configured = this.cloneList(snapshot.enabledLocalSearches, ["BIT_FLIP", "IWSS", "IWSSR"]);
+    const normalized = configured
+      .map((entry) => String(entry || "").trim().toUpperCase())
+      .filter(Boolean);
+
+    return normalized.length ? [...new Set(normalized)] : ["BIT_FLIP", "IWSS", "IWSSR"];
+  }
+
+  resolveVndDispatchBudget(snapshot = {}) {
+    const enabledLocalSearches = this.resolveEnabledLocalSearches(snapshot);
+    const searchesPerCycle = Math.max(enabledLocalSearches.length, 1);
+    const configuredCycles = this.resolveNeighborhoodCycles(snapshot);
+    return Math.max(configuredCycles * searchesPerCycle, searchesPerCycle);
+  }
+
+  isTerminalSolutionEvent(event) {
+    if (!event || event.topic !== "SOLUTIONS_TOPIC") {
+      return false;
+    }
+
+    const snapshot = this.extractSnapshotFromEventPayload(event.payload);
+    const neighborhood = String(snapshot.neighborhood || "").trim().toUpperCase();
+    const iterationNeighborhood = this.numberOrNull(snapshot.iterationNeighborhood ?? null);
+
+    if (!Number.isFinite(iterationNeighborhood)) {
+      return false;
+    }
+
+    if (neighborhood === "VND") {
+      return iterationNeighborhood >= this.resolveVndDispatchBudget(snapshot);
+    }
+
+    if (neighborhood === "RVND") {
+      return iterationNeighborhood >= this.resolveNeighborhoodCycles(snapshot);
+    }
+
+    return false;
+  }
+
+  isSeedStillProcessingEvent(event) {
+    if (!event) {
+      return false;
+    }
+
+    if (event.topic === "INITIAL_SOLUTION_TOPIC" || event.topic === "NEIGHBORHOOD_RESTART_TOPIC") {
+      return true;
+    }
+
+    if (event.topic === "LOCAL_SEARCH_PROGRESS_TOPIC") {
+      return true;
+    }
+
+    if (event.topic === "SOLUTIONS_TOPIC") {
+      return !this.isTerminalSolutionEvent(event);
+    }
+
+    return false;
+  }
+
+  summarizeSeedLifecycle(events = []) {
+    let terminalEventAt = null;
+
+    events
+      .filter((event) => event && event.seedId)
+      .sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt))
+      .forEach((event) => {
+        if (this.isTerminalSolutionEvent(event)) {
+          terminalEventAt = event.createdAt;
+          return;
+        }
+
+        if (this.isSeedStillProcessingEvent(event)) {
+          terminalEventAt = null;
+        }
+      });
+
+    return {
+      completed: Boolean(terminalEventAt),
+      terminalEventAt: terminalEventAt?.toISOString?.() || null,
+    };
+  }
+
   async summarizePipelineProgress(record, nextStartedLaunch = null) {
     const algorithms = Array.isArray(record?.algorithms)
       ? record.algorithms.map((algorithm) => String(algorithm).trim().toUpperCase()).filter(Boolean)
@@ -72,8 +193,6 @@ class ExecutionLaunchService {
       },
       select: {
         seedId: true,
-        status: true,
-        topic: true,
         createdAt: true,
         updatedAt: true,
         completedAt: true,
@@ -96,12 +215,46 @@ class ExecutionLaunchService {
     });
 
     const uniqueRuns = [...latestRunBySeed.values()];
-    const completedSeedCount = uniqueRuns.filter((run) =>
-      String(run.status || "").toUpperCase() === "COMPLETED"
-    ).length;
+    const observedSeedCount = uniqueRuns.length;
+    const seedIds = uniqueRuns.map((run) => run.seedId).filter(Boolean);
+    const events = seedIds.length > 0
+      ? await prisma.graspExecutionEvent.findMany({
+          where: {
+            seedId: { in: seedIds },
+            eventType: { in: ["kafka.update", "kafka.progress"] },
+            createdAt: {
+              gte: startedAt,
+              ...(nextStartedAt ? { lt: nextStartedAt } : {}),
+            },
+          },
+          orderBy: { createdAt: "asc" },
+          select: {
+            seedId: true,
+            topic: true,
+            createdAt: true,
+            payload: true,
+          },
+        })
+      : [];
 
-    const timestamps = uniqueRuns
-      .flatMap((run) => [run.createdAt, run.updatedAt, run.completedAt])
+    const eventsBySeed = new Map();
+    events.forEach((event) => {
+      if (!event.seedId) {
+        return;
+      }
+
+      const currentSeedEvents = eventsBySeed.get(event.seedId) || [];
+      currentSeedEvents.push(event);
+      eventsBySeed.set(event.seedId, currentSeedEvents);
+    });
+
+    const completedSeedCount = seedIds.reduce((count, seedId) => {
+      const lifecycle = this.summarizeSeedLifecycle(eventsBySeed.get(seedId) || []);
+      return lifecycle.completed ? count + 1 : count;
+    }, 0);
+
+    const timestamps = (events.length > 0 ? events.map((event) => event.createdAt) : uniqueRuns
+      .flatMap((run) => [run.createdAt, run.updatedAt, run.completedAt]))
       .filter(Boolean)
       .map((value) => new Date(value));
 
@@ -114,7 +267,7 @@ class ExecutionLaunchService {
 
     return {
       expectedSeedCount,
-      observedSeedCount: uniqueRuns.length,
+      observedSeedCount,
       completedSeedCount,
       pendingSeedCount: Math.max(expectedSeedCount - completedSeedCount, 0),
       pipelineCompleted: expectedSeedCount > 0 && completedSeedCount >= expectedSeedCount,
@@ -144,7 +297,7 @@ class ExecutionLaunchService {
         metadata: this.mergeMetadata(nextMetadata, {
           queueState: "completed",
           completedAt: metadata.completedAt || progress.lastResultAt || new Date().toISOString(),
-          note: "Distributed pipeline finished all expected seeds for this execution.",
+          note: "Distributed pipeline reached a terminal local-search result for every expected seed.",
         }),
       };
     }

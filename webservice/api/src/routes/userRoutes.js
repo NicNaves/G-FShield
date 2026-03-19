@@ -9,38 +9,27 @@ const router = express.Router();
  * /register:
  *   post:
  *     tags: [Auth]
- *     summary: Registra um novo usuario
- *     description: Cria uma nova conta de usuario.
+ *     summary: Cria uma nova conta de usuario
+ *     security: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *                 example: "Joao Silva"
- *               email:
- *                 type: string
- *                 example: "joao@example.com"
- *               cpf:
- *                 type: string
- *                 example: "12345678901"
- *               telefone:
- *                 type: string
- *                 example: "11987654321"
- *               password:
- *                 type: string
- *                 example: "senha123"
- *               role:
- *                 type: string
- *                 example: "VIEWER"
+ *             $ref: '#/components/schemas/RegisterRequest'
  *     responses:
  *       201:
- *         description: Usuario registrado com sucesso.
+ *         description: Usuario criado com sucesso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserSummary'
  *       400:
- *         description: Erro ao registrar usuario.
+ *         description: Payload invalido ou e-mail ja utilizado.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post("/register", UserController.registrar);
 
@@ -49,28 +38,65 @@ router.post("/register", UserController.registrar);
  * /login:
  *   post:
  *     tags: [Auth]
- *     summary: Realiza login de um usuario
- *     description: Autentica um usuario e retorna um token JWT.
+ *     summary: Autentica o usuario
+ *     description: |
+ *       Valida as credenciais, retorna um JWT para clientes programaticos
+ *       e tambem emite uma sessao HTTP-only em cookie para o frontend web.
+ *     security: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *                 example: "joao@example.com"
- *               password:
- *                 type: string
- *                 example: "senha123"
+ *             $ref: '#/components/schemas/LoginRequest'
  *     responses:
  *       200:
- *         description: Login bem-sucedido.
+ *         description: Login efetuado com sucesso.
+ *         headers:
+ *           Set-Cookie:
+ *             description: Cookie HTTP-only com a sessao autenticada.
+ *             schema:
+ *               type: string
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       400:
+ *         description: Requisicao invalida.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Credenciais invalidas.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Usuario inativo.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post("/login", UserController.login);
+
+/**
+ * @swagger
+ * /logout:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Encerra a sessao autenticada
+ *     responses:
+ *       200:
+ *         description: Sessao encerrada com sucesso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LogoutResponse'
+ */
+router.post("/logout", UserController.logout);
 
 /**
  * @swagger
@@ -80,9 +106,17 @@ router.post("/login", UserController.login);
  *     summary: Retorna o usuario autenticado
  *     responses:
  *       200:
- *         description: Usuario autenticado retornado com sucesso.
+ *         description: Resumo do usuario autenticado.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserSummary'
  *       401:
- *         description: Token invalido ou ausente.
+ *         description: Sessao ausente, invalida ou expirada.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get("/me", authMiddleware, UserController.me);
 
@@ -92,23 +126,27 @@ router.get("/me", authMiddleware, UserController.me);
  *   get:
  *     tags: [Users]
  *     summary: Lista todos os usuarios
- *     description: Retorna uma lista com todos os usuarios cadastrados.
  *     responses:
  *       200:
- *         description: Lista de usuarios retornada com sucesso.
+ *         description: Lista retornada com sucesso.
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                   name:
- *                     type: string
- *                   email:
- *                     type: string
+ *                 $ref: '#/components/schemas/UserSummary'
+ *       401:
+ *         description: Nao autenticado.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Requer papel ADMIN.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get("/users", authMiddleware, roleMiddleware("ADMIN"), UserController.buscarTodosUsuarios);
 
@@ -118,7 +156,6 @@ router.get("/users", authMiddleware, roleMiddleware("ADMIN"), UserController.bus
  *   get:
  *     tags: [Users]
  *     summary: Busca um usuario por ID
- *     description: Retorna os dados de um usuario especifico.
  *     parameters:
  *       - in: path
  *         name: id
@@ -128,9 +165,17 @@ router.get("/users", authMiddleware, roleMiddleware("ADMIN"), UserController.bus
  *           example: 1
  *     responses:
  *       200:
- *         description: Usuario encontrado com sucesso.
+ *         description: Usuario encontrado.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserSummary'
  *       404:
  *         description: Usuario nao encontrado.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get("/users/:id", authMiddleware, roleMiddleware("ADMIN"), UserController.buscarUsuarioPorId);
 
@@ -139,8 +184,7 @@ router.get("/users/:id", authMiddleware, roleMiddleware("ADMIN"), UserController
  * /users/{id}:
  *   put:
  *     tags: [Users]
- *     summary: Atualiza os dados de um usuario
- *     description: Atualiza os dados de um usuario especifico pelo ID.
+ *     summary: Atualiza um usuario
  *     parameters:
  *       - in: path
  *         name: id
@@ -160,21 +204,40 @@ router.get("/users/:id", authMiddleware, roleMiddleware("ADMIN"), UserController
  *                 example: "Joao Silva"
  *               email:
  *                 type: string
- *                 example: "joao@example.com"
+ *                 format: email
+ *                 example: "joao@gfshield.local"
  *               telefone:
  *                 type: string
  *                 example: "11987654321"
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 6
+ *                 example: "NovaSenha123"
  *               role:
  *                 type: string
- *                 example: "VIEWER"
+ *                 enum: [ADMIN, VIEWER]
  *               active:
  *                 type: boolean
- *                 example: true
  *     responses:
  *       200:
  *         description: Usuario atualizado com sucesso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserSummary'
+ *       400:
+ *         description: Dados invalidos.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Usuario nao encontrado.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.put("/users/:id", authMiddleware, roleMiddleware("ADMIN"), UserController.atualizarUsuario);
 

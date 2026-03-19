@@ -10,6 +10,9 @@ class GraspExecutionMonitorService {
     this.consumer = null;
     this.started = false;
     this.startPromise = null;
+    this.keepRunning = false;
+    this.reconnectTimer = null;
+    this.reconnectDelayMs = Math.max(Number(process.env.GRASP_MONITOR_RECONNECT_DELAY_MS || 5000), 1000);
     this.clients = new Set();
     this.runs = new Map();
     this.events = [];
@@ -164,6 +167,8 @@ class GraspExecutionMonitorService {
   }
 
   async start() {
+    this.keepRunning = true;
+
     if (this.started) {
       return;
     }
@@ -177,6 +182,12 @@ class GraspExecutionMonitorService {
   }
 
   async stop() {
+    this.keepRunning = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     const activeConsumer = this.consumer;
 
     this.started = false;
@@ -198,6 +209,38 @@ class GraspExecutionMonitorService {
     }
   }
 
+  scheduleReconnect(reason, metadata = {}) {
+    if (!this.keepRunning || this.reconnectTimer) {
+      return;
+    }
+
+    this.started = false;
+    this.startPromise = null;
+    this.consumer = null;
+    this.kafka = null;
+
+    logger.warn("Agendando reconexao do monitor Kafka", {
+      reason,
+      delayMs: this.reconnectDelayMs,
+      ...metadata,
+    });
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+
+      if (!this.keepRunning) {
+        return;
+      }
+
+      this.start().catch((error) => {
+        logger.error("Reconexao do monitor Kafka falhou", {
+          reason,
+          error: error.message,
+        });
+      });
+    }, this.reconnectDelayMs);
+  }
+
   async connect() {
     try {
       this.kafka = new Kafka({
@@ -216,6 +259,16 @@ class GraspExecutionMonitorService {
           groupId: event.payload?.groupId || null,
           restart: event.payload?.restart ?? null,
         });
+
+        this.scheduleReconnect("consumer-crash", {
+          groupId: event.payload?.groupId || null,
+          restart: event.payload?.restart ?? null,
+        });
+      });
+
+      this.consumer.on(this.consumer.events.DISCONNECT, () => {
+        logger.warn("Consumer do monitor Kafka desconectado");
+        this.scheduleReconnect("consumer-disconnect");
       });
 
       await this.consumer.connect();
@@ -253,6 +306,7 @@ class GraspExecutionMonitorService {
     } catch (error) {
       logger.error("Falha ao iniciar monitor Kafka", { error: error.message, brokers: kafkaBrokers });
       this.startPromise = null;
+      this.scheduleReconnect("connect-failure", { error: error.message });
       throw error;
     }
   }
