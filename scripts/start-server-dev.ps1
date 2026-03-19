@@ -22,10 +22,10 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $apiDir = Join-Path $repoRoot "webservice/api"
 $frontDir = Join-Path $repoRoot "webservice/front"
 $rootComposeFile = Join-Path $repoRoot "docker-compose.yml"
-$rootPresetComposeFile = Join-Path $repoRoot "docker-compose.local.yml"
+$rootPresetComposeFile = Join-Path $repoRoot "docker-compose.server.yml"
 $dbComposeFile = Join-Path $apiDir "docker-compose.db.yml"
-$dbPresetComposeFile = Join-Path $apiDir "docker-compose.db.local.yml"
-$stateDir = Join-Path $repoRoot ".local-dev"
+$dbPresetComposeFile = Join-Path $apiDir "docker-compose.db.server.yml"
+$stateDir = Join-Path $repoRoot ".server-dev"
 $stateFile = Join-Path $stateDir "processes.json"
 
 function Get-NpmCommand {
@@ -183,10 +183,10 @@ if ($Rebuild) {
   $rootComposeArgs += "--build"
 }
 
-Write-Host "Subindo stack principal do GF-Shield..."
+Write-Host "Subindo stack server do GF-Shield..."
 Invoke-Compose -WorkingDirectory $repoRoot -Arguments $rootComposeArgs
 
-Write-Host "Subindo banco local do webservice/api..."
+Write-Host "Subindo banco server do webservice/api..."
 Invoke-Compose -WorkingDirectory $repoRoot -Arguments @("-f", $dbComposeFile, "-f", $dbPresetComposeFile, "up", "-d")
 
 $apiCommand = @"
@@ -205,10 +205,10 @@ Set-Location '$frontDir'
 "@
 
 Write-Host "Abrindo API em nova janela..."
-$apiProcess = Start-ManagedShell -Name "webservice-api" -WorkingDirectory $apiDir -Command $apiCommand
+$apiProcess = Start-ManagedShell -Name "webservice-api-server" -WorkingDirectory $apiDir -Command $apiCommand
 
 Write-Host "Abrindo front em nova janela..."
-$frontProcess = Start-ManagedShell -Name "webservice-front" -WorkingDirectory $frontDir -Command $frontCommand
+$frontProcess = Start-ManagedShell -Name "webservice-front-server" -WorkingDirectory $frontDir -Command $frontCommand
 
 $state = [PSCustomObject]@{
   startedAt = (Get-Date).ToString("o")
@@ -233,7 +233,7 @@ if ($DispatchSampleRun) {
 }
 
 Write-Host ""
-Write-Host "Ambiente iniciado."
+Write-Host "Ambiente server iniciado."
 Write-Host "Front: http://localhost:$FrontendPort"
 Write-Host "API: http://localhost:$ApiPort"
 Write-Host "Swagger: http://localhost:$ApiPort/api-docs"

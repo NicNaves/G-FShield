@@ -4,7 +4,7 @@
 
 ### Objetivo
 
-Este guia descreve o fluxo recomendado para subir o GF-Shield localmente com Docker, API Node.js e front React.
+Este guia descreve o fluxo recomendado para subir o GF-Shield com Docker, API Node.js e front React, tanto no preset `local` quanto no preset `server`.
 
 ### Pre-requisitos
 
@@ -12,12 +12,14 @@ Este guia descreve o fluxo recomendado para subir o GF-Shield localmente com Doc
 - Node.js com `npm.cmd`
 - Java 17 para execucoes locais fora do Docker, quando necessario
 
-### O que sobe no ambiente local
+### O que sobe no ambiente
 
 - stack principal via [`docker-compose.yml`](../docker-compose.yml)
-- preset local opcional via [`docker-compose.local.yml`](../docker-compose.local.yml)
+- preset local via [`docker-compose.local.yml`](../docker-compose.local.yml)
+- preset server via [`docker-compose.server.yml`](../docker-compose.server.yml)
 - banco PostgreSQL da API via [`webservice/api/docker-compose.db.yml`](../webservice/api/docker-compose.db.yml)
-- preset local opcional via [`webservice/api/docker-compose.db.local.yml`](../webservice/api/docker-compose.db.local.yml)
+- preset local via [`webservice/api/docker-compose.db.local.yml`](../webservice/api/docker-compose.db.local.yml)
+- preset server via [`webservice/api/docker-compose.db.server.yml`](../webservice/api/docker-compose.db.server.yml)
 - API Express na porta `4000`
 - front React na porta `3000`
 
@@ -25,61 +27,100 @@ Este guia descreve o fluxo recomendado para subir o GF-Shield localmente com Doc
 
 #### 1. Iniciar tudo com o script
 
+Windows local:
+
 ```powershell
 .\scripts\start-local-dev.ps1
 ```
 
-Esse script:
+Windows server:
+
+```powershell
+.\scripts\start-server-dev.ps1
+```
+
+Ubuntu local:
+
+```bash
+bash scripts/start-local-dev.sh
+```
+
+Ubuntu server:
+
+```bash
+bash scripts/start-server-dev.sh
+```
+
+Esses scripts:
 
 - sobe a stack principal do GF-Shield
 - sobe o banco da API
-- abre API e front em novas janelas
-- pode disparar uma execucao de exemplo se chamado com `-DispatchSampleRun`
+- iniciam API e front fora do Docker
+- separam estado entre `local` e `server`
+- podem disparar uma execucao de exemplo
 
 #### 2. Encerrar o ambiente
+
+Windows local:
 
 ```powershell
 .\scripts\stop-local-dev.ps1
 ```
 
-Se quiser manter Docker de pe:
+Windows server:
 
 ```powershell
-.\scripts\stop-local-dev.ps1 -KeepDocker
+.\scripts\stop-server-dev.ps1
 ```
 
-Se quiser derrubar o banco da API e remover volumes:
+Ubuntu local:
 
-```powershell
-.\scripts\stop-local-dev.ps1 -ResetDatabase
+```bash
+bash scripts/stop-local-dev.sh
 ```
+
+Ubuntu server:
+
+```bash
+bash scripts/stop-server-dev.sh
+```
+
+Para manter Docker de pe:
+
+- PowerShell: `-KeepDocker`
+- Shell: `--keep-docker`
+
+Para derrubar o banco da API e remover volumes:
+
+- PowerShell: `-ResetDatabase`
+- Shell: `--reset-database`
 
 ### Fluxo manual
 
 #### Stack principal
 
 ```powershell
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 ```
 
-Ou com limite local de recursos:
+Ou com o preset server:
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.server.yml up -d --build
 ```
 
 #### Banco da API
 
 ```powershell
 cd .\webservice\api
-docker compose -f .\docker-compose.db.yml up -d
+docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.local.yml up -d
 ```
 
-Ou com limite local de recursos:
+Ou com o preset server:
 
 ```powershell
 cd .\webservice\api
-docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.local.yml up -d
+docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.server.yml up -d
 ```
 
 #### Migracao e seed
@@ -113,6 +154,7 @@ npm.cmd start
 ### Observacoes importantes
 
 - No PowerShell, prefira `npm.cmd` em vez de `npm` se a execution policy bloquear scripts.
+- No Ubuntu, os scripts `.sh` gravam logs em `.local-dev` ou `.server-dev`.
 - O catalogo de datasets da API usa `GRASP_DATASETS_DIR="../../datasets"` por padrao.
 - O dashboard usa eventos persistidos da API, nao os CSVs de `metrics`.
 - a aba `Settings > Operations` mostra o `Request Summary` das launches persistidas.
@@ -149,7 +191,7 @@ Use `Ctrl + F5` no navegador.
 
 ### Goal
 
-This guide describes the recommended flow to start GF-Shield locally with Docker, the Node.js API, and the React front-end.
+This guide describes the recommended flow to start GF-Shield with Docker, the Node.js API, and the React front-end using either the `local` or `server` preset.
 
 ### Prerequisites
 
@@ -157,12 +199,14 @@ This guide describes the recommended flow to start GF-Shield locally with Docker
 - Node.js with `npm.cmd`
 - Java 17 for local non-Docker Java runs when needed
 
-### What starts in the local environment
+### What starts in the environment
 
 - main stack via [`docker-compose.yml`](../docker-compose.yml)
-- optional local preset via [`docker-compose.local.yml`](../docker-compose.local.yml)
+- local preset via [`docker-compose.local.yml`](../docker-compose.local.yml)
+- server preset via [`docker-compose.server.yml`](../docker-compose.server.yml)
 - API PostgreSQL database via [`webservice/api/docker-compose.db.yml`](../webservice/api/docker-compose.db.yml)
-- optional local preset via [`webservice/api/docker-compose.db.local.yml`](../webservice/api/docker-compose.db.local.yml)
+- local preset via [`webservice/api/docker-compose.db.local.yml`](../webservice/api/docker-compose.db.local.yml)
+- server preset via [`webservice/api/docker-compose.db.server.yml`](../webservice/api/docker-compose.db.server.yml)
 - Express API on port `4000`
 - React front-end on port `3000`
 
@@ -170,61 +214,100 @@ This guide describes the recommended flow to start GF-Shield locally with Docker
 
 #### 1. Start everything with the script
 
+Windows local:
+
 ```powershell
 .\scripts\start-local-dev.ps1
 ```
 
-This script:
+Windows server:
+
+```powershell
+.\scripts\start-server-dev.ps1
+```
+
+Ubuntu local:
+
+```bash
+bash scripts/start-local-dev.sh
+```
+
+Ubuntu server:
+
+```bash
+bash scripts/start-server-dev.sh
+```
+
+These scripts:
 
 - starts the main GF-Shield stack
 - starts the API database
-- opens API and front-end in new windows
-- can dispatch a sample run if called with `-DispatchSampleRun`
+- starts the API and front-end outside Docker
+- keeps `local` and `server` state separated
+- can dispatch a sample run
 
 #### 2. Stop the environment
+
+Windows local:
 
 ```powershell
 .\scripts\stop-local-dev.ps1
 ```
 
-If you want to keep Docker running:
+Windows server:
 
 ```powershell
-.\scripts\stop-local-dev.ps1 -KeepDocker
+.\scripts\stop-server-dev.ps1
 ```
 
-If you want to stop the API database and remove volumes:
+Ubuntu local:
 
-```powershell
-.\scripts\stop-local-dev.ps1 -ResetDatabase
+```bash
+bash scripts/stop-local-dev.sh
 ```
+
+Ubuntu server:
+
+```bash
+bash scripts/stop-server-dev.sh
+```
+
+To keep Docker running:
+
+- PowerShell: `-KeepDocker`
+- Shell: `--keep-docker`
+
+To stop the API database and remove volumes:
+
+- PowerShell: `-ResetDatabase`
+- Shell: `--reset-database`
 
 ### Manual flow
 
 #### Main stack
 
 ```powershell
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 ```
 
-Or with local resource limits:
+Or with the server preset:
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.server.yml up -d --build
 ```
 
 #### API database
 
 ```powershell
 cd .\webservice\api
-docker compose -f .\docker-compose.db.yml up -d
+docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.local.yml up -d
 ```
 
-Or with local resource limits:
+Or with the server preset:
 
 ```powershell
 cd .\webservice\api
-docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.local.yml up -d
+docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.server.yml up -d
 ```
 
 #### Migration and seed
@@ -258,6 +341,7 @@ npm.cmd start
 ### Important notes
 
 - In PowerShell, prefer `npm.cmd` instead of `npm` if execution policy blocks scripts.
+- On Ubuntu, the `.sh` scripts write logs to `.local-dev` or `.server-dev`.
 - The API dataset catalog uses `GRASP_DATASETS_DIR="../../datasets"` by default.
 - The dashboard uses API-persisted execution events, not the CSV files under `metrics`.
 - `Settings > Operations` shows the persisted `Request Summary` for launches.

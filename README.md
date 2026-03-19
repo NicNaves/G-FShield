@@ -73,64 +73,49 @@ GF-Shield/
 
 ### Inicio rapido
 
-Suba a stack principal:
+Windows local:
 
 ```powershell
-docker compose up -d --build
+.\scripts\start-local-dev.ps1
+.\scripts\stop-local-dev.ps1
 ```
 
-Ou com o preset local de recursos:
+Windows server:
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+.\scripts\start-server-dev.ps1
+.\scripts\stop-server-dev.ps1
 ```
 
-Suba o banco da API:
+Ubuntu local:
 
-```powershell
-cd .\webservice\api
-docker compose -f .\docker-compose.db.yml up -d
+```bash
+bash scripts/start-local-dev.sh
+bash scripts/stop-local-dev.sh
 ```
 
-Ou com o preset local de recursos:
+Ubuntu server:
 
-```powershell
-cd .\webservice\api
-docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.local.yml up -d
-```
-
-Execute migracao e seed:
-
-```powershell
-cd .\webservice\api
-npm.cmd run migrate
-```
-
-Inicie API e front:
-
-```powershell
-cd .\webservice\api
-npm.cmd run dev
-```
-
-```powershell
-cd .\webservice\front
-npm.cmd start
+```bash
+bash scripts/start-server-dev.sh
+bash scripts/stop-server-dev.sh
 ```
 
 ### Scripts auxiliares
 
-Tambem e possivel iniciar o ambiente local com os scripts em [`scripts`](./scripts):
+Os scripts em [`scripts`](./scripts) cobrem os dois presets de recurso (`local` e `server`) e os dois ambientes operacionais principais:
 
-```powershell
-.\scripts\start-local-dev.ps1
-```
+- PowerShell para Windows:
+  `start-local-dev.ps1`, `stop-local-dev.ps1`, `start-server-dev.ps1`, `stop-server-dev.ps1`
+- Shell para Ubuntu:
+  `start-local-dev.sh`, `stop-local-dev.sh`, `start-server-dev.sh`, `stop-server-dev.sh`
 
-Para encerrar:
+Todos eles:
 
-```powershell
-.\scripts\stop-local-dev.ps1
-```
+- sobem a stack principal com o compose base + preset correto
+- sobem o banco da API com o compose base + preset correto
+- iniciam API e front fora do Docker
+- mantem estado separado entre `local` e `server`
 
 ### Monitoramento e persistencia
 
@@ -254,64 +239,49 @@ GF-Shield/
 
 ### Quick start
 
-Start the main stack:
+Windows local:
 
 ```powershell
-docker compose up -d --build
+.\scripts\start-local-dev.ps1
+.\scripts\stop-local-dev.ps1
 ```
 
-Or with the local resource preset:
+Windows server:
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+.\scripts\start-server-dev.ps1
+.\scripts\stop-server-dev.ps1
 ```
 
-Start the API database:
+Ubuntu local:
 
-```powershell
-cd .\webservice\api
-docker compose -f .\docker-compose.db.yml up -d
+```bash
+bash scripts/start-local-dev.sh
+bash scripts/stop-local-dev.sh
 ```
 
-Or with the local resource preset:
+Ubuntu server:
 
-```powershell
-cd .\webservice\api
-docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.local.yml up -d
-```
-
-Run migration and seed:
-
-```powershell
-cd .\webservice\api
-npm.cmd run migrate
-```
-
-Start API and front-end:
-
-```powershell
-cd .\webservice\api
-npm.cmd run dev
-```
-
-```powershell
-cd .\webservice\front
-npm.cmd start
+```bash
+bash scripts/start-server-dev.sh
+bash scripts/stop-server-dev.sh
 ```
 
 ### Helper scripts
 
-You can also start the local environment with the scripts under [`scripts`](./scripts):
+The scripts under [`scripts`](./scripts) cover both resource presets (`local` and `server`) and both main operating-system flows:
 
-```powershell
-.\scripts\start-local-dev.ps1
-```
+- PowerShell for Windows:
+  `start-local-dev.ps1`, `stop-local-dev.ps1`, `start-server-dev.ps1`, `stop-server-dev.ps1`
+- Shell for Ubuntu:
+  `start-local-dev.sh`, `stop-local-dev.sh`, `start-server-dev.sh`, `stop-server-dev.sh`
 
-To stop everything:
+All of them:
 
-```powershell
-.\scripts\stop-local-dev.ps1
-```
+- start the main stack with the base compose file plus the correct preset
+- start the API database with the base DB compose file plus the correct preset
+- start the API and front-end outside Docker
+- keep separate state for `local` and `server`
 
 ### Monitoring and persistence
 

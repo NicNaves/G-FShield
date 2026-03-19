@@ -8,10 +8,10 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $apiDir = Join-Path $repoRoot "webservice/api"
 $rootComposeFile = Join-Path $repoRoot "docker-compose.yml"
-$rootPresetComposeFile = Join-Path $repoRoot "docker-compose.local.yml"
+$rootPresetComposeFile = Join-Path $repoRoot "docker-compose.server.yml"
 $dbComposeFile = Join-Path $apiDir "docker-compose.db.yml"
-$dbPresetComposeFile = Join-Path $apiDir "docker-compose.db.local.yml"
-$stateFile = Join-Path $repoRoot ".local-dev/processes.json"
+$dbPresetComposeFile = Join-Path $apiDir "docker-compose.db.server.yml"
+$stateFile = Join-Path $repoRoot ".server-dev/processes.json"
 
 function Invoke-Compose {
   param(
@@ -45,7 +45,7 @@ if (Test-Path $stateFile) {
 }
 
 if (-not $KeepDocker) {
-  Write-Host "Parando stack principal do GF-Shield..."
+  Write-Host "Parando stack server do GF-Shield..."
   Invoke-Compose -WorkingDirectory $repoRoot -Arguments @("-f", $rootComposeFile, "-f", $rootPresetComposeFile, "down")
 
   $dbDownArgs = @("-f", $dbComposeFile, "-f", $dbPresetComposeFile, "down")
@@ -53,8 +53,8 @@ if (-not $KeepDocker) {
     $dbDownArgs += "-v"
   }
 
-  Write-Host "Parando banco local do webservice/api..."
+  Write-Host "Parando banco server do webservice/api..."
   Invoke-Compose -WorkingDirectory $repoRoot -Arguments $dbDownArgs
 }
 
-Write-Host "Ambiente encerrado."
+Write-Host "Ambiente server encerrado."

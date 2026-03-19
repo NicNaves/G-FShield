@@ -44,6 +44,7 @@ Get-ChildItem .\metrics -File | Where-Object { $_.Name -ne '.gitkeep' } | Remove
 Exemplo de topicos normalmente usados:
 
 - `INITIAL_SOLUTION_TOPIC`
+- `NEIGHBORHOOD_RESTART_TOPIC`
 - `LOCAL_SEARCH_PROGRESS_TOPIC`
 - `SOLUTIONS_TOPIC`
 - `BEST_SOLUTION_TOPIC`
@@ -71,6 +72,22 @@ docker compose down
 - stack server: `docker compose -f docker-compose.yml -f docker-compose.server.yml up -d`
 - banco API local: `docker compose -f docker-compose.db.yml -f docker-compose.db.local.yml up -d`
 - banco API server: `docker compose -f docker-compose.db.yml -f docker-compose.db.server.yml up -d`
+
+### Scripts operacionais
+
+Windows:
+
+- local start: `.\scripts\start-local-dev.ps1`
+- local stop: `.\scripts\stop-local-dev.ps1`
+- server start: `.\scripts\start-server-dev.ps1`
+- server stop: `.\scripts\stop-server-dev.ps1`
+
+Ubuntu:
+
+- local start: `bash scripts/start-local-dev.sh`
+- local stop: `bash scripts/stop-local-dev.sh`
+- server start: `bash scripts/start-server-dev.sh`
+- server stop: `bash scripts/stop-server-dev.sh`
 
 ### Resetar o banco da API
 
@@ -171,6 +188,7 @@ Get-ChildItem .\metrics -File | Where-Object { $_.Name -ne '.gitkeep' } | Remove
 Examples of commonly used topics:
 
 - `INITIAL_SOLUTION_TOPIC`
+- `NEIGHBORHOOD_RESTART_TOPIC`
 - `LOCAL_SEARCH_PROGRESS_TOPIC`
 - `SOLUTIONS_TOPIC`
 - `BEST_SOLUTION_TOPIC`
@@ -198,6 +216,22 @@ docker compose down
 - server stack: `docker compose -f docker-compose.yml -f docker-compose.server.yml up -d`
 - local API DB: `docker compose -f docker-compose.db.yml -f docker-compose.db.local.yml up -d`
 - server API DB: `docker compose -f docker-compose.db.yml -f docker-compose.db.server.yml up -d`
+
+### Operational scripts
+
+Windows:
+
+- local start: `.\scripts\start-local-dev.ps1`
+- local stop: `.\scripts\stop-local-dev.ps1`
+- server start: `.\scripts\start-server-dev.ps1`
+- server stop: `.\scripts\stop-server-dev.ps1`
+
+Ubuntu:
+
+- local start: `bash scripts/start-local-dev.sh`
+- local stop: `bash scripts/stop-local-dev.sh`
+- server start: `bash scripts/start-server-dev.sh`
+- server stop: `bash scripts/stop-server-dev.sh`
 
 ### Reset the API database
 
