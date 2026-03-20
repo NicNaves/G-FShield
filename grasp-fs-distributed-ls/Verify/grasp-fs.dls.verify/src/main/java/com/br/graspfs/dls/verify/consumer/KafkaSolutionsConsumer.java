@@ -17,7 +17,7 @@ public class KafkaSolutionsConsumer {
 
     @KafkaListener(
         topics = "SOLUTIONS_TOPIC",
-        groupId = "myGroup",
+        groupId = "${spring.kafka.consumer.group-id}",
         containerFactory = "solutionListenerContainerFactory"
     )
     public void consume(ConsumerRecord<String, DataSolution> record) {

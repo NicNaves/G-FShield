@@ -20,6 +20,7 @@ import weka.core.Instances;
 import java.io.BufferedWriter;
 import java.io.FileInputStream;
 import java.io.FileWriter;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Locale;
 
@@ -60,7 +61,8 @@ public class IwssService {
         );
 
         Instances trainingDataset = MachineLearningUtils.lerDataset(
-                new FileInputStream(datasetsBasePath + data.getTrainingFileName()));
+                Path.of(datasetsBasePath, data.getTrainingFileName()),
+                Boolean.TRUE.equals(data.getUseTrainingCache()));
         Instances testingDataset = MachineLearningUtils.lerDataset(
                 new FileInputStream(datasetsBasePath + data.getTestingFileName()));
         AbstractClassifier classifier = getClassifier(data.getClassfier());
@@ -308,6 +310,7 @@ public class IwssService {
                 .rclAlgorithm(solution.getRclAlgorithm())
                 .trainingFileName(solution.getTrainingFileName())
                 .testingFileName(solution.getTestingFileName())
+                .useTrainingCache(solution.getUseTrainingCache())
                 .neighborhood(solution.getNeighborhood())
                 .f1Score(solution.getF1Score())
                 .cpuUsage(solution.getCpuUsage())

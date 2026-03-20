@@ -108,6 +108,9 @@ const translations = {
       neighborhoodMaxIterations: "Neighborhood Max Iterations",
       classifier: "Classifier Algorithm",
       neighborhoodStrategy: "Neighborhood Strategy",
+      useTrainingCache: "Reuse cached training dataset",
+      useTrainingCacheDescription:
+        "Keeps a copy of the selected training file in memory inside the services to reduce repeated load time on later executions.",
       trainingDataset: "Training Dataset",
       testingDataset: "Testing Dataset",
       chooseSharedFile: "Choose a file from the shared folder",
@@ -143,6 +146,7 @@ const translations = {
       bitFlipIterationsSummary: "BitFlip max iterations: {{value}}",
       iwssIterationsSummary: "IWSS max iterations: {{value}}",
       iwssrIterationsSummary: "IWSSR max iterations: {{value}}",
+      trainingCacheSummary: "Training cache: {{value}}",
       classifierSummary: "Classifier: {{value}}",
       neighborhoodSummary: "Neighborhood: {{value}}",
       trainingSummary: "Training: {{value}}",
@@ -336,10 +340,11 @@ const translations = {
       allSearches: "All searches",
       executionFocus: "Execution focus",
       clearAllFilters: "Clear all filters",
-      recentImprovementsTitle: "Best Improvement Alerts",
+      recentImprovementsTitle: "Improvement Timeline",
       recentImprovementsSubtitle:
-        "Notifications appear only when a run beats its own previous best score.",
+        "Each card shows a moment when one seed beats its own previous best score, so the same seed can appear multiple times.",
       noImprovements: "No real improvement has been recorded yet.",
+      strongestJump: "Strongest jump",
       improvementToast: "{{algorithm}} improved to {{score}}% via {{search}}",
       tabOverview: "Overview",
       tabPerformance: "Performance",
@@ -350,8 +355,8 @@ const translations = {
         "Realtime monitoring overview focused on the selected execution and the latest improvements.",
       tabDescPerformance:
         "Pipeline performance indicators, from initial solutions to average CPU and memory costs.",
-      tabDescAlgorithms:
-        "Consolidated view by RCL algorithm, including resource footprint and final outcomes.",
+        tabDescAlgorithms:
+          "Consolidated view by RCL and DLS algorithms, including resource footprint and final outcomes.",
       tabDescAnalytics:
         "Analytics-focused monitoring, including topic volume and the full visible solution feed.",
       tabDescExecutions:
@@ -364,7 +369,7 @@ const translations = {
       statInitialSolutions: "Initial Solutions",
       statLocalSearchFinals: "Local Search Finals",
       statBestFinalF1: "Best Final F1-Score",
-      statBestSolutions: "Best Solutions",
+      statBestSolutions: "Best Solution Updates",
       analyticsVisibleSnapshots: "Visible Snapshots",
       analyticsLiveEvents: "Live Events",
       analyticsUniqueSeeds: "Unique Seeds",
@@ -445,15 +450,18 @@ const translations = {
       executionsLocalSearchProgressTitle: "Local Search Progress",
       executionsLocalSearchProgressSubtitle:
         "Intermediate candidate solutions published during local-search iterations.",
-      executionsBestWorkflowTitle: "Best Solutions Workflow",
+      executionsBestSolutionMomentsTitle: "Best Solution Moments",
+      executionsBestSolutionMomentsSubtitle:
+        "Every visible BEST_SOLUTION publication in chronological order, including repeated improvements from the same seed.",
+      executionsBestWorkflowTitle: "Per-Seed Final Workflow",
       executionsBestWorkflowSubtitle:
-        "Full best-solution path, including RCL, neighborhood, and local searches used.",
-      algorithmsBestSolutionsByAlgorithmTitle: "Best Solutions by Algorithm",
-      algorithmsBestSolutionsByAlgorithmSubtitle:
-        "Each row below comes directly from BEST_SOLUTION_TOPIC. Total visible best-solution updates: {{count}}",
-      algorithmsBestOutcomeTitle: "Best Outcome by Algorithm",
-      algorithmsBestOutcomeSubtitle:
-        "Consolidated table with the best visible final result per algorithm.",
+        "One consolidated row per seed, showing the strongest visible BEST_SOLUTION snapshot and the workflow that produced it.",
+        algorithmsRclSummaryTitle: "RCL Final Summary",
+        algorithmsRclSummarySubtitle:
+          "One row per RCL algorithm, aggregating the visible final seeds currently shown in the workspace. Algorithms in the summary: {{count}}",
+        algorithmsDlsSummaryTitle: "DLS Final Summary",
+        algorithmsDlsSummarySubtitle:
+          "One row per DLS algorithm, aggregating the visible final seeds currently shown in the workspace. Algorithms in the summary: {{count}}",
       topicsCount: "{{count}} topics",
       rowsCount: "{{count}} rows",
       finalsCount: "{{count}} finals",
@@ -605,6 +613,9 @@ const translations = {
       neighborhoodMaxIterations: "Maximo de iteracoes da vizinhanca",
       classifier: "Algoritmo classificador",
       neighborhoodStrategy: "Estrategia de vizinhanca",
+      useTrainingCache: "Reutilizar cache do dataset de treino",
+      useTrainingCacheDescription:
+        "Mantem uma copia do arquivo de treino em memoria dentro dos servicos para reduzir o tempo de carga em execucoes seguintes.",
       trainingDataset: "Dataset de treino",
       testingDataset: "Dataset de teste",
       chooseSharedFile: "Escolha um arquivo da pasta compartilhada",
@@ -640,6 +651,7 @@ const translations = {
       bitFlipIterationsSummary: "Maximo de iteracoes do BitFlip: {{value}}",
       iwssIterationsSummary: "Maximo de iteracoes do IWSS: {{value}}",
       iwssrIterationsSummary: "Maximo de iteracoes do IWSSR: {{value}}",
+      trainingCacheSummary: "Cache de treino: {{value}}",
       classifierSummary: "Classificador: {{value}}",
       neighborhoodSummary: "Vizinhanca: {{value}}",
       trainingSummary: "Treino: {{value}}",
@@ -833,10 +845,11 @@ const translations = {
       allSearches: "Todas as buscas",
       executionFocus: "Foco da execucao",
       clearAllFilters: "Limpar todos os filtros",
-      recentImprovementsTitle: "Alertas de melhor melhoria",
+      recentImprovementsTitle: "Timeline de melhorias",
       recentImprovementsSubtitle:
-        "As notificacoes aparecem somente quando uma execucao supera o proprio melhor valor anterior.",
+        "Cada card mostra um momento em que uma seed supera o proprio melhor valor anterior, entao a mesma seed pode aparecer varias vezes.",
       noImprovements: "Nenhuma melhoria real foi registrada ainda.",
+      strongestJump: "Maior salto",
       improvementToast: "{{algorithm}} melhorou para {{score}}% via {{search}}",
       tabOverview: "Visao geral",
       tabPerformance: "Performance",
@@ -847,8 +860,8 @@ const translations = {
         "Visao geral do monitor em tempo real, com foco na execucao selecionada e nas melhorias mais recentes.",
       tabDescPerformance:
         "Indicadores de performance do pipeline, das solucoes iniciais ate os custos medios de CPU e memoria.",
-      tabDescAlgorithms:
-        "Visao consolidada por algoritmo RCL, incluindo consumo de recursos e resultados finais.",
+        tabDescAlgorithms:
+          "Visao consolidada por algoritmos RCL e DLS, incluindo consumo de recursos e resultados finais.",
       tabDescAnalytics:
         "Monitoramento orientado a analise, incluindo volume por topico e o feed visivel completo de solucoes.",
       tabDescExecutions:
@@ -861,7 +874,7 @@ const translations = {
       statInitialSolutions: "Solucoes iniciais",
       statLocalSearchFinals: "Finais da busca local",
       statBestFinalF1: "Melhor F1 final",
-      statBestSolutions: "Melhores solucoes",
+      statBestSolutions: "Atualizacoes de best solution",
       analyticsVisibleSnapshots: "Snapshots visiveis",
       analyticsLiveEvents: "Eventos ao vivo",
       analyticsUniqueSeeds: "Seeds unicas",
@@ -943,15 +956,18 @@ const translations = {
       executionsLocalSearchProgressTitle: "Progresso da busca local",
       executionsLocalSearchProgressSubtitle:
         "Solucoes candidatas intermediarias publicadas durante as iteracoes da busca local.",
-      executionsBestWorkflowTitle: "Fluxo das melhores solucoes",
+      executionsBestSolutionMomentsTitle: "Momentos de best solution",
+      executionsBestSolutionMomentsSubtitle:
+        "Cada publicacao visivel de BEST_SOLUTION em ordem cronologica, incluindo melhorias repetidas da mesma seed.",
+      executionsBestWorkflowTitle: "Fluxo final por seed",
       executionsBestWorkflowSubtitle:
-        "Caminho completo da melhor solucao, incluindo RCL, vizinhanca e buscas locais usadas.",
-      algorithmsBestSolutionsByAlgorithmTitle: "Melhores solucoes por algoritmo",
-      algorithmsBestSolutionsByAlgorithmSubtitle:
-        "Cada linha abaixo vem diretamente de BEST_SOLUTION_TOPIC. Total de atualizacoes visiveis da best solution: {{count}}",
-      algorithmsBestOutcomeTitle: "Melhor resultado por algoritmo",
-      algorithmsBestOutcomeSubtitle:
-        "Tabela consolidada com o melhor resultado final visivel por algoritmo.",
+        "Uma linha consolidada por seed, mostrando o snapshot visivel mais forte de BEST_SOLUTION e o fluxo que levou ate ele.",
+        algorithmsRclSummaryTitle: "Resumo final por algoritmo RCL",
+        algorithmsRclSummarySubtitle:
+          "Uma linha por algoritmo RCL, agregando as seeds finais visiveis no recorte atual. Algoritmos no resumo: {{count}}",
+        algorithmsDlsSummaryTitle: "Resumo final por algoritmo DLS",
+        algorithmsDlsSummarySubtitle:
+          "Uma linha por algoritmo DLS, agregando as seeds finais visiveis no recorte atual. Algoritmos no resumo: {{count}}",
       topicsCount: "{{count}} topicos",
       rowsCount: "{{count}} linhas",
       finalsCount: "{{count}} finais",

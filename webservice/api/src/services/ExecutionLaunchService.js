@@ -117,17 +117,23 @@ class ExecutionLaunchService {
     return false;
   }
 
+  isCompletedSnapshot(snapshot = {}) {
+    return String(snapshot.status || "").trim().toUpperCase() === "COMPLETED";
+  }
+
   isSeedStillProcessingEvent(event) {
     if (!event) {
       return false;
     }
+
+    const snapshot = this.extractSnapshotFromEventPayload(event.payload);
 
     if (event.topic === "INITIAL_SOLUTION_TOPIC" || event.topic === "NEIGHBORHOOD_RESTART_TOPIC") {
       return true;
     }
 
     if (event.topic === "LOCAL_SEARCH_PROGRESS_TOPIC") {
-      return true;
+      return !this.isCompletedSnapshot(snapshot);
     }
 
     if (event.topic === "SOLUTIONS_TOPIC") {

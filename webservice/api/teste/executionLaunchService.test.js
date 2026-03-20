@@ -82,4 +82,32 @@ describe("ExecutionLaunchService", () => {
       terminalEventAt: null,
     });
   });
+
+  test("keeps a seed completed when a completed progress snapshot arrives after the terminal solution", () => {
+    const lifecycle = executionLaunchService.summarizeSeedLifecycle([
+      buildEvent("seed-4", "SOLUTIONS_TOPIC", "2026-03-19T10:00:00.000Z", {
+        neighborhood: "VND",
+        iterationNeighborhood: 3,
+        neighborhoodMaxIterations: 1,
+        enabledLocalSearches: ["BIT_FLIP", "IWSS", "IWSSR"],
+        status: "completed",
+      }),
+      buildEvent("seed-4", "LOCAL_SEARCH_PROGRESS_TOPIC", "2026-03-19T10:00:01.000Z", {
+        neighborhood: "VND",
+        iterationNeighborhood: 3,
+        localSearch: "BIT_FLIP",
+        status: "completed",
+      }),
+      buildEvent("seed-4", "BEST_SOLUTION_TOPIC", "2026-03-19T10:00:02.000Z", {
+        neighborhood: "VND",
+        iterationNeighborhood: 3,
+        status: "completed",
+      }),
+    ]);
+
+    expect(lifecycle).toEqual({
+      completed: true,
+      terminalEventAt: "2026-03-19T10:00:00.000Z",
+    });
+  });
 });

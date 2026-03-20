@@ -103,7 +103,8 @@ public class BitFlipService {
         int configuredMaxIterations = resolveMaxIterations(solution);
 
         Instances trainingDataset = MachineLearningUtils.lerDataset(
-                new FileInputStream("/datasets/" + solution.getTrainingFileName()));
+                Path.of("/datasets/", solution.getTrainingFileName()),
+                Boolean.TRUE.equals(solution.getUseTrainingCache()));
         Instances testingDataset = MachineLearningUtils.lerDataset(
                 new FileInputStream("/datasets/" + solution.getTestingFileName()));
 
@@ -292,6 +293,7 @@ public class BitFlipService {
                 .rclAlgorithm(s.getRclAlgorithm())
                 .trainingFileName(s.getTrainingFileName())
                 .testingFileName(s.getTestingFileName())
+                .useTrainingCache(s.getUseTrainingCache())
                 .localSearch(s.getLocalSearch())
                 .f1Score(s.getF1Score())
                 .cpuUsage(s.getCpuUsage())

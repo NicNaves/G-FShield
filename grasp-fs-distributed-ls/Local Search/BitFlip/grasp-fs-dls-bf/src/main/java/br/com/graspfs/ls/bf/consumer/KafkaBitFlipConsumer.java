@@ -17,7 +17,7 @@ public class KafkaBitFlipConsumer {
 
     private final BitFlipService bitFlipService;
 
-    @KafkaListener(topics = TOPIC, groupId = "myGroup", containerFactory = "jsonKafkaListenerContainer")
+    @KafkaListener(topics = TOPIC, groupId = "${spring.kafka.consumer.group-id}", containerFactory = "jsonKafkaListenerContainer")
     public void consume(DataSolution record) {
         log.info(
                 "dls message received search={} topic={} seedId={} iteration={} neighborhoodIteration={} status={}",

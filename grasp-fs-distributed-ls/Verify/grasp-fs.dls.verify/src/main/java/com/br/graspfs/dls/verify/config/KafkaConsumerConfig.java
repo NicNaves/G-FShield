@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 
 import java.util.HashMap;
@@ -20,7 +21,7 @@ public class KafkaConsumerConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapserver;
 
-    @Value("${spring.kafka.consumer.group-id:myGroup}")
+    @Value("${spring.kafka.consumer.group-id:grasp-fs-dls-verify-group}")
     private String consumerGroupId;
 
     @Value("${spring.kafka.consumer.auto-offset-reset:earliest}")
@@ -52,6 +53,7 @@ public class KafkaConsumerConfig {
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(dataSolutionConsumerFactory());
         factory.setConcurrency(listenerConcurrency);
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
         factory.getContainerProperties().setMissingTopicsFatal(false);
         return factory;
     }
@@ -62,6 +64,7 @@ public class KafkaConsumerConfig {
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(dataSolutionConsumerFactory());
         factory.setConcurrency(listenerConcurrency);
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
         factory.getContainerProperties().setMissingTopicsFatal(false);
         return factory;
     }

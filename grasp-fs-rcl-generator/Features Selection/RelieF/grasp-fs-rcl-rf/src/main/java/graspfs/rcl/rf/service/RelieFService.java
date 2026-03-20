@@ -124,6 +124,7 @@ public class RelieFService {
                 .iterationLocalSearch(rcl.getIterationLocalSearch())
                 .trainingFileName(rcl.getTrainingFileName())
                 .testingFileName(rcl.getTestingFileName())
+                .useTrainingCache(rcl.getUseTrainingCache())
                 .build();
 
         Random random = new Random();

@@ -58,6 +58,7 @@ export const defaultExecutionForm = {
   algorithms: algorithmCatalog.map((algorithm) => algorithm.key),
   neighborhoodStrategy: "VND",
   localSearches: localSearchCatalog.map((search) => search.key),
+  useTrainingCache: false,
   maxGenerations: 10,
   rclCutoff: 20,
   sampleSize: 5,

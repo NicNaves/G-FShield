@@ -202,6 +202,7 @@ function Settings() {
   );
 
   const handleChange = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
+  const handleBooleanChange = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.checked }));
   const toggleListValue = (field, value) => setForm((current) => ({
     ...current,
     [field]: current[field].includes(value)
@@ -340,6 +341,19 @@ function Settings() {
                     <TextField sx={fieldSx(darkMode)} select SelectProps={{ MenuProps: selectMenuProps(darkMode) }} fullWidth label={t("settings.neighborhoodStrategy")} value={form.neighborhoodStrategy} onChange={handleChange("neighborhoodStrategy")}>
                       {neighborhoodOptions.map((option) => <MenuItem key={option.key} value={option.key}>{option.label}</MenuItem>)}
                     </TextField>
+                    <Card variant="outlined" sx={{ ...cardSx(darkMode), p: 1.5 }}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={form.useTrainingCache}
+                            onChange={handleBooleanChange("useTrainingCache")}
+                            sx={{ color: darkMode ? "rgba(226,232,240,0.84)" : undefined }}
+                          />
+                        }
+                        label={t("settings.useTrainingCache")}
+                      />
+                      <MDTypography variant="caption">{t("settings.useTrainingCacheDescription")}</MDTypography>
+                    </Card>
                   </Stack>
                 </SettingsSection>
               </Grid>
@@ -438,6 +452,7 @@ function Settings() {
                       <MDTypography variant="caption" display="block">{t("settings.bitFlipIterationsSummary", { value: form.bitFlipMaxIterations })}</MDTypography>
                       <MDTypography variant="caption" display="block">{t("settings.iwssIterationsSummary", { value: form.iwssMaxIterations })}</MDTypography>
                       <MDTypography variant="caption" display="block">{t("settings.iwssrIterationsSummary", { value: form.iwssrMaxIterations })}</MDTypography>
+                      <MDTypography variant="caption" display="block">{t("settings.trainingCacheSummary", { value: form.useTrainingCache ? t("common.yes") : t("common.no") })}</MDTypography>
                       <MDTypography variant="caption" display="block">{t("settings.trainingSummary", { value: form.datasetTrainingName || "--" })}</MDTypography>
                       <MDTypography variant="caption" display="block">{t("settings.testingSummary", { value: form.datasetTestingName || "--" })}</MDTypography>
                     </MDBox>

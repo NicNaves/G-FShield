@@ -8,6 +8,26 @@ const ALLOWED_NEIGHBORHOODS = new Set(["VND", "RVND"]);
 const ALLOWED_LOCAL_SEARCHES = new Set(DEFAULT_LOCAL_SEARCHES);
 
 class GraspGatewayService {
+  normalizeBoolean(value) {
+    if (typeof value === "boolean") {
+      return value;
+    }
+
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+
+      if (["true", "1", "yes", "on"].includes(normalized)) {
+        return true;
+      }
+
+      if (["false", "0", "no", "off"].includes(normalized)) {
+        return false;
+      }
+    }
+
+    return null;
+  }
+
   normalizeAlgorithms(algorithms) {
     if (!algorithms) {
       return DEFAULT_ALGORITHMS;
@@ -45,6 +65,7 @@ class GraspGatewayService {
   buildParams(payload) {
     const neighborhoodStrategy = this.normalizeNeighborhoodStrategy(payload.neighborhoodStrategy);
     const localSearches = this.normalizeLocalSearches(payload.localSearches);
+    const useTrainingCache = this.normalizeBoolean(payload.useTrainingCache);
     const optionalIntegerParams = [
       "neighborhoodMaxIterations",
       "bitFlipMaxIterations",
@@ -59,6 +80,7 @@ class GraspGatewayService {
       datasetTrainingName: payload.datasetTrainingName,
       datasetTestingName: payload.datasetTestingName,
       classifier: payload.classifier || "J48",
+      ...(useTrainingCache !== null ? { useTrainingCache } : {}),
       ...(neighborhoodStrategy ? { neighborhoodStrategy } : {}),
       ...(localSearches.length > 0 ? { localSearches: localSearches.join(",") } : {}),
     };
@@ -94,6 +116,10 @@ class GraspGatewayService {
 
     if (payload.localSearches && this.normalizeLocalSearches(payload.localSearches).length === 0) {
       throw new Error("Nenhuma busca local valida foi informada. Use BIT_FLIP, IWSS ou IWSSR.");
+    }
+
+    if (payload.useTrainingCache !== undefined && this.normalizeBoolean(payload.useTrainingCache) === null) {
+      throw new Error("Parametro invalido para useTrainingCache. Use true ou false.");
     }
 
     [

@@ -828,6 +828,14 @@ function Dashboard() {
     [monitorSnapshots]
   );
 
+  const bestSolutionSnapshotEvents = useMemo(
+    () =>
+      monitorSnapshots
+        .filter((event) => event.topic === "BEST_SOLUTION_TOPIC" && event.seedId)
+        .sort((left, right) => getSortableDateValue(right.timestamp) - getSortableDateValue(left.timestamp)),
+    [monitorSnapshots]
+  );
+
   const rawTopicMetrics = useMemo(() => {
     const grouped = new Map();
 
@@ -1050,6 +1058,120 @@ function Dashboard() {
     );
   }, [bestSolutionRuns]);
 
+  const finalRunsByRclAlgorithm = useMemo(() => {
+    const initialSeedCountByAlgorithm = initialSolutionEvents.reduce((counts, event) => {
+      const algorithm = event.rclAlgorithm || "Unknown";
+      counts.set(algorithm, (counts.get(algorithm) || 0) + 1);
+      return counts;
+    }, new Map());
+
+    const groups = new Map();
+
+    bestSolutionRuns.forEach((run) => {
+      const algorithm = run.rclAlgorithm || "Unknown";
+      const initialEvent = initialEventBySeed.get(run.seedId);
+      const finalScore = getFiniteMetric(run.bestF1Score);
+      const initialScore = getFiniteMetric(initialEvent?.bestF1Score ?? initialEvent?.currentF1Score);
+      const gain = Number.isFinite(finalScore) && Number.isFinite(initialScore)
+        ? finalScore - initialScore
+        : null;
+      const searchLabel = run.localSearch || run.neighborhood || "--";
+      const datasetLabel = `${run.trainingFileName || "--"} -> ${run.testingFileName || "--"}`;
+      const current = groups.get(algorithm) || {
+        algorithm,
+        initialSeedCount: initialSeedCountByAlgorithm.get(algorithm) || 0,
+        finalSeedCount: 0,
+        bestRun: null,
+        finalScores: [],
+        gains: [],
+        searches: new Set(),
+        datasets: new Set(),
+      };
+
+      current.finalSeedCount += 1;
+      current.bestRun = current.bestRun ? pickPreferredRun(current.bestRun, run) : run;
+      if (Number.isFinite(finalScore)) {
+        current.finalScores.push(finalScore);
+      }
+      if (Number.isFinite(gain)) {
+        current.gains.push(gain);
+      }
+      current.searches.add(searchLabel);
+      current.datasets.add(datasetLabel);
+      groups.set(algorithm, current);
+    });
+
+    return [...groups.values()]
+      .map((entry) => ({
+        algorithm: entry.algorithm,
+        initialSeedCount: entry.initialSeedCount,
+        finalSeedCount: entry.finalSeedCount,
+        bestRun: entry.bestRun,
+        avgFinalF1Score: averageMetric(entry.finalScores),
+        avgGain: averageMetric(entry.gains),
+        searches: [...entry.searches].sort(),
+        datasets: [...entry.datasets].sort(),
+      }))
+      .sort(
+        (left, right) =>
+          getNumericScore(right.bestRun?.bestF1Score, Number.NEGATIVE_INFINITY)
+          - getNumericScore(left.bestRun?.bestF1Score, Number.NEGATIVE_INFINITY)
+      );
+  }, [bestSolutionRuns, initialEventBySeed, initialSolutionEvents]);
+
+  const finalRunsByDlsAlgorithm = useMemo(() => {
+    const groups = new Map();
+
+    bestSolutionRuns.forEach((run) => {
+      const algorithm = run.localSearch || run.neighborhood || "Unknown";
+      const initialEvent = initialEventBySeed.get(run.seedId);
+      const finalScore = getFiniteMetric(run.bestF1Score);
+      const initialScore = getFiniteMetric(initialEvent?.bestF1Score ?? initialEvent?.currentF1Score);
+      const gain = Number.isFinite(finalScore) && Number.isFinite(initialScore)
+        ? finalScore - initialScore
+        : null;
+      const rclAlgorithm = run.rclAlgorithm || "Unknown";
+      const datasetLabel = `${run.trainingFileName || "--"} -> ${run.testingFileName || "--"}`;
+      const current = groups.get(algorithm) || {
+        algorithm,
+        finalSeedCount: 0,
+        bestRun: null,
+        finalScores: [],
+        gains: [],
+        rclAlgorithms: new Set(),
+        datasets: new Set(),
+      };
+
+      current.finalSeedCount += 1;
+      current.bestRun = current.bestRun ? pickPreferredRun(current.bestRun, run) : run;
+      if (Number.isFinite(finalScore)) {
+        current.finalScores.push(finalScore);
+      }
+      if (Number.isFinite(gain)) {
+        current.gains.push(gain);
+      }
+      current.rclAlgorithms.add(rclAlgorithm);
+      current.datasets.add(datasetLabel);
+      groups.set(algorithm, current);
+    });
+
+    return [...groups.values()]
+      .map((entry) => ({
+        algorithm: entry.algorithm,
+        finalSeedCount: entry.finalSeedCount,
+        bestRun: entry.bestRun,
+        avgFinalF1Score: averageMetric(entry.finalScores),
+        avgGain: averageMetric(entry.gains),
+        rclAlgorithms: [...entry.rclAlgorithms].sort(),
+        datasets: [...entry.datasets].sort(),
+      }))
+      .sort(
+        (left, right) =>
+          getNumericScore(right.bestRun?.bestF1Score, Number.NEGATIVE_INFINITY)
+          - getNumericScore(left.bestRun?.bestF1Score, Number.NEGATIVE_INFINITY)
+      );
+  }, [bestSolutionRuns, initialEventBySeed]);
+
   const finalizedRuns = useMemo(
     () => bestSolutionRuns,
     [bestSolutionRuns]
@@ -1136,6 +1258,7 @@ function Dashboard() {
       localSearchOutcomes: localSearchOutcomeEvents.length,
       progressSnapshots: localSearchProgressEvents.length,
       bestSolutions: bestSolutionRuns.length,
+      bestSolutionSnapshots: monitorSnapshots.filter((event) => event.topic === "BEST_SOLUTION_TOPIC").length,
       bestRun,
       datasetPairs: datasetPairs.size,
       algorithms: new Set(filteredRuns.map((run) => run.rclAlgorithm).filter(Boolean)).size,
@@ -1145,6 +1268,7 @@ function Dashboard() {
     initialSolutionEvents.length,
     localSearchOutcomeEvents.length,
     localSearchProgressEvents.length,
+    monitorSnapshots,
     bestSolutionRuns.length,
   ]);
 
@@ -1793,104 +1917,6 @@ function Dashboard() {
     []
   );
 
-  const finalSolutionsTableData = useMemo(
-    () => ({
-      columns: [
-        { Header: "Time", accessor: "timestamp", align: "left" },
-        { Header: "Algorithm", accessor: "algorithm", align: "left" },
-        { Header: "Best Solution", accessor: "solution", align: "left" },
-        { Header: "Best F1-Score", accessor: "bestF1Score", align: "left" },
-        { Header: "Stage / Search", accessor: "stage", align: "left" },
-        { Header: "Dataset", accessor: "dataset", align: "left" },
-        { Header: "Seed", accessor: "seed", align: "left" },
-        { Header: "Details", accessor: "details", align: "left" },
-      ],
-      rows: bestSolutionRuns.map((run) => {
-        return {
-          timestamp: (
-            <MDBox>
-              <MDTypography variant="button" fontWeight="medium" color="dark">
-                {formatShortTime(run.updatedAt)}
-              </MDTypography>
-              <MDTypography variant="caption" color="text">
-                {formatRelativeTime(run.updatedAt)}
-              </MDTypography>
-            </MDBox>
-          ),
-          algorithm: (
-            <MDBox>
-              <MDTypography variant="button" fontWeight="medium" color="dark">
-                {run.rclAlgorithm || "Unknown"}
-              </MDTypography>
-            </MDBox>
-          ),
-          solution: (
-            <MDBox>
-              <MDTypography variant="button" fontWeight="medium" color="dark">
-                {formatFeatureSubset(run.solutionFeatures, 10)}
-              </MDTypography>
-              <MDTypography variant="caption" color="text">
-                {formatDateTime(run.updatedAt)}
-              </MDTypography>
-            </MDBox>
-          ),
-          bestF1Score: (
-            <Chip
-              label={formatCompactPercent(run.bestF1Score)}
-              color="success"
-              size="small"
-              variant="outlined"
-            />
-          ),
-          stage: (
-            <MDBox>
-              <MDTypography variant="button" fontWeight="medium" color="dark">
-                {getStageLabel(run.stage)}
-              </MDTypography>
-              <MDTypography variant="caption" color="text">
-                {run.localSearch || run.neighborhood || "--"}
-              </MDTypography>
-            </MDBox>
-          ),
-          dataset: (
-            <MDBox>
-              <MDTypography variant="button" fontWeight="medium" color="dark">
-                {run.trainingFileName || "--"}
-              </MDTypography>
-              <MDTypography variant="caption" color="text">
-                {run.testingFileName || "--"}
-              </MDTypography>
-            </MDBox>
-          ),
-          seed: (
-            <MDTypography
-              component={Link}
-              to={`/dashboard/runs/${run.seedId}`}
-              variant="button"
-              fontWeight="medium"
-              color="info"
-              sx={{ textDecoration: "none" }}
-            >
-              {shortenSeed(run.seedId)}
-            </MDTypography>
-          ),
-          details: (
-            <MDButton
-              component={Link}
-              to={`/dashboard/runs/${run.seedId}`}
-              variant="outlined"
-              color="info"
-              size="small"
-            >
-              View
-            </MDButton>
-          ),
-        };
-      }),
-    }),
-    [bestSolutionRuns]
-  );
-
   const initialSolutionsTableData = useMemo(
     () => ({
       columns: [
@@ -2238,26 +2264,90 @@ function Dashboard() {
     [bestSolutionRuns, initialEventBySeed]
   );
 
-  const algorithmSummaryTableData = useMemo(
+  const bestSolutionMomentsTableData = useMemo(
+    () => ({
+      columns: [
+        { Header: "Time", accessor: "timestamp", align: "left" },
+        { Header: "RCL", accessor: "algorithm", align: "left" },
+        { Header: "Best Solution", accessor: "solution", align: "left" },
+        { Header: "Best F1", accessor: "bestF1", align: "left" },
+        { Header: "Search / Neighborhood", accessor: "search", align: "left" },
+        { Header: "Delta vs previous", accessor: "delta", align: "left" },
+        { Header: "Seed", accessor: "seed", align: "left" },
+        { Header: "Dataset", accessor: "dataset", align: "left" },
+      ],
+      rows: bestSolutionSnapshotEvents.map((event) => ({
+        timestamp: (
+          <MDBox>
+            <MDTypography variant="button" fontWeight="medium" color="dark">
+              {formatShortTime(event.timestamp)}
+            </MDTypography>
+            <MDTypography variant="caption" color="text">
+              {formatRelativeTime(event.timestamp)}
+            </MDTypography>
+          </MDBox>
+        ),
+        algorithm: event.rclAlgorithm || "--",
+        solution: (
+          <MDBox>
+            <MDTypography variant="button" fontWeight="medium" color="dark">
+              {formatFeatureSubset(event.solutionFeatures, 10)}
+            </MDTypography>
+            <MDTypography variant="caption" color="text">
+              {formatDateTime(event.timestamp)}
+            </MDTypography>
+          </MDBox>
+        ),
+        bestF1: (
+          <Chip
+            label={formatCompactPercent(event.bestF1Score ?? event.currentF1Score)}
+            color="success"
+            size="small"
+            variant="outlined"
+          />
+        ),
+        search: `${event.localSearch || "--"} / ${event.neighborhood || "--"}`,
+        delta: formatScoreDelta(
+          event.bestF1Score ?? event.currentF1Score,
+          event.previousBestF1Score
+        ),
+        seed: (
+          <MDTypography
+            component={Link}
+            to={`/dashboard/runs/${event.seedId}`}
+            variant="button"
+            fontWeight="medium"
+            color="info"
+            sx={{ textDecoration: "none" }}
+          >
+            {shortenSeed(event.seedId)}
+          </MDTypography>
+        ),
+        dataset: `${event.trainingFileName || "--"} -> ${event.testingFileName || "--"}`,
+      })),
+    }),
+    [bestSolutionSnapshotEvents]
+  );
+
+  const rclAlgorithmSummaryTableData = useMemo(
     () => ({
       columns: [
         { Header: "Algorithm", accessor: "algorithm", align: "left" },
         { Header: "Initial Seeds", accessor: "initialSeeds", align: "left" },
-        { Header: "Final Search", accessor: "search", align: "left" },
+        { Header: "Visible Final Seeds", accessor: "finalSeeds", align: "left" },
+        { Header: "Final Searches", accessor: "search", align: "left" },
         { Header: "Best Run", accessor: "bestRun", align: "left" },
         { Header: "Best F1-Score", accessor: "bestF1Score", align: "left" },
-        { Header: "Gain vs initial", accessor: "gain", align: "left" },
-        { Header: "Solutions", accessor: "solutions", align: "left" },
-        { Header: "Dataset", accessor: "dataset", align: "left" },
+        { Header: "Avg Final F1", accessor: "avgF1Score", align: "left" },
+        { Header: "Avg Gain vs initial", accessor: "gain", align: "left" },
+        { Header: "Datasets", accessor: "dataset", align: "left" },
       ],
-      rows: finalRunsByAlgorithm.map((entry) => {
-        const initialSeedCount = initialSolutionEvents.filter((event) => event.rclAlgorithm === entry.algorithm).length;
-        const linkedInitial = initialEventBySeed.get(entry.bestRun?.seedId);
-
+      rows: finalRunsByRclAlgorithm.map((entry) => {
         return {
           algorithm: entry.algorithm,
-          initialSeeds: initialSeedCount,
-          search: entry.bestRun?.localSearch || entry.bestRun?.neighborhood || "--",
+          initialSeeds: entry.initialSeedCount,
+          finalSeeds: entry.finalSeedCount,
+          search: entry.searches.join(", ") || "--",
           bestRun: (
             <MDBox>
               <MDTypography variant="button" fontWeight="medium" color="dark">
@@ -2276,20 +2366,55 @@ function Dashboard() {
               variant="outlined"
             />
           ),
-          gain: formatScoreDelta(
-            entry.bestRun?.bestF1Score,
-            linkedInitial?.bestF1Score ?? linkedInitial?.currentF1Score
-          ),
-          solutions: (
-            <MDTypography variant="button" fontWeight="medium" color="dark">
-              {entry.runCount}
-            </MDTypography>
-          ),
-          dataset: `${entry.bestRun?.trainingFileName || "--"} -> ${entry.bestRun?.testingFileName || "--"}`,
+          avgF1Score: formatCompactPercent(entry.avgFinalF1Score),
+          gain: formatMetric(entry.avgGain, " pp"),
+          dataset: entry.datasets.join(", ") || "--",
         };
       }),
     }),
-    [finalRunsByAlgorithm, initialEventBySeed, initialSolutionEvents]
+    [finalRunsByRclAlgorithm]
+  );
+
+  const dlsAlgorithmSummaryTableData = useMemo(
+    () => ({
+      columns: [
+        { Header: "DLS Algorithm", accessor: "algorithm", align: "left" },
+        { Header: "Visible Final Seeds", accessor: "finalSeeds", align: "left" },
+        { Header: "Best Run", accessor: "bestRun", align: "left" },
+        { Header: "Best F1-Score", accessor: "bestF1Score", align: "left" },
+        { Header: "Avg Final F1", accessor: "avgF1Score", align: "left" },
+        { Header: "Avg Gain vs initial", accessor: "gain", align: "left" },
+        { Header: "RCL Algorithms", accessor: "rclAlgorithms", align: "left" },
+        { Header: "Datasets", accessor: "dataset", align: "left" },
+      ],
+      rows: finalRunsByDlsAlgorithm.map((entry) => ({
+        algorithm: entry.algorithm,
+        finalSeeds: entry.finalSeedCount,
+        bestRun: (
+          <MDBox>
+            <MDTypography variant="button" fontWeight="medium" color="dark">
+              {formatFeatureSubset(entry.bestRun?.solutionFeatures, 10)}
+            </MDTypography>
+            <MDTypography variant="caption" color="text">
+              {`${entry.bestRun?.rclAlgorithm || "--"} / ${shortenSeed(entry.bestRun?.seedId)}`}
+            </MDTypography>
+          </MDBox>
+        ),
+        bestF1Score: (
+          <Chip
+            label={formatCompactPercent(entry.bestRun?.bestF1Score)}
+            color="success"
+            size="small"
+            variant="outlined"
+          />
+        ),
+        avgF1Score: formatCompactPercent(entry.avgFinalF1Score),
+        gain: formatMetric(entry.avgGain, " pp"),
+        rclAlgorithms: entry.rclAlgorithms.join(", ") || "--",
+        dataset: entry.datasets.join(", ") || "--",
+      })),
+    }),
+    [finalRunsByDlsAlgorithm]
   );
 
   return (
@@ -2322,7 +2447,7 @@ function Dashboard() {
               color="warning"
               icon="emoji_events"
               title={t("dashboard.statBestSolutions")}
-              count={overview.bestSolutions}
+              count={overview.bestSolutionSnapshots}
             />
           </Grid>
         </Grid>
@@ -2937,10 +3062,10 @@ function Dashboard() {
                       >
                         <MDBox>
                           <MDTypography variant="h6" color="dark">
-                            Best Improvement Alerts
+                            {t("dashboard.recentImprovementsTitle")}
                           </MDTypography>
                           <MDTypography variant="button" color="text">
-                            Shows only the moments when a seed beats its previous best value.
+                            {t("dashboard.recentImprovementsSubtitle")}
                           </MDTypography>
                         </MDBox>
 
@@ -2953,7 +3078,7 @@ function Dashboard() {
                           />
                           {improvementSummary.strongest ? (
                             <Chip
-                              label={`Top jump ${formatScoreDelta(
+                              label={`${t("dashboard.strongestJump")} ${formatScoreDelta(
                                 improvementSummary.strongest.bestF1Score ?? improvementSummary.strongest.currentF1Score,
                                 improvementSummary.strongest.previousBestScore
                               )}`}
@@ -3057,7 +3182,7 @@ function Dashboard() {
                           }}
                         >
                           <MDTypography variant="button" color="text">
-                            No real improvement has been recorded yet.
+                            {t("dashboard.noImprovements")}
                           </MDTypography>
                         </MDBox>
                       ) : (
@@ -3575,6 +3700,38 @@ function Dashboard() {
             </Grid>
 
             <Grid item xs={12}>
+              <Card sx={{ height: "100%" }}>
+                <MDBox
+                  p={3}
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems={{ xs: "flex-start", md: "center" }}
+                  flexDirection={{ xs: "column", md: "row" }}
+                  gap={1.5}
+                >
+                  <MDBox>
+                    <MDTypography variant="h6" color="dark">
+                      {t("dashboard.executionsBestSolutionMomentsTitle")}
+                    </MDTypography>
+                    <MDTypography variant="button" color="text">
+                      {t("dashboard.executionsBestSolutionMomentsSubtitle")}
+                    </MDTypography>
+                  </MDBox>
+                  <Chip label={t("dashboard.rowsCount", { count: bestSolutionSnapshotEvents.length })} color="warning" size="small" variant="outlined" />
+                </MDBox>
+                <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 1120 } }}>
+                  <DataTable
+                    table={bestSolutionMomentsTableData}
+                    entriesPerPage={{ defaultValue: 8, entries: [8, 12, 20] }}
+                    canSearch
+                    showTotalEntries
+                    noEndBorder
+                  />
+                </MDBox>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12}>
               <Card>
                 <MDBox
                   p={3}
@@ -3624,20 +3781,20 @@ function Dashboard() {
                 >
                   <MDBox>
                     <MDTypography variant="h6" color="dark">
-                      {t("dashboard.algorithmsBestSolutionsByAlgorithmTitle")}
+                      {t("dashboard.algorithmsRclSummaryTitle")}
                     </MDTypography>
                     <MDTypography variant="button" color="text">
-                      {t("dashboard.algorithmsBestSolutionsByAlgorithmSubtitle", { count: bestSolutionRuns.length })}
+                      {t("dashboard.algorithmsRclSummarySubtitle", { count: finalRunsByRclAlgorithm.length })}
                     </MDTypography>
                   </MDBox>
-                  <Chip label={t("dashboard.finalsCount", { count: bestSolutionRuns.length })} color="warning" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.algorithmsCount", { count: finalRunsByRclAlgorithm.length })} color="warning" size="small" variant="outlined" />
                 </MDBox>
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 1120 } }}>
                   <DataTable
-                    table={finalSolutionsTableData}
-                    entriesPerPage={{ defaultValue: 10, entries: [10, 15, 20] }}
+                    table={rclAlgorithmSummaryTableData}
+                    entriesPerPage={false}
                     canSearch
-                    showTotalEntries
+                    showTotalEntries={false}
                     noEndBorder
                   />
                 </MDBox>
@@ -3656,17 +3813,17 @@ function Dashboard() {
                 >
                   <MDBox>
                     <MDTypography variant="h6" color="dark">
-                      {t("dashboard.algorithmsBestOutcomeTitle")}
+                      {t("dashboard.algorithmsDlsSummaryTitle")}
                     </MDTypography>
                     <MDTypography variant="button" color="text">
-                      {t("dashboard.algorithmsBestOutcomeSubtitle")}
+                      {t("dashboard.algorithmsDlsSummarySubtitle", { count: finalRunsByDlsAlgorithm.length })}
                     </MDTypography>
                   </MDBox>
-                  <Chip label={t("dashboard.algorithmsCount", { count: finalRunsByAlgorithm.length })} color="secondary" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.algorithmsCount", { count: finalRunsByDlsAlgorithm.length })} color="secondary" size="small" variant="outlined" />
                 </MDBox>
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 980 } }}>
                   <DataTable
-                    table={algorithmSummaryTableData}
+                    table={dlsAlgorithmSummaryTableData}
                     entriesPerPage={false}
                     canSearch
                     showTotalEntries={false}

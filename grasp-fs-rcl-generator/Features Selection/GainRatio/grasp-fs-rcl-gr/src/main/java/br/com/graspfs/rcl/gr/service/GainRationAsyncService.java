@@ -42,6 +42,7 @@ public class GainRationAsyncService {
             String trainingFileName,
             String testingFileName,
             String classifierName,
+            boolean useTrainingCache,
             String neighborhoodStrategy,
             String localSearches,
             Integer neighborhoodMaxIterations,
@@ -57,8 +58,8 @@ public class GainRationAsyncService {
         try {
             logger.info("rcl async start algorithm={} requestId={}", ALGORITHM_NAME, requestId);
 
-            Instances trainingDataset = loadDataset(trainingFileName, "training", requestId);
-            Instances testingDataset = loadDataset(testingFileName, "testing", requestId);
+            Instances trainingDataset = loadDataset(trainingFileName, "training", requestId, useTrainingCache);
+            Instances testingDataset = loadDataset(testingFileName, "testing", requestId, false);
 
             AbstractClassifier classifier = resolveClassifier(classifierName);
             logger.info(
@@ -73,7 +74,7 @@ public class GainRationAsyncService {
                     trainingDataset, rclCutoff, classifier, trainingFileName, testingFileName
             );
             configureNeighborhood(dataSolution, neighborhoodStrategy, localSearches,
-                    neighborhoodMaxIterations, bitFlipMaxIterations, iwssMaxIterations, iwssrMaxIterations);
+                    neighborhoodMaxIterations, bitFlipMaxIterations, iwssMaxIterations, iwssrMaxIterations, useTrainingCache);
             logger.info(
                     "rcl seed template ready algorithm={} requestId={} featureCount={} neighborhood={} enabledSearches={}",
                     ALGORITHM_NAME,
@@ -133,18 +134,33 @@ public class GainRationAsyncService {
         }
     }
 
-    private Instances loadDataset(String fileName, String datasetType, String requestId) throws IOException {
+    private Instances loadDataset(String fileName, String datasetType, String requestId, boolean useTrainingCache) throws IOException {
         File datasetFile = new File(DATASET_BASE_PATH + fileName);
         logger.info(
-                "rcl dataset loading algorithm={} requestId={} datasetType={} path={} sizeBytes={}",
+                "rcl dataset loading algorithm={} requestId={} datasetType={} path={} sizeBytes={} useTrainingCache={}",
                 ALGORITHM_NAME,
                 requestId,
                 datasetType,
                 datasetFile.getAbsolutePath(),
-                datasetFile.length()
+                datasetFile.length(),
+                useTrainingCache
         );
 
         long startedAt = System.currentTimeMillis();
+        if (useTrainingCache) {
+            Instances dataset = MachineLearningUtils.lerDataset(datasetFile.toPath(), true);
+            logger.info(
+                    "rcl dataset loaded algorithm={} requestId={} datasetType={} rows={} attributes={} elapsedMs={}",
+                    ALGORITHM_NAME,
+                    requestId,
+                    datasetType,
+                    dataset.numInstances(),
+                    dataset.numAttributes(),
+                    System.currentTimeMillis() - startedAt
+            );
+            return dataset;
+        }
+
         try (FileInputStream inputStream = new FileInputStream(datasetFile)) {
             Instances dataset = MachineLearningUtils.lerDataset(inputStream);
             logger.info(
@@ -176,7 +192,8 @@ public class GainRationAsyncService {
             Integer neighborhoodMaxIterations,
             Integer bitFlipMaxIterations,
             Integer iwssMaxIterations,
-            Integer iwssrMaxIterations
+            Integer iwssrMaxIterations,
+            boolean useTrainingCache
     ) {
         dataSolution.setNeighborhood(resolveNeighborhoodStrategy(neighborhoodStrategy));
         dataSolution.setEnabledLocalSearches(resolveLocalSearches(localSearches));
@@ -184,6 +201,7 @@ public class GainRationAsyncService {
         dataSolution.setBitFlipMaxIterations(bitFlipMaxIterations);
         dataSolution.setIwssMaxIterations(iwssMaxIterations);
         dataSolution.setIwssrMaxIterations(iwssrMaxIterations);
+        dataSolution.setUseTrainingCache(useTrainingCache);
     }
 
     private void ensureMetricsHeader(boolean isFirstRun) throws IOException {

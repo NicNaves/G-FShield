@@ -37,6 +37,7 @@ public class GainRationController {
         @RequestParam("datasetTrainingName") String trainingFileName,
         @RequestParam("datasetTestingName") String testingFileName,
         @RequestParam(value = "classifier", defaultValue = "J48") String classifierName,
+        @RequestParam(value = "useTrainingCache", defaultValue = "false") boolean useTrainingCache,
         @RequestParam(value = "neighborhoodStrategy", required = false) String neighborhoodStrategy,
         @RequestParam(value = "localSearches", required = false) String localSearches,
         @RequestParam(value = "neighborhoodMaxIterations", required = false) Integer neighborhoodMaxIterations,
@@ -46,14 +47,14 @@ public class GainRationController {
     ) {
         String requestId = "GR-" + UUID.randomUUID();
         logger.info(
-            "Received GR requestId={} train={} test={} classifier={} maxGenerations={} rclCutoff={} sampleSize={} neighborhood={} localSearches={}",
-            requestId, trainingFileName, testingFileName, classifierName, maxGenerations, rclCutoff, sampleSize,
-            neighborhoodStrategy, localSearches
+            "Received GR requestId={} train={} test={} classifier={} useTrainingCache={} maxGenerations={} rclCutoff={} sampleSize={} neighborhood={} localSearches={}",
+            requestId, trainingFileName, testingFileName, classifierName, useTrainingCache, maxGenerations, rclCutoff,
+            sampleSize, neighborhoodStrategy, localSearches
         );
 
         gainRationAsyncService.processAsync(
             maxGenerations, rclCutoff, sampleSize,
-            trainingFileName, testingFileName, classifierName, neighborhoodStrategy, localSearches,
+            trainingFileName, testingFileName, classifierName, useTrainingCache, neighborhoodStrategy, localSearches,
             neighborhoodMaxIterations, bitFlipMaxIterations, iwssMaxIterations, iwssrMaxIterations,
             gainRationProducer, gainRationService, isFirstTime, requestId
         );

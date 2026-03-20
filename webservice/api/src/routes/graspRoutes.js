@@ -77,6 +77,10 @@ router.get("/datasets", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), 
  *               classifier:
  *                 type: string
  *                 example: "J48"
+ *               useTrainingCache:
+ *                 type: boolean
+ *                 description: Reaproveita em memoria o dataset de treino dentro de cada microservico para acelerar novas execucoes com o mesmo arquivo.
+ *                 example: true
  *               neighborhoodMaxIterations:
  *                 type: integer
  *                 example: 10

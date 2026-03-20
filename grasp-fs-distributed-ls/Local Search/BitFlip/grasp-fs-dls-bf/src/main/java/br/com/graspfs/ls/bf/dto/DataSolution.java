@@ -88,6 +88,9 @@ public class DataSolution {
     @JsonProperty("testingFileName")
     private String testingFileName; // nome do arquivo de teste
 
+    @JsonProperty("useTrainingCache")
+    private Boolean useTrainingCache;
+
     
     public DataSolution() {
     }
