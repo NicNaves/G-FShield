@@ -1,8 +1,7 @@
 FROM maven:3.9.4-eclipse-temurin-17 AS builder
 WORKDIR /app
 
-COPY pom.xml mvnw mvnw.cmd ./
-COPY .mvn .mvn
+COPY pom.xml ./
 RUN mvn -q -DskipTests dependency:go-offline
 
 COPY src src

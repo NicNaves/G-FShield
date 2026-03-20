@@ -4,18 +4,35 @@ set -euo pipefail
 
 readonly DEV_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly DEV_REPO_ROOT="$(cd "${DEV_COMMON_DIR}/.." && pwd)"
+readonly DEV_NPM_DOCKER_SCRIPT="${DEV_COMMON_DIR}/npm-in-docker.sh"
 
 ensure_dir() {
   mkdir -p "$1"
 }
 
 get_npm_command() {
+  if [[ -n "${DEV_NODE_IMAGE:-}" ]]; then
+    if command -v docker >/dev/null 2>&1; then
+      chmod +x "$DEV_NPM_DOCKER_SCRIPT" >/dev/null 2>&1 || true
+      echo "$DEV_NPM_DOCKER_SCRIPT"
+      return 0
+    fi
+
+    echo "docker nao encontrado. Instale o Docker ou remova DEV_NODE_IMAGE." >&2
+    return 1
+  fi
+
   if command -v npm >/dev/null 2>&1; then
     command -v npm
     return 0
   fi
 
-  echo "npm nao encontrado. Instale o Node.js ou ajuste o PATH." >&2
+  if command -v docker >/dev/null 2>&1; then
+    echo "npm nao encontrado. Para usar npm em container, rode com DEV_NODE_IMAGE=node:24." >&2
+    return 1
+  fi
+
+  echo "npm nao encontrado. Instale o Node.js, ajuste o PATH, ou use Docker com DEV_NODE_IMAGE=node:24." >&2
   return 1
 }
 
@@ -26,6 +43,38 @@ invoke_compose() {
     cd "$workdir"
     docker compose "$@"
   )
+}
+
+run_npm_command() {
+  local workdir="$1"
+  shift
+  local npm_command
+  npm_command="$(get_npm_command)"
+
+  (
+    cd "$workdir"
+    "$npm_command" "$@"
+  )
+}
+
+install_node_dependencies() {
+  local workdir="$1"
+  local label="$2"
+
+  if [[ -f "${workdir}/package-lock.json" ]]; then
+    echo "Instalando dependencias de ${label}..."
+    run_npm_command "$workdir" ci
+    return 0
+  fi
+
+  if [[ -f "${workdir}/package.json" ]]; then
+    echo "Instalando dependencias de ${label} com npm install..."
+    run_npm_command "$workdir" install
+    return 0
+  fi
+
+  echo "package.json nao encontrado em ${workdir}" >&2
+  return 1
 }
 
 kill_pid_if_running() {
@@ -107,6 +156,21 @@ wait_for_http() {
 
     sleep 2
   done
+}
+
+print_log_tail() {
+  local label="$1"
+  local logfile="$2"
+  local lines="${3:-40}"
+
+  if [[ ! -f "$logfile" ]]; then
+    echo "Log ${label} nao encontrado em ${logfile}" >&2
+    return 0
+  fi
+
+  echo
+  echo "Ultimas ${lines} linhas de ${label} (${logfile}):" >&2
+  tail -n "$lines" "$logfile" >&2 || true
 }
 
 wait_for_tcp_port() {
