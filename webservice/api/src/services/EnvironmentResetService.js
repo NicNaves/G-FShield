@@ -11,8 +11,40 @@ class EnvironmentResetService {
   constructor() {
     this.activeReset = null;
     this.lastResult = null;
-    this.projectRoot = path.resolve(__dirname, "../../../..");
-    this.metricsDir = path.join(this.projectRoot, "metrics");
+    this.refreshConfiguration();
+  }
+
+  refreshConfiguration() {
+    this.projectRoot = process.env.GF_SHIELD_PROJECT_ROOT
+      ? path.resolve(process.env.GF_SHIELD_PROJECT_ROOT)
+      : path.resolve(__dirname, "../../../..");
+    this.metricsDir = process.env.GF_SHIELD_METRICS_DIR
+      ? path.resolve(process.env.GF_SHIELD_METRICS_DIR)
+      : path.join(this.projectRoot, "metrics");
+    this.dockerCommand = process.env.GF_SHIELD_DOCKER_BIN || "docker";
+    this.composeProjectName = String(process.env.GF_SHIELD_COMPOSE_PROJECT_NAME || "").trim();
+    this.composeFiles = this.parseComposeFiles(process.env.GF_SHIELD_COMPOSE_FILES);
+  }
+
+  parseComposeFiles(value = "") {
+    return String(value || "")
+      .split(/[,\r\n;]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  buildComposeArgs(...commandArgs) {
+    const args = ["compose"];
+
+    if (this.composeProjectName) {
+      args.push("-p", this.composeProjectName);
+    }
+
+    for (const composeFile of this.composeFiles) {
+      args.push("-f", composeFile);
+    }
+
+    return [...args, ...commandArgs];
   }
 
   async resetEnvironment() {
@@ -32,8 +64,11 @@ class EnvironmentResetService {
   }
 
   async runReset() {
+    this.refreshConfiguration();
+
     const startedAt = new Date().toISOString();
     const steps = [];
+    let runtimeInterrupted = false;
 
     try {
       await this.runStep(steps, "queue.reset", async () => {
@@ -50,9 +85,10 @@ class EnvironmentResetService {
         await graspExecutionMonitorService.stop();
         return { stopped: true };
       });
+      runtimeInterrupted = true;
 
       await this.runStep(steps, "docker.compose.down", async () =>
-        this.runCommand("docker", ["compose", "down", "--remove-orphans"], {
+        this.runCommand(this.dockerCommand, this.buildComposeArgs("down", "--remove-orphans"), {
           cwd: this.projectRoot,
           timeoutMs: 10 * 60 * 1000,
         })
@@ -72,7 +108,7 @@ class EnvironmentResetService {
       });
 
       await this.runStep(steps, "docker.compose.up", async () =>
-        this.runCommand("docker", ["compose", "up", "-d", "--force-recreate", "--remove-orphans"], {
+        this.runCommand(this.dockerCommand, this.buildComposeArgs("up", "-d", "--force-recreate", "--remove-orphans"), {
           cwd: this.projectRoot,
           timeoutMs: 10 * 60 * 1000,
         })
@@ -109,6 +145,10 @@ class EnvironmentResetService {
 
       return result;
     } catch (error) {
+      if (runtimeInterrupted) {
+        await this.restoreRuntimeStateAfterFailure(steps);
+      }
+
       const failure = {
         status: "failed",
         startedAt,
@@ -126,6 +166,32 @@ class EnvironmentResetService {
       });
 
       throw error;
+    }
+  }
+
+  async restoreRuntimeStateAfterFailure(steps) {
+    await this.runBestEffortStep(steps, "monitor.consumer.recover", async () => {
+      await this.retry(async () => {
+        await graspExecutionMonitorService.start();
+      }, 5, 2000);
+
+      return { started: true };
+    });
+
+    await this.runBestEffortStep(steps, "queue.recover", async () => {
+      await executionQueueService.start();
+      return { started: true };
+    });
+  }
+
+  async runBestEffortStep(steps, name, action) {
+    try {
+      await this.runStep(steps, name, action);
+    } catch (error) {
+      logger.warn("Best-effort recovery step failed", {
+        step: name,
+        error: error.message,
+      });
     }
   }
 
