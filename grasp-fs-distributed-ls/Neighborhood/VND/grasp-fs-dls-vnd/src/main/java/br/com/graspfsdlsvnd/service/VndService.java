@@ -13,6 +13,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 @Component
 @RequiredArgsConstructor
@@ -26,6 +29,7 @@ public class VndService {
     private final KafkaIwssProducer kafkaIwssProducer;
     private final KafkaIwssrProducer kafkaIwssrProducer;
     private final KafkaNeighborhoodRestartProducer kafkaNeighborhoodRestartProducer;
+    private final ConcurrentMap<UUID, Float> cycleBaselineScores = new ConcurrentHashMap<>();
 
     public void doVnd(DataSolution data, LocalSearch localSearch) {
         List<LocalSearch> sequence = resolveEnabledLocalSearches(data);
@@ -33,6 +37,7 @@ public class VndService {
                 ? localSearch
                 : sequence.get(0);
         int dispatchBudget = resolveDispatchBudget(data, sequence);
+        initializeCycleBaseline(data, sequence, effectiveLocalSearch);
 
         data.setNeighborhood("VND");
         int currentIteration = data.getIterationNeighborhood() != null ? data.getIterationNeighborhood() : 0;
@@ -63,69 +68,110 @@ public class VndService {
         int currentStep = incoming.getIterationNeighborhood() != null ? incoming.getIterationNeighborhood() : 0;
         boolean improved = scoreOf(incoming) > scoreOf(bestSolution);
         DataSolution updatedBest = improved ? incoming : bestSolution;
+        float cycleBaseline = resolveCycleBaseline(incoming, bestSolution, sequence);
+        boolean cycleImproved = scoreOf(updatedBest) > cycleBaseline;
+        boolean lastSearchInCycle = isLastSearchInCycle(sequence, incoming.getLocalSearch());
 
         log.info(
-                "vnd result seedId={} incomingSearch={} incomingF1={} bestF1={} improved={} dispatchStep={}/{} availableSearches={}",
+                "vnd result seedId={} incomingSearch={} incomingF1={} bestF1={} improved={} cycleImproved={} dispatchStep={}/{} availableSearches={}",
                 incoming.getSeedId(),
                 incoming.getLocalSearch(),
                 scoreOf(incoming),
                 scoreOf(bestSolution),
                 improved,
+                cycleImproved,
                 currentStep,
                 dispatchBudget,
                 sequence
         );
 
-        if (improved) {
+        if (!lastSearchInCycle) {
+            LocalSearch nextLocalSearch = nextLocalSearch(sequence, incoming.getLocalSearch());
+            log.info(
+                    "vnd continuing seedId={} currentSearch={} nextSearch={} dispatchStep={}/{} sequenceSize={} cycleImproved={}",
+                    incoming.getSeedId(),
+                    incoming.getLocalSearch(),
+                    nextLocalSearch,
+                    currentStep,
+                    dispatchBudget,
+                    sequence.size(),
+                    cycleImproved
+            );
+            doVnd(updatedBest, nextLocalSearch);
+            return updatedBest;
+        }
+
+        clearCycleBaseline(incoming);
+
+        if (cycleImproved) {
             if (allowContinuation) {
                 log.info(
-                        "vnd improvement seedId={} previousBestF1={} newBestF1={} restartingCycle=true remainingDispatches={}",
+                        "vnd cycle improved seedId={} cycleBaselineF1={} finalBestF1={} restartingCycle=true remainingDispatches={}",
                         incoming.getSeedId(),
-                        scoreOf(bestSolution),
-                        scoreOf(incoming),
+                        cycleBaseline,
+                        scoreOf(updatedBest),
                         Math.max(dispatchBudget - currentStep, 0)
                 );
-                kafkaNeighborhoodRestartProducer.send(incoming);
+                kafkaNeighborhoodRestartProducer.send(updatedBest);
             } else {
                 log.info(
-                        "vnd improvement seedId={} previousBestF1={} newBestF1={} restartingCycle=false reason=dispatch-budget-exhausted",
+                        "vnd cycle improved seedId={} cycleBaselineF1={} finalBestF1={} restartingCycle=false reason=dispatch-budget-exhausted",
                         incoming.getSeedId(),
-                        scoreOf(bestSolution),
-                        scoreOf(incoming)
+                        cycleBaseline,
+                        scoreOf(updatedBest)
                 );
             }
             return updatedBest;
         }
 
-        if (!allowContinuation) {
-            log.info(
-                    "vnd cycle completed seedId={} lastSearch={} dispatchStep={}/{} finalBestF1={}",
-                    incoming.getSeedId(),
-                    incoming.getLocalSearch(),
-                    currentStep,
-                    dispatchBudget,
-                    scoreOf(updatedBest)
-            );
-            return updatedBest;
-        }
-
-        LocalSearch nextLocalSearch = nextLocalSearch(sequence, incoming.getLocalSearch());
         log.info(
-                "vnd continuing seedId={} currentSearch={} nextSearch={} dispatchStep={}/{} sequenceSize={}",
+                "vnd cycle completed seedId={} lastSearch={} dispatchStep={}/{} finalBestF1={} cycleBaselineF1={}",
                 incoming.getSeedId(),
                 incoming.getLocalSearch(),
-                nextLocalSearch,
                 currentStep,
                 dispatchBudget,
-                sequence.size()
+                scoreOf(updatedBest),
+                cycleBaseline
         );
-        doVnd(incoming, nextLocalSearch);
 
         return updatedBest;
     }
 
     private float scoreOf(DataSolution data) {
         return data.getF1Score() != null ? data.getF1Score() : 0.0F;
+    }
+
+    private void initializeCycleBaseline(DataSolution data, List<LocalSearch> sequence, LocalSearch effectiveLocalSearch) {
+        if (data.getSeedId() == null || sequence.isEmpty() || effectiveLocalSearch != sequence.get(0)) {
+            return;
+        }
+
+        cycleBaselineScores.put(data.getSeedId(), scoreOf(data));
+    }
+
+    private float resolveCycleBaseline(DataSolution incoming, DataSolution bestSolution, List<LocalSearch> sequence) {
+        if (incoming.getSeedId() == null) {
+            return scoreOf(bestSolution);
+        }
+
+        return cycleBaselineScores.computeIfAbsent(
+                incoming.getSeedId(),
+                ignored -> isFirstSearchInCycle(sequence, incoming.getLocalSearch()) ? scoreOf(bestSolution) : scoreOf(bestSolution)
+        );
+    }
+
+    private void clearCycleBaseline(DataSolution data) {
+        if (data.getSeedId() != null) {
+            cycleBaselineScores.remove(data.getSeedId());
+        }
+    }
+
+    private boolean isFirstSearchInCycle(List<LocalSearch> sequence, LocalSearch search) {
+        return !sequence.isEmpty() && search == sequence.get(0);
+    }
+
+    private boolean isLastSearchInCycle(List<LocalSearch> sequence, LocalSearch search) {
+        return !sequence.isEmpty() && search == sequence.get(sequence.size() - 1);
     }
 
     public List<LocalSearch> resolveEnabledLocalSearches(DataSolution data) {
