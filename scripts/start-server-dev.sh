@@ -183,7 +183,7 @@ if ! (
 fi
 
 echo "Iniciando front estatico em background..."
-FRONT_PID="$(start_managed_process "$FRONT_DIR" "$FRONT_LOG" "$NPM_COMMAND" exec --yes serve -s build -l "$FRONTEND_PORT")"
+FRONT_PID="$(start_managed_process "$FRONT_DIR" "$FRONT_LOG" "$NPM_COMMAND" exec --yes serve -- -s build -l "$FRONTEND_PORT")"
 
 write_state_file "$STATE_FILE" "$(date -Iseconds)" "$AUTH_MODE" "$API_PID" "$FRONT_PID" "$API_LOG" "$FRONT_LOG"
 

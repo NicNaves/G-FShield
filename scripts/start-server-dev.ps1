@@ -221,7 +221,7 @@ Set-Location '$apiDir'
 
 $frontCommand = @"
 Set-Location '$frontDir'
-& '$npmCommand' exec --yes serve -s build -l $FrontendPort
+& '$npmCommand' exec --yes serve -- -s build -l $FrontendPort
 "@
 
 Write-Host "Abrindo API em nova janela..."
