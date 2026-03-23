@@ -94,7 +94,7 @@ function Projects() {
           showTotalEntries={false}
           isSorted={false}
           noEndBorder
-          entriesPerPage={false}
+          entriesPerPage={{ defaultValue: 5, entries: [5, 10, 15, 20] }}
         />
       </MDBox>
     </Card>

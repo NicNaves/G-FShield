@@ -236,7 +236,7 @@ function ExecutionComparison({ runs }) {
             <MDBox mt={3} sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 860 } }}>
               <DataTable
                 table={tableData}
-                entriesPerPage={false}
+                entriesPerPage={{ defaultValue: 6, entries: [6, 12, 20, 30] }}
                 canSearch
                 showTotalEntries={false}
                 noEndBorder

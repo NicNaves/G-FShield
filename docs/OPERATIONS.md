@@ -128,7 +128,7 @@ Topicos mais usados:
 Exemplo de delete:
 
 ```powershell
-docker exec g-fshield-kafka-1 kafka-topics --bootstrap-server localhost:9092 --delete --if-exists --topic BEST_SOLUTION_TOPIC
+docker exec g-fshield-kafka-1 kafka-topics --bootstrap-server localhost:19092 --delete --if-exists --topic BEST_SOLUTION_TOPIC
 ```
 
 Nao remova `__consumer_offsets`.
@@ -314,7 +314,7 @@ Most common topics:
 Delete example:
 
 ```powershell
-docker exec g-fshield-kafka-1 kafka-topics --bootstrap-server localhost:9092 --delete --if-exists --topic BEST_SOLUTION_TOPIC
+docker exec g-fshield-kafka-1 kafka-topics --bootstrap-server localhost:19092 --delete --if-exists --topic BEST_SOLUTION_TOPIC
 ```
 
 Do not remove `__consumer_offsets`.

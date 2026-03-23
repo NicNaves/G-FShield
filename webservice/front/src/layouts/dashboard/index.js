@@ -53,6 +53,8 @@ import { useMaterialUIController } from "context";
 import {
   formatCompactPercent,
   formatDateTime,
+  formatDuration,
+  formatElapsedDuration,
   formatFeatureSubset,
   formatMetric,
   formatRelativeTime,
@@ -268,6 +270,8 @@ const DASHBOARD_MONITOR_SUMMARY_EVENT_LIMIT = Math.max(
   Math.min(Number(process.env.REACT_APP_GRASP_MONITOR_SUMMARY_EVENT_LIMIT || 300) || 300, DASHBOARD_MONITOR_LIMIT),
   50
 );
+
+const summaryTableEntries = { defaultValue: 8, entries: [8, 15, 25, 50] };
 
 const getEntryTimestamp = (entry = {}) => entry?.timestamp || entry?.updatedAt || entry?.createdAt || null;
 
@@ -753,6 +757,21 @@ const buildSeriesLabels = (entries) =>
     entries.length > 24 ? `#${index + 1}` : formatShortTime(entry.timestamp)
   );
 
+const timelineSeriesPalette = [
+  "#4361ee",
+  "#ff8c42",
+  "#11b5ae",
+  "#8b5cf6",
+  "#ef476f",
+  "#36c56c",
+  "#f59e0b",
+  "#06b6d4",
+  "#ec4899",
+  "#64748b",
+];
+
+const getTimelineSeriesColor = (index = 0) => timelineSeriesPalette[index % timelineSeriesPalette.length];
+
 const buildEmptyLineData = (primaryLabel, secondaryLabel) => ({
   labels: ["#1"],
   datasets: [
@@ -848,6 +867,80 @@ const deriveWorkflowSteps = (run = {}, initialEvent = null) => {
   return steps;
 };
 
+const resolveRunStartTimestamp = (run = {}, fallbackEvent = null) =>
+  run?.createdAt
+  || fallbackEvent?.timestamp
+  || run?.history?.[0]?.timestamp
+  || run?.updatedAt
+  || null;
+
+const resolveRunEndTimestamp = (run = {}) => {
+  const status = String(run?.status || "").toLowerCase();
+  const lastHistoryTimestamp = Array.isArray(run?.history) && run.history.length
+    ? run.history[run.history.length - 1]?.timestamp
+    : null;
+
+  if (status === "completed") {
+    return run?.completedAt || run?.updatedAt || lastHistoryTimestamp || null;
+  }
+
+  return run?.updatedAt || Date.now();
+};
+
+const buildRunTimelinePoints = (run = {}, options = {}) => {
+  const {
+    fallbackEvent = null,
+    range = {},
+    query = "",
+  } = options;
+  const startTimestamp = resolveRunStartTimestamp(run, fallbackEvent);
+  const startMs = parseDateTimeValue(startTimestamp);
+
+  if (startMs === null) {
+    return [];
+  }
+
+  const historyEntries = Array.isArray(run?.history) && run.history.length
+    ? [...run.history]
+        .sort((left, right) => getSortableDateValue(left?.timestamp) - getSortableDateValue(right?.timestamp))
+        .map((entry, index) => ({
+          ...entry,
+          order: index + 1,
+        }))
+    : [
+        {
+          timestamp: resolveRunEndTimestamp(run),
+          f1Score: run?.currentF1Score ?? run?.bestF1Score ?? fallbackEvent?.bestF1Score ?? fallbackEvent?.currentF1Score ?? null,
+          stage: run?.stage || fallbackEvent?.stage || null,
+          order: 1,
+        },
+      ];
+
+  return historyEntries
+    .filter(
+      (entry) =>
+        isTimestampWithinRange(entry?.timestamp, range)
+        && matchesTimelineTimestampQuery(entry, query)
+    )
+    .map((entry) => {
+      const timestampMs = parseDateTimeValue(entry?.timestamp);
+      const score = getFiniteMetric(entry?.f1Score ?? entry?.bestF1Score ?? entry?.currentF1Score);
+
+      if (timestampMs === null || score === null) {
+        return null;
+      }
+
+      return {
+        x: Math.max(timestampMs - startMs, 0),
+        y: score,
+        timestamp: entry.timestamp,
+        order: entry.order,
+        stage: entry.stage || run?.stage || fallbackEvent?.stage || null,
+      };
+    })
+    .filter(Boolean);
+};
+
 function Dashboard() {
   const { t } = useI18n();
   const [controller] = useMaterialUIController();
@@ -855,6 +948,7 @@ function Dashboard() {
   const {
     runs: liveRuns,
     events: liveEvents,
+    summary,
     loading,
     error,
     connected,
@@ -871,10 +965,10 @@ function Dashboard() {
   const [selectedStageLens, setSelectedStageLens] = useState("all");
   const [selectedRunStatus, setSelectedRunStatus] = useState("all");
   const [selectedSearch, setSelectedSearch] = useState("all");
-  const [selectedTimeWindow, setSelectedTimeWindow] = useState("15m");
+  const [selectedTimeWindow, setSelectedTimeWindow] = useState("all");
   const [customRangeStart, setCustomRangeStart] = useState("");
   const [customRangeEnd, setCustomRangeEnd] = useState("");
-  const [selectedTimelineWindow, setSelectedTimelineWindow] = useState("15m");
+  const [selectedTimelineWindow, setSelectedTimelineWindow] = useState("all");
   const [timelineRangeStart, setTimelineRangeStart] = useState("");
   const [timelineRangeEnd, setTimelineRangeEnd] = useState("");
   const [timelineTimestampQuery, setTimelineTimestampQuery] = useState("");
@@ -1760,6 +1854,11 @@ function Dashboard() {
     };
   }, [filteredSnapshotEvents.length, monitorSnapshots, rawTopicMetrics.length]);
 
+  const persistedSummary = useMemo(
+    () => (summary?.totals ? summary : null),
+    [summary]
+  );
+
   const bestAlgorithmOutcome = useMemo(
     () => finalRunsByAlgorithm[0]?.bestRun || null,
     [finalRunsByAlgorithm]
@@ -1861,7 +1960,7 @@ function Dashboard() {
     setSelectedStageLens("all");
     setSelectedRunStatus("all");
     setSelectedSearch("all");
-    setSelectedTimeWindow("15m");
+    setSelectedTimeWindow("all");
     setCustomRangeStart("");
     setCustomRangeEnd("");
     setSelectedTimelineWindow("15m");
@@ -2050,7 +2149,7 @@ function Dashboard() {
   }, [selectedTimelineWindow, t, timelineRangeEnd, timelineRangeStart, timelineTimestampQuery]);
 
   const resetTimelineFilters = () => {
-    setSelectedTimelineWindow("15m");
+    setSelectedTimelineWindow("all");
     setTimelineRangeStart("");
     setTimelineRangeEnd("");
     setTimelineTimestampQuery("");
@@ -2091,6 +2190,33 @@ function Dashboard() {
         : [],
     [featuredRun, fullHistory]
   );
+
+  const timelineComparisonRuns = useMemo(() => {
+    const visibleRunsBySeed = new Map(
+      filteredRuns
+        .filter((run) => run?.seedId)
+        .map((run) => [run.seedId, run])
+    );
+
+    (selectedRequestBundle.runs || []).forEach((run) => {
+      if (!run?.seedId || !visibleRunsBySeed.has(run.seedId)) {
+        return;
+      }
+
+      visibleRunsBySeed.set(run.seedId, mergeRunDetail(visibleRunsBySeed.get(run.seedId) || {}, run));
+    });
+
+    if (featuredRun?.seedId && visibleRunsBySeed.has(featuredRun.seedId)) {
+      visibleRunsBySeed.set(
+        featuredRun.seedId,
+        mergeRunDetail(visibleRunsBySeed.get(featuredRun.seedId) || {}, featuredRun)
+      );
+    }
+
+    return [...visibleRunsBySeed.values()].sort(
+      (left, right) => getSortableDateValue(right?.updatedAt) - getSortableDateValue(left?.updatedAt)
+    );
+  }, [featuredRun, filteredRuns, selectedRequestBundle.runs]);
 
   const requestExportSnapshots = useMemo(
     () =>
@@ -2217,47 +2343,77 @@ function Dashboard() {
     downloadTextFile(fileName, JSON.stringify(payload, null, 2), "application/json;charset=utf-8");
   };
 
-  const fullTimelineChartData = useMemo(() => {
-    if (!fullHistory.length) {
-      return buildEmptyLineData("Best F1-Score", "F1-Score");
-    }
+  const fullTimelineComparison = useMemo(() => {
+    let snapshotCount = 0;
+    let maxElapsedMs = 0;
 
-    let rollingBest = null;
+    const datasets = timelineComparisonRuns
+      .map((run, index) => {
+        const points = buildRunTimelinePoints(run, {
+          fallbackEvent: initialEventBySeed.get(run.seedId),
+          range: timelineRangeBounds,
+          query: timelineTimestampQuery,
+        });
+
+        if (!points.length) {
+          return null;
+        }
+
+        snapshotCount += points.length;
+        maxElapsedMs = Math.max(maxElapsedMs, points[points.length - 1]?.x || 0);
+
+        const color = getTimelineSeriesColor(index);
+        const isFocused = run.seedId === featuredRun?.seedId;
+
+        return {
+          label: `${shortenSeed(run.seedId)} · ${run.rclAlgorithm || "GRASP-FS"}`,
+          data: points,
+          borderColor: color,
+          backgroundColor: `${color}24`,
+          borderWidth: isFocused ? 3 : 1.8,
+          pointRadius: points.length > 48 ? 0 : isFocused ? 2.5 : 1.5,
+          pointHoverRadius: isFocused ? 5 : 4,
+          pointHitRadius: 10,
+          tension: 0.25,
+          fill: false,
+        };
+      })
+      .filter(Boolean);
 
     return {
-      labels: buildSeriesLabels(fullHistory),
-      datasets: [
-        {
-          label: "Best F1-Score",
-          data: fullHistory.map((entry) => {
-            if (entry.f1Score === null || entry.f1Score === undefined) {
-              return rollingBest ?? 0;
-            }
-
-            rollingBest = rollingBest === null ? entry.f1Score : Math.max(rollingBest, entry.f1Score);
-            return rollingBest;
-          }),
-          borderColor: "#4361ee",
-          backgroundColor: "rgba(67, 97, 238, 0.12)",
-          tension: 0.3,
-          fill: true,
-        },
-        {
-          label: "F1-Score",
-          data: fullHistory.map((entry) => entry.f1Score ?? 0),
-          borderColor: "#36c56c",
-          backgroundColor: "rgba(54, 197, 108, 0.08)",
-          tension: 0.3,
-          fill: true,
-        },
-      ],
+      datasets,
+      snapshotCount,
+      maxElapsedMs,
     };
-  }, [fullHistory]);
+  }, [featuredRun?.seedId, initialEventBySeed, timelineComparisonRuns, timelineRangeBounds, timelineTimestampQuery]);
+
+  const fullTimelineChartData = useMemo(() => {
+    if (!fullTimelineComparison.datasets.length) {
+      return {
+        datasets: [
+          {
+            label: "F1-Score",
+            data: [{ x: 0, y: 0 }],
+            borderColor: "#4361ee",
+            backgroundColor: "rgba(67, 97, 238, 0.10)",
+            pointRadius: 0,
+            tension: 0.25,
+            fill: false,
+          },
+        ],
+      };
+    }
+
+    return {
+      datasets: fullTimelineComparison.datasets,
+    };
+  }, [fullTimelineComparison.datasets]);
 
   const fullTimelineChartOptions = useMemo(
     () => ({
       responsive: true,
       maintainAspectRatio: false,
+      parsing: false,
       interaction: {
         mode: "index",
         intersect: false,
@@ -2270,11 +2426,25 @@ function Dashboard() {
             boxWidth: 8,
           },
         },
+        tooltip: {
+          callbacks: {
+            title: (items) => {
+              const elapsedValue = items?.[0]?.parsed?.x;
+              return `${t("dashboard.timelineElapsedAxis")}: ${formatDuration(elapsedValue)}`;
+            },
+            label: (context) => {
+              const rawPoint = context.raw || {};
+              const summary = `${context.dataset.label}: ${formatCompactPercent(context.parsed?.y)}`;
+              const timestampLabel = rawPoint.timestamp ? formatDateTime(rawPoint.timestamp) : "--";
+              return `${summary} · ${timestampLabel}`;
+            },
+          },
+        },
       },
       elements: {
         point: {
-          radius: fullHistory.length > 80 ? 0 : 2,
-          hoverRadius: fullHistory.length > 80 ? 3 : 5,
+          radius: fullTimelineComparison.snapshotCount > 240 ? 0 : 2,
+          hoverRadius: fullTimelineComparison.snapshotCount > 240 ? 3 : 5,
         },
       },
       scales: {
@@ -2286,13 +2456,23 @@ function Dashboard() {
           },
         },
         x: {
+          type: "linear",
+          beginAtZero: true,
+          suggestedMax: fullTimelineComparison.maxElapsedMs || undefined,
+          title: {
+            display: true,
+            text: t("dashboard.timelineElapsedAxis"),
+          },
+          ticks: {
+            callback: (value) => formatDuration(value),
+          },
           grid: {
             display: false,
           },
         },
       },
     }),
-    [fullHistory.length]
+    [fullTimelineComparison.maxElapsedMs, fullTimelineComparison.snapshotCount, t]
   );
 
   const resourceChartData = useMemo(() => {
@@ -2907,6 +3087,7 @@ function Dashboard() {
         { Header: "RCL", accessor: "algorithm", align: "left" },
         { Header: "Initial Solution", accessor: "solution", align: "left" },
         { Header: "Initial F1", accessor: "initialF1", align: "left" },
+        { Header: "Global Runtime", accessor: "runtime", align: "left" },
         { Header: "RCL / Solution Size", accessor: "sizes", align: "left" },
         { Header: "Search Plan", accessor: "searchPlan", align: "left" },
         { Header: "Best After Search", accessor: "bestAfterSearch", align: "left" },
@@ -2945,6 +3126,19 @@ function Dashboard() {
             </MDBox>
           ),
           initialF1: formatCompactPercent(event.bestF1Score ?? event.currentF1Score),
+          runtime: (
+            <MDBox>
+              <MDTypography variant="button" fontWeight="medium" color="dark">
+                {formatElapsedDuration(
+                  resolveRunStartTimestamp(linkedBestRun || {}, event),
+                  resolveRunEndTimestamp(linkedBestRun || {})
+                )}
+              </MDTypography>
+              <MDTypography variant="caption" color="text">
+                {String(linkedBestRun?.status || "running").toLowerCase()}
+              </MDTypography>
+            </MDBox>
+          ),
           sizes: `RCL ${resolveCount(event.rclSize, event.rclFeatures?.length || 0)} / Sol ${resolveCount(event.solutionSize, event.solutionFeatures?.length || 0)}`,
           searchPlan: (
             <MDBox>
@@ -3436,6 +3630,44 @@ function Dashboard() {
             />
           </Grid>
         </Grid>
+
+        {persistedSummary ? (
+          <MDBox mt={2}>
+            <Card>
+              <MDBox p={2.5}>
+                <MDBox
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems={{ xs: "flex-start", md: "center" }}
+                  flexDirection={{ xs: "column", md: "row" }}
+                  gap={1.5}
+                  mb={2}
+                >
+                  <MDBox>
+                    <MDTypography variant="h6" color="dark">
+                      {t("dashboard.persistedSummaryTitle")}
+                    </MDTypography>
+                    <MDTypography variant="button" color="text">
+                      {t("dashboard.persistedSummarySubtitle")}
+                    </MDTypography>
+                  </MDBox>
+                  <MDTypography variant="caption" color="text">
+                    {`${formatDateTime(persistedSummary.generatedAt)} · ${formatRelativeTime(persistedSummary.generatedAt)}`}
+                  </MDTypography>
+                </MDBox>
+
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  <Chip label={t("dashboard.persistedRuns", { count: persistedSummary.totals.runs || 0 })} color="primary" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.persistedEvents", { count: persistedSummary.totals.events || 0 })} color="info" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.persistedActiveRuns", { count: persistedSummary.totals.activeRuns || 0 })} color="warning" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.persistedCompletedRuns", { count: persistedSummary.totals.completedRuns || 0 })} color="success" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.persistedAlgorithms", { count: persistedSummary.totals.algorithms || 0 })} color="secondary" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.persistedDatasets", { count: persistedSummary.totals.datasetPairs || 0 })} color="default" size="small" variant="outlined" />
+                </Stack>
+              </MDBox>
+            </Card>
+          </MDBox>
+        ) : null}
 
         <MDBox mt={4}>
           <Card>
@@ -3956,8 +4188,11 @@ function Dashboard() {
                           </MDTypography>
                           <MDTypography variant="button" color="text">
                             {featuredRun
-                          ? `${featuredRun.rclAlgorithm || "GRASP-FS"} / ${featuredRun.classifier || "--"} / ${t("dashboard.persistedCheckpoints", { count: fullHistory.length })}`
-                          : t("dashboard.waitingMonitorEvents")}
+                              ? t("dashboard.fullExecutionTimelineComparison", {
+                                runs: fullTimelineComparison.datasets.length,
+                                snapshots: fullTimelineComparison.snapshotCount,
+                              })
+                              : t("dashboard.waitingMonitorEvents")}
                           </MDTypography>
                         </MDBox>
 
@@ -4081,9 +4316,9 @@ function Dashboard() {
 
                             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                               <Chip
-                                label={t("dashboard.timelineVisibleCheckpoints", {
-                                  count: fullHistory.length,
-                                  total: fullHistorySource.length,
+                                label={t("dashboard.timelineVisibleRuns", {
+                                  runs: fullTimelineComparison.datasets.length,
+                                  snapshots: fullTimelineComparison.snapshotCount,
                                 })}
                                 color="info"
                                 size="small"
@@ -4231,6 +4466,32 @@ function Dashboard() {
                                 </MDTypography>
                                 <MDTypography variant="caption" color="text">
                                   {t("dashboard.persistedInMonitor")}
+                                </MDTypography>
+                              </MDBox>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6}>
+                              <MDBox
+                                p={2}
+                                sx={{
+                                  borderRadius: 2.5,
+                                  border: "1px solid rgba(148, 163, 184, 0.18)",
+                                  background: darkMode
+                                    ? "rgba(15, 23, 42, 0.28)"
+                                    : "rgba(248, 250, 252, 0.9)",
+                                }}
+                              >
+                                <MDTypography variant="caption" color="text" fontWeight="medium">
+                                  {t("dashboard.globalRuntimeLabel")}
+                                </MDTypography>
+                                <MDTypography variant="button" display="block" color="dark" fontWeight="medium">
+                                  {formatElapsedDuration(
+                                    resolveRunStartTimestamp(featuredRun, initialEventBySeed.get(featuredRun.seedId)),
+                                    resolveRunEndTimestamp(featuredRun)
+                                  )}
+                                </MDTypography>
+                                <MDTypography variant="caption" color="text">
+                                  {String(featuredRun.status || "running").toLowerCase()}
                                 </MDTypography>
                               </MDBox>
                             </Grid>
@@ -4736,7 +4997,7 @@ function Dashboard() {
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 860 } }}>
                   <DataTable
                     table={resourceSummaryTableData}
-                    entriesPerPage={false}
+                    entriesPerPage={summaryTableEntries}
                     canSearch
                     showTotalEntries={false}
                     noEndBorder
@@ -4773,7 +5034,7 @@ function Dashboard() {
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 860 } }}>
                   <DataTable
                     table={localSearchResourceSummaryTableData}
-                    entriesPerPage={false}
+                    entriesPerPage={summaryTableEntries}
                     canSearch
                     showTotalEntries={false}
                     noEndBorder
@@ -4876,7 +5137,7 @@ function Dashboard() {
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 720 } }}>
                   <DataTable
                     table={rawTopicTableData}
-                    entriesPerPage={false}
+                    entriesPerPage={summaryTableEntries}
                     canSearch
                     showTotalEntries={false}
                     noEndBorder
@@ -5116,7 +5377,7 @@ function Dashboard() {
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 1120 } }}>
                   <DataTable
                     table={rclAlgorithmSummaryTableData}
-                    entriesPerPage={false}
+                    entriesPerPage={summaryTableEntries}
                     canSearch
                     showTotalEntries={false}
                     noEndBorder
@@ -5148,7 +5409,7 @@ function Dashboard() {
                 <MDBox sx={{ overflowX: "auto", "& .MuiTable-root": { minWidth: 980 } }}>
                   <DataTable
                     table={dlsAlgorithmSummaryTableData}
-                    entriesPerPage={false}
+                    entriesPerPage={summaryTableEntries}
                     canSearch
                     showTotalEntries={false}
                     noEndBorder

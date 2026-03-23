@@ -27,7 +27,7 @@ const graspServices = {
   },
 };
 
-const kafkaBrokers = (process.env.KAFKA_BROKERS || "localhost:9092")
+const kafkaBrokers = (process.env.KAFKA_BROKERS || "localhost:19092")
   .split(",")
   .map((broker) => broker.trim())
   .filter(Boolean);

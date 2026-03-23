@@ -91,6 +91,52 @@ export const formatRelativeTime = (value) => {
   return `${diffDays} d`;
 };
 
+export const formatDuration = (value) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return "--";
+  }
+
+  const totalSeconds = Math.max(0, Math.floor(Number(value) / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const parts = [];
+
+  if (days > 0) {
+    parts.push(`${days}d`);
+  }
+
+  if (hours > 0) {
+    parts.push(`${hours}h`);
+  }
+
+  if (minutes > 0) {
+    parts.push(`${minutes}m`);
+  }
+
+  if (parts.length === 0 || (days === 0 && hours === 0)) {
+    parts.push(`${seconds}s`);
+  }
+
+  return parts.slice(0, 3).join(" ");
+};
+
+export const formatElapsedDuration = (startValue, endValue = Date.now()) => {
+  if (!startValue) {
+    return "--";
+  }
+
+  const start = new Date(startValue);
+  const end = new Date(endValue);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return "--";
+  }
+
+  return formatDuration(Math.max(end.getTime() - start.getTime(), 0));
+};
+
 export const getStatusColor = (status) => {
   switch (String(status || "").toLowerCase()) {
     case "completed":

@@ -36,7 +36,7 @@ GF-Shield/
 - API: `4000`
 - Swagger: `4000/api-docs`
 - Kafbat UI: `8080`
-- Kafka: `9092`
+- Kafka: `19092`
 - Zookeeper: `2181`
 
 Servicos DLS:
@@ -186,7 +186,7 @@ GF-Shield/
 - API: `4000`
 - Swagger: `4000/api-docs`
 - Kafbat UI: `8080`
-- Kafka: `9092`
+- Kafka: `19092`
 - Zookeeper: `2181`
 
 DLS services:

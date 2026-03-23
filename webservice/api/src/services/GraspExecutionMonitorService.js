@@ -18,8 +18,15 @@ class GraspExecutionMonitorService {
     this.events = [];
     this.historyLimit = Math.max(Number(process.env.GRASP_MONITOR_HISTORY_LIMIT || 500), 1);
     this.eventLimit = Math.max(Number(process.env.GRASP_MONITOR_EVENT_LIMIT || 300), 1);
+    this.storeBootstrapRunLimit = Math.max(Number(process.env.GRASP_MONITOR_BOOTSTRAP_RUN_LIMIT || 300), 1);
+    this.storeBootstrapEventLimit = Math.max(Number(process.env.GRASP_MONITOR_BOOTSTRAP_EVENT_LIMIT || 300), 1);
+    this.storeBootstrapHistoryLimit = Math.max(
+      Number(process.env.GRASP_RUN_SUMMARY_HISTORY_LIMIT || 30),
+      0
+    );
     this.persistProgressEvents = String(process.env.GRASP_PERSIST_PROGRESS_EVENTS || "true").toLowerCase() === "true";
     this.exposeProgressEvents = String(process.env.GRASP_EXPOSE_PROGRESS_EVENTS || "true").toLowerCase() === "true";
+    this.rehydratedAt = null;
   }
 
   isProgressTopic(topic) {
@@ -177,8 +184,35 @@ class GraspExecutionMonitorService {
       return this.startPromise;
     }
 
-    this.startPromise = this.connect();
+    this.startPromise = (async () => {
+      await this.rehydrateFromStore();
+      await this.connect();
+    })();
     return this.startPromise;
+  }
+
+  async rehydrateFromStore() {
+    try {
+      const [storedRuns, storedEvents] = await Promise.all([
+        graspExecutionStoreService.listRuns(this.storeBootstrapRunLimit, this.storeBootstrapHistoryLimit),
+        graspExecutionStoreService.listEvents(this.storeBootstrapEventLimit),
+      ]);
+
+      const mergedRuns = this.mergeRuns(storedRuns, this.getRuns());
+      this.runs = new Map(mergedRuns.map((run) => [run.seedId, run]));
+      this.events = this.mergeEvents(storedEvents, this.getEvents(this.storeBootstrapEventLimit), this.storeBootstrapEventLimit);
+      this.rehydratedAt = new Date().toISOString();
+
+      logger.info("Monitor reidratado a partir do store persistido", {
+        runs: mergedRuns.length,
+        events: this.events.length,
+        rehydratedAt: this.rehydratedAt,
+      });
+    } catch (error) {
+      logger.warn("Falha ao reidratar monitor a partir do store persistido", {
+        error: error.message,
+      });
+    }
   }
 
   async stop() {
