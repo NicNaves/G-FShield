@@ -4,372 +4,382 @@
 
 ### Objetivo
 
-Este guia descreve o fluxo recomendado para subir o GF-Shield com Docker, API Node.js e front React, tanto no preset `local` quanto no preset `server`.
+Este guia descreve o fluxo recomendado para subir o GF-Shield localmente e no servidor de desenvolvimento com os scripts atuais.
 
 ### Pre-requisitos
 
-- Docker Desktop
-- Node.js com `npm.cmd`
-- Java 17 para execucoes locais fora do Docker, quando necessario
+Minimo recomendado:
 
-### O que sobe no ambiente
+- Docker ou Docker Desktop
+- `docker compose`
+- PowerShell no Windows ou `bash` no Ubuntu
 
-- stack principal via [`docker-compose.yml`](../docker-compose.yml)
-- preset local via [`docker-compose.local.yml`](../docker-compose.local.yml)
-- preset server via [`docker-compose.server.yml`](../docker-compose.server.yml)
-- banco PostgreSQL da API via [`webservice/api/docker-compose.db.yml`](../webservice/api/docker-compose.db.yml)
-- preset local via [`webservice/api/docker-compose.db.local.yml`](../webservice/api/docker-compose.db.local.yml)
-- preset server via [`webservice/api/docker-compose.db.server.yml`](../webservice/api/docker-compose.db.server.yml)
-- API Express na porta `4000`
-- front React na porta `3000`
+Opcional:
 
-### Fluxo recomendado
+- Node.js no host, se voce nao quiser usar `DEV_NODE_IMAGE=node:24`
 
-#### 1. Iniciar tudo com o script
+### Modos de execucao
 
-Windows local:
+#### 1. Modo recomendado: Node em Docker
+
+Use este modo quando voce quiser:
+
+- alinhar local e servidor
+- evitar instalacao de Node/npm no host
+- manter o `Restart and clean environment` funcional no dashboard
+
+Windows:
+
+```powershell
+.\scripts\start-local-dev.ps1 -DevNodeImage node:24
+```
+
+Ubuntu:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-local-dev.sh
+```
+
+#### 2. Modo alternativo: Node no host
+
+Use este modo quando sua maquina ja tiver Node configurado.
+
+Windows:
 
 ```powershell
 .\scripts\start-local-dev.ps1
 ```
 
-Windows server:
-
-```powershell
-.\scripts\start-server-dev.ps1
-```
-
-Ubuntu local:
+Ubuntu:
 
 ```bash
 bash scripts/start-local-dev.sh
 ```
 
-Ubuntu server:
+### Fluxo recomendado no servidor de desenvolvimento
+
+Quando o host nao tem Node/npm instalados e voce quer rodar tudo com Docker:
 
 ```bash
-bash scripts/start-server-dev.sh
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-server-dev.sh --frontend-port 3001 --public-front-origin http://SEU_IP:3001
 ```
 
-Esses scripts:
+Se precisar trocar as portas:
 
-- sobe a stack principal do GF-Shield
-- sobe o banco da API
-- iniciam API e front fora do Docker
-- separam estado entre `local` e `server`
-- podem disparar uma execucao de exemplo
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-server-dev.sh --api-port 4001 --frontend-port 3001 --public-front-origin http://SEU_IP:3001
+```
 
-#### 2. Encerrar o ambiente
+### O que os scripts fazem
 
-Windows local:
+Os scripts de start:
+
+- sobem a stack principal (`docker-compose.yml` + preset)
+- sobem o PostgreSQL da API
+- podem instalar dependencias automaticamente
+- iniciam API e front
+- esperam a API responder no healthcheck
+- no modo Docker, montam datasets, repo root e configuracao de reset
+
+Os scripts de stop:
+
+- param API e front
+- podem manter a stack Docker ligada
+- podem derrubar o banco da API
+- no PowerShell local, podem limpar volumes de `node_modules` usados pelo modo Docker
+
+### Comandos de parada
+
+Windows:
 
 ```powershell
 .\scripts\stop-local-dev.ps1
 ```
 
-Windows server:
-
-```powershell
-.\scripts\stop-server-dev.ps1
-```
-
-Ubuntu local:
+Ubuntu:
 
 ```bash
 bash scripts/stop-local-dev.sh
 ```
 
-Ubuntu server:
+Servidor:
 
 ```bash
+export DEV_NODE_IMAGE=node:24
 bash scripts/stop-server-dev.sh
 ```
 
-Para manter Docker de pe:
+Flags uteis:
 
-- PowerShell: `-KeepDocker`
-- Shell: `--keep-docker`
-
-Para derrubar o banco da API e remover volumes:
-
-- PowerShell: `-ResetDatabase`
-- Shell: `--reset-database`
-
-### Fluxo manual
-
-#### Stack principal
-
-```powershell
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
-```
-
-Ou com o preset server:
-
-```powershell
-docker compose -f docker-compose.yml -f docker-compose.server.yml up -d --build
-```
-
-#### Banco da API
-
-```powershell
-cd .\webservice\api
-docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.local.yml up -d
-```
-
-Ou com o preset server:
-
-```powershell
-cd .\webservice\api
-docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.server.yml up -d
-```
-
-#### Migracao e seed
-
-```powershell
-cd .\webservice\api
-npm.cmd run migrate
-```
-
-#### API
-
-```powershell
-cd .\webservice\api
-npm.cmd run dev
-```
-
-#### Front
-
-```powershell
-cd .\webservice\front
-npm.cmd start
-```
+- manter Docker ligado
+  PowerShell: `-KeepDocker`
+  Shell: `--keep-docker`
+- resetar o banco da API
+  PowerShell: `-ResetDatabase`
+  Shell: `--reset-database`
+- limpar volumes locais do modo Docker
+  PowerShell: `-ResetNodeVolumes`
 
 ### URLs principais
+
+Local padrao:
 
 - Front: `http://localhost:3000`
 - API: `http://localhost:4000`
 - Swagger: `http://localhost:4000/api-docs`
-- Conduktor: `http://localhost:8080`
+- Kafbat: `http://localhost:8080`
 
-### Observacoes importantes
+Servidor, exemplo com front em `3001`:
 
-- No PowerShell, prefira `npm.cmd` em vez de `npm` se a execution policy bloquear scripts.
-- No Ubuntu, os scripts `.sh` gravam logs em `.local-dev` ou `.server-dev`.
-- O catalogo de datasets da API usa `GRASP_DATASETS_DIR="../../datasets"` por padrao.
-- O dashboard usa eventos persistidos da API, nao os CSVs de `metrics`.
-- a aba `Settings > Operations` mostra o `Request Summary` das launches persistidas.
-- a fila da API suporta cancelamento best-effort.
+- Front: `http://SEU_IP:3001`
+- API: `http://SEU_IP:4000`
+
+### CORS e acesso remoto
+
+Se o front for acessado por IP ou dominio remoto, passe a origem publica no start do servidor:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-server-dev.sh --frontend-port 3001 --public-front-origin http://200.156.91.194:3001
+```
+
+Se precisar definir tudo manualmente:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-server-dev.sh --cors-origins "http://200.156.91.194:3001,http://localhost:3001"
+```
+
+### Credencial seedada
+
+Modo real com seed:
+
+- email: `admin@admin.com`
+- senha: `senhaSegura123`
+
+### Dashboard: o que mudou
+
+O front atual inclui:
+
+- exportacao em CSV/JSON nas tabelas compartilhadas
+- exportacao por request, run inteira ou recorte de timeline
+- filtro temporal com calendario e busca por timestamp
+- grafico de atividade por horario
+- `DLS Outcome Summary`, que mostra os algoritmos de busca local visiveis no recorte atual
 
 ### Troubleshooting
 
-#### `npm` bloqueado no PowerShell
+#### API sobe, mas o front nao consegue logar
 
-Use:
+Verifique:
 
-```powershell
-npm.cmd run dev
-```
+- `CORS_ORIGINS`
+- porta publica do front
+- firewall do servidor
 
-ou:
+#### Datasets nao aparecem quando a API roda em container
 
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-```
+Use o modo Docker dos scripts. Ele monta a pasta `datasets` e ajusta `GRASP_DATASETS_DIR` automaticamente.
 
-#### API nao enxerga mensagens antigas do Kafka
+#### O dashboard ficou pesado
 
-Verifique em [`webservice/api/.env`](../webservice/api/.env):
+As versoes mais recentes do front ja reduzem o volume inicial de historico carregado e usam um limite mais leve para o monitor. Mesmo assim, um `Ctrl+F5` apos deploy ajuda a limpar cache antigo.
 
-- `KAFKA_MONITOR_FROM_BEGINNING=true`
-- `KAFKA_MONITOR_GROUP_ID` com um grupo novo para replay
+#### Botao `Restart and clean environment` retorna erro
 
-#### Front com cache antigo
-
-Use `Ctrl + F5` no navegador.
+Use o modo Docker dos scripts para API/front. Nesse modo a API sobe com acesso ao Compose do host e consegue executar o reset completo.
 
 ## EN-US
 
 ### Goal
 
-This guide describes the recommended flow to start GF-Shield with Docker, the Node.js API, and the React front-end using either the `local` or `server` preset.
+This guide describes the recommended way to start GF-Shield locally and on the development server using the current scripts.
 
 ### Prerequisites
 
-- Docker Desktop
-- Node.js with `npm.cmd`
-- Java 17 for local non-Docker Java runs when needed
+Recommended minimum:
 
-### What starts in the environment
+- Docker or Docker Desktop
+- `docker compose`
+- PowerShell on Windows or `bash` on Ubuntu
 
-- main stack via [`docker-compose.yml`](../docker-compose.yml)
-- local preset via [`docker-compose.local.yml`](../docker-compose.local.yml)
-- server preset via [`docker-compose.server.yml`](../docker-compose.server.yml)
-- API PostgreSQL database via [`webservice/api/docker-compose.db.yml`](../webservice/api/docker-compose.db.yml)
-- local preset via [`webservice/api/docker-compose.db.local.yml`](../webservice/api/docker-compose.db.local.yml)
-- server preset via [`webservice/api/docker-compose.db.server.yml`](../webservice/api/docker-compose.db.server.yml)
-- Express API on port `4000`
-- React front-end on port `3000`
+Optional:
 
-### Recommended flow
+- Node.js on the host, if you do not want to use `DEV_NODE_IMAGE=node:24`
 
-#### 1. Start everything with the script
+### Runtime modes
 
-Windows local:
+#### 1. Recommended mode: Node in Docker
+
+Use this mode when you want to:
+
+- align local and server behavior
+- avoid installing Node/npm on the host
+- keep `Restart and clean environment` working from the dashboard
+
+Windows:
+
+```powershell
+.\scripts\start-local-dev.ps1 -DevNodeImage node:24
+```
+
+Ubuntu:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-local-dev.sh
+```
+
+#### 2. Alternative mode: Node on the host
+
+Use this mode when the machine already has Node configured.
+
+Windows:
 
 ```powershell
 .\scripts\start-local-dev.ps1
 ```
 
-Windows server:
-
-```powershell
-.\scripts\start-server-dev.ps1
-```
-
-Ubuntu local:
+Ubuntu:
 
 ```bash
 bash scripts/start-local-dev.sh
 ```
 
-Ubuntu server:
+### Recommended flow on the development server
+
+When the host does not have Node/npm installed and you want everything through Docker:
 
 ```bash
-bash scripts/start-server-dev.sh
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-server-dev.sh --frontend-port 3001 --public-front-origin http://YOUR_IP:3001
 ```
 
-These scripts:
+To change ports:
 
-- starts the main GF-Shield stack
-- starts the API database
-- starts the API and front-end outside Docker
-- keeps `local` and `server` state separated
-- can dispatch a sample run
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-server-dev.sh --api-port 4001 --frontend-port 3001 --public-front-origin http://YOUR_IP:3001
+```
 
-#### 2. Stop the environment
+### What the scripts do
 
-Windows local:
+The start scripts:
+
+- start the main stack (`docker-compose.yml` + preset)
+- start the API PostgreSQL database
+- can install dependencies automatically
+- start the API and front-end
+- wait for the API healthcheck
+- in Docker mode, mount datasets, repo root, and reset-related runtime settings
+
+The stop scripts:
+
+- stop the API and front-end
+- can keep the Docker stack running
+- can stop the API database
+- on Windows local mode, can clear Docker `node_modules` volumes
+
+### Stop commands
+
+Windows:
 
 ```powershell
 .\scripts\stop-local-dev.ps1
 ```
 
-Windows server:
-
-```powershell
-.\scripts\stop-server-dev.ps1
-```
-
-Ubuntu local:
+Ubuntu:
 
 ```bash
 bash scripts/stop-local-dev.sh
 ```
 
-Ubuntu server:
+Server:
 
 ```bash
+export DEV_NODE_IMAGE=node:24
 bash scripts/stop-server-dev.sh
 ```
 
-To keep Docker running:
+Useful flags:
 
-- PowerShell: `-KeepDocker`
-- Shell: `--keep-docker`
-
-To stop the API database and remove volumes:
-
-- PowerShell: `-ResetDatabase`
-- Shell: `--reset-database`
-
-### Manual flow
-
-#### Main stack
-
-```powershell
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
-```
-
-Or with the server preset:
-
-```powershell
-docker compose -f docker-compose.yml -f docker-compose.server.yml up -d --build
-```
-
-#### API database
-
-```powershell
-cd .\webservice\api
-docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.local.yml up -d
-```
-
-Or with the server preset:
-
-```powershell
-cd .\webservice\api
-docker compose -f .\docker-compose.db.yml -f .\docker-compose.db.server.yml up -d
-```
-
-#### Migration and seed
-
-```powershell
-cd .\webservice\api
-npm.cmd run migrate
-```
-
-#### API
-
-```powershell
-cd .\webservice\api
-npm.cmd run dev
-```
-
-#### Front-end
-
-```powershell
-cd .\webservice\front
-npm.cmd start
-```
+- keep Docker running
+  PowerShell: `-KeepDocker`
+  Shell: `--keep-docker`
+- reset the API database
+  PowerShell: `-ResetDatabase`
+  Shell: `--reset-database`
+- clear local Docker-mode Node volumes
+  PowerShell: `-ResetNodeVolumes`
 
 ### Main URLs
 
-- Front-end: `http://localhost:3000`
+Default local:
+
+- Front: `http://localhost:3000`
 - API: `http://localhost:4000`
 - Swagger: `http://localhost:4000/api-docs`
-- Conduktor: `http://localhost:8080`
+- Kafbat: `http://localhost:8080`
 
-### Important notes
+Server example with front on `3001`:
 
-- In PowerShell, prefer `npm.cmd` instead of `npm` if execution policy blocks scripts.
-- On Ubuntu, the `.sh` scripts write logs to `.local-dev` or `.server-dev`.
-- The API dataset catalog uses `GRASP_DATASETS_DIR="../../datasets"` by default.
-- The dashboard uses API-persisted execution events, not the CSV files under `metrics`.
-- `Settings > Operations` shows the persisted `Request Summary` for launches.
-- the API queue supports best-effort cancellation.
+- Front: `http://YOUR_IP:3001`
+- API: `http://YOUR_IP:4000`
+
+### CORS and remote access
+
+If the front-end is opened through a remote IP or domain, pass the public origin on server startup:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-server-dev.sh --frontend-port 3001 --public-front-origin http://200.156.91.194:3001
+```
+
+To define all origins manually:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-server-dev.sh --cors-origins "http://200.156.91.194:3001,http://localhost:3001"
+```
+
+### Seeded credential
+
+Real mode with seed:
+
+- email: `admin@admin.com`
+- password: `senhaSegura123`
+
+### Dashboard changes now in place
+
+The current front-end includes:
+
+- CSV/JSON export in shared tables
+- export by full request, full run, or timeline slice
+- time filters with calendar inputs and timestamp search
+- hourly activity chart
+- `DLS Outcome Summary`, showing local-search algorithms visible in the current slice
 
 ### Troubleshooting
 
-#### `npm` blocked in PowerShell
+#### API starts, but the front-end cannot log in
 
-Use:
+Check:
 
-```powershell
-npm.cmd run dev
-```
+- `CORS_ORIGINS`
+- the public front-end port
+- the server firewall
 
-or:
+#### Datasets do not show up when the API runs in a container
 
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-```
+Use the Docker mode from the scripts. It mounts the `datasets` folder and adjusts `GRASP_DATASETS_DIR` automatically.
 
-#### API does not see older Kafka messages
+#### The dashboard feels heavy
 
-Check [`webservice/api/.env`](../webservice/api/.env):
+Recent front-end changes already reduced the initial history volume and use a lighter monitor limit. Even so, a `Ctrl+F5` after deploy helps clear stale cache.
 
-- `KAFKA_MONITOR_FROM_BEGINNING=true`
-- `KAFKA_MONITOR_GROUP_ID` set to a new group for replay
+#### `Restart and clean environment` returns an error
 
-#### Front-end shows stale cache
-
-Use `Ctrl + F5` in the browser.
+Use the Docker script mode for the API/front-end. In that mode the API starts with access to the host Compose runtime and can perform the full reset.

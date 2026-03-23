@@ -4,44 +4,117 @@
 
 ### Objetivo
 
-Este guia concentra os comandos operacionais mais comuns para reset, limpeza, replay e verificacao do ambiente GF-Shield.
+Este guia reune os comandos operacionais mais comuns para logs, reset, rebuild, limpeza e verificacao do ambiente GF-Shield.
 
-### Validacao rapida do ambiente
+### Nome do projeto Compose
+
+Os scripts atuais resolvem o nome do repositorio real e normalmente sobem a stack com o projeto Compose:
+
+```text
+g-fshield
+```
+
+Por isso, os containers mais recentes tendem a aparecer como:
+
+- `g-fshield-zookeeper-1`
+- `g-fshield-kafka-1`
+- `g-fshield-grasp-fs-dls-vnd-1`
+- `g-fshield-api-dev`
+- `g-fshield-front-dev`
+
+Se voce ainda tiver uma stack antiga `gf-shield-*`, derrube-a antes de misturar os ambientes.
+
+### Validacao rapida
 
 ```powershell
-docker compose ps
+docker compose -p g-fshield ps
 ```
 
 ```powershell
-docker compose logs --tail=100
+docker compose -p g-fshield logs --tail=100
 ```
 
 ### Logs uteis
 
-#### DRG
+Stack principal:
 
 ```powershell
-docker logs -f gf-shield-grasp-fs-rcl-ig-1
-docker logs -f gf-shield-grasp-fs-rcl-gr-1
-docker logs -f gf-shield-grasp-fs-rcl-su-1
-docker logs -f gf-shield-grasp-fs-rcl-rf-1
+docker logs -f g-fshield-kafka-1
+docker logs -f g-fshield-zookeeper-1
+docker logs -f g-fshield-grasp-fs-dls-vnd-1
+docker logs -f g-fshield-grasp-fs-dls-iwr-1
 ```
 
-#### Verify
+API e front em containers standalone:
 
 ```powershell
-docker logs -f gf-shield-grasp-fs.dls.verify-1
+docker logs -f g-fshield-api-dev
+docker logs -f g-fshield-front-dev
 ```
 
-### Limpar metricas CSV
+Logs gravados pelos scripts:
+
+- local: `.local-dev/api.log`, `.local-dev/front.log`
+- server: `.server-dev/api.log`, `.server-dev/front.log`
+
+### Subir e parar pelos scripts
+
+Windows:
+
+- start local: `.\scripts\start-local-dev.ps1`
+- stop local: `.\scripts\stop-local-dev.ps1`
+- start local com Node em Docker: `.\scripts\start-local-dev.ps1 -DevNodeImage node:24`
+- start server: `.\scripts\start-server-dev.ps1`
+
+Ubuntu:
+
+- start local: `bash scripts/start-local-dev.sh`
+- stop local: `bash scripts/stop-local-dev.sh`
+- start server com Node em Docker:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-server-dev.sh
+```
+
+### Derrubar a stack principal
 
 ```powershell
-Get-ChildItem .\metrics -File | Where-Object { $_.Name -ne '.gitkeep' } | Remove-Item -Force
+docker compose -p g-fshield down
 ```
 
-### Limpar topicos Kafka da aplicacao
+Para tambem remover volumes:
 
-Exemplo de topicos normalmente usados:
+```powershell
+docker compose -p g-fshield down -v
+```
+
+### Banco da API
+
+Reset do banco:
+
+```powershell
+cd .\webservice\api
+docker compose -f .\docker-compose.db.yml down -v
+docker compose -f .\docker-compose.db.yml up -d
+npm.cmd run migrate
+npm.cmd run seed
+```
+
+### Reset do monitor e reset completo
+
+No dashboard:
+
+- `Settings > Operations > Reset monitor`
+- `Settings > Operations > Restart and clean environment`
+
+Observacao importante:
+
+- o reset completo exige que a API esteja rodando no modo Docker dos scripts, com acesso ao Docker/Compose do host
+
+### Kafka e replay
+
+Topicos mais usados:
 
 - `INITIAL_SOLUTION_TOPIC`
 - `NEIGHBORHOOD_RESTART_TOPIC`
@@ -52,78 +125,48 @@ Exemplo de topicos normalmente usados:
 - `IWSS_TOPIC`
 - `IWSSR_TOPIC`
 
-Recrie ou apague conforme sua rotina operacional. Nao remova `__consumer_offsets`.
-
-Exemplo:
+Exemplo de delete:
 
 ```powershell
-docker exec gf-shield-kafka-1 kafka-topics --bootstrap-server localhost:9092 --delete --if-exists --topic BEST_SOLUTION_TOPIC
+docker exec g-fshield-kafka-1 kafka-topics --bootstrap-server localhost:9092 --delete --if-exists --topic BEST_SOLUTION_TOPIC
 ```
 
-### Parar toda a stack
+Nao remova `__consumer_offsets`.
 
-```powershell
-docker compose down
-```
-
-### Presets de recursos
-
-- stack local: `docker compose -f docker-compose.yml -f docker-compose.local.yml up -d`
-- stack server: `docker compose -f docker-compose.yml -f docker-compose.server.yml up -d`
-- banco API local: `docker compose -f docker-compose.db.yml -f docker-compose.db.local.yml up -d`
-- banco API server: `docker compose -f docker-compose.db.yml -f docker-compose.db.server.yml up -d`
-
-### Scripts operacionais
-
-Windows:
-
-- local start: `.\scripts\start-local-dev.ps1`
-- local stop: `.\scripts\stop-local-dev.ps1`
-- server start: `.\scripts\start-server-dev.ps1`
-- server stop: `.\scripts\stop-server-dev.ps1`
-
-Ubuntu:
-
-- local start: `bash scripts/start-local-dev.sh`
-- local stop: `bash scripts/stop-local-dev.sh`
-- server start: `bash scripts/start-server-dev.sh`
-- server stop: `bash scripts/stop-server-dev.sh`
-
-### Resetar o banco da API
-
-```powershell
-cd .\webservice\api
-docker compose -f .\docker-compose.db.yml down -v
-docker compose -f .\docker-compose.db.yml up -d
-npm.cmd run migrate
-```
-
-### Replay de dados antigos do Kafka para o monitor
-
-Em [`webservice/api/.env`](../webservice/api/.env):
+Para replay do monitor, ajuste em [`webservice/api/.env`](../webservice/api/.env):
 
 ```env
 KAFKA_MONITOR_FROM_BEGINNING=true
 KAFKA_MONITOR_GROUP_ID=grasp-fs-monitor-group-replay
 ```
 
-Depois reinicie a API. Para novo replay futuro, troque o `KAFKA_MONITOR_GROUP_ID`.
+Depois reinicie a API. Para um replay novo no futuro, troque o `KAFKA_MONITOR_GROUP_ID`.
 
-### Limpar o estado do monitor web
+### Rebuild seletivo
 
-O monitor persistido fica nas tabelas:
+DRG:
 
-- `GraspExecutionLaunch`
-- `GraspExecutionRun`
-- `GraspExecutionEvent`
+```powershell
+docker compose -p g-fshield build grasp-fs-rcl-ig grasp-fs-rcl-gr grasp-fs-rcl-su grasp-fs-rcl-rf
+docker compose -p g-fshield up -d --no-deps --force-recreate grasp-fs-rcl-ig grasp-fs-rcl-gr grasp-fs-rcl-su grasp-fs-rcl-rf
+```
 
-Se necessario, limpe essas tabelas no PostgreSQL da API para zerar o dashboard.
+DLS:
 
-`GraspExecutionLaunch` tambem guarda os parametros da request usados na fila do webservice.
+```powershell
+docker compose -p g-fshield build grasp-fs-dls-bf grasp-fs-dls-iw grasp-fs-dls-iwr grasp-fs-dls-vnd grasp-fs-dls-rvnd grasp-fs.dls.verify
+docker compose -p g-fshield up -d --no-deps --force-recreate grasp-fs-dls-bf grasp-fs-dls-iw grasp-fs-dls-iwr grasp-fs-dls-vnd grasp-fs-dls-rvnd grasp-fs.dls.verify
+```
 
-### Limpar estado do navegador
+### Limpeza de metricas e browser
 
-No console do browser:
+Metricas CSV:
+
+```powershell
+Get-ChildItem .\metrics -File | Where-Object { $_.Name -ne '.gitkeep' } | Remove-Item -Force
+```
+
+Estado do browser:
 
 ```js
 localStorage.clear()
@@ -137,55 +180,127 @@ Isso remove:
 - `darkMode`
 - notificacoes do monitor
 
-### Rebuild seletivo
+### Dicas de diagnostico
 
-```powershell
-docker compose build grasp-fs-rcl-ig grasp-fs-rcl-gr grasp-fs-rcl-su grasp-fs-rcl-rf
-docker compose build grasp-fs-dls-bf grasp-fs-dls-iw grasp-fs-dls-iwr grasp-fs-dls-vnd grasp-fs-dls-rvnd grasp-fs.dls.verify
-```
+- se o dashboard parecer pesado, verifique se o browser esta com build antigo em cache
+- se o `DLS Outcome Summary` mostrar menos algoritmos do que o esperado, cheque os logs de `VND` e `IWSSR` para confirmar se houve atividade real
+- se o login falhar em acesso remoto, revise `CORS_ORIGINS` e a porta publica do front
 
 ## EN-US
 
 ### Goal
 
-This guide gathers the most common operational commands for reset, cleanup, replay, and environment checks in GF-Shield.
+This guide gathers the most common operational commands for logs, reset, rebuild, cleanup, and validation in GF-Shield.
 
-### Quick environment validation
+### Compose project name
+
+The current scripts resolve the real repository name and typically start the stack with the Compose project:
+
+```text
+g-fshield
+```
+
+Because of that, the latest containers usually look like:
+
+- `g-fshield-zookeeper-1`
+- `g-fshield-kafka-1`
+- `g-fshield-grasp-fs-dls-vnd-1`
+- `g-fshield-api-dev`
+- `g-fshield-front-dev`
+
+If you still have an older `gf-shield-*` stack, stop it before mixing environments.
+
+### Quick validation
 
 ```powershell
-docker compose ps
+docker compose -p g-fshield ps
 ```
 
 ```powershell
-docker compose logs --tail=100
+docker compose -p g-fshield logs --tail=100
 ```
 
 ### Useful logs
 
-#### DRG
+Main stack:
 
 ```powershell
-docker logs -f gf-shield-grasp-fs-rcl-ig-1
-docker logs -f gf-shield-grasp-fs-rcl-gr-1
-docker logs -f gf-shield-grasp-fs-rcl-su-1
-docker logs -f gf-shield-grasp-fs-rcl-rf-1
+docker logs -f g-fshield-kafka-1
+docker logs -f g-fshield-zookeeper-1
+docker logs -f g-fshield-grasp-fs-dls-vnd-1
+docker logs -f g-fshield-grasp-fs-dls-iwr-1
 ```
 
-#### Verify
+API and front-end standalone containers:
 
 ```powershell
-docker logs -f gf-shield-grasp-fs.dls.verify-1
+docker logs -f g-fshield-api-dev
+docker logs -f g-fshield-front-dev
 ```
 
-### Clear CSV metrics
+Script-managed logs:
+
+- local: `.local-dev/api.log`, `.local-dev/front.log`
+- server: `.server-dev/api.log`, `.server-dev/front.log`
+
+### Start and stop through scripts
+
+Windows:
+
+- local start: `.\scripts\start-local-dev.ps1`
+- local stop: `.\scripts\stop-local-dev.ps1`
+- local start with Docker Node: `.\scripts\start-local-dev.ps1 -DevNodeImage node:24`
+- server start: `.\scripts\start-server-dev.ps1`
+
+Ubuntu:
+
+- local start: `bash scripts/start-local-dev.sh`
+- local stop: `bash scripts/stop-local-dev.sh`
+- server start with Docker Node:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-server-dev.sh
+```
+
+### Stop the main stack
 
 ```powershell
-Get-ChildItem .\metrics -File | Where-Object { $_.Name -ne '.gitkeep' } | Remove-Item -Force
+docker compose -p g-fshield down
 ```
 
-### Clear application Kafka topics
+To also remove volumes:
 
-Examples of commonly used topics:
+```powershell
+docker compose -p g-fshield down -v
+```
+
+### API database
+
+Database reset:
+
+```powershell
+cd .\webservice\api
+docker compose -f .\docker-compose.db.yml down -v
+docker compose -f .\docker-compose.db.yml up -d
+npm.cmd run migrate
+npm.cmd run seed
+```
+
+### Monitor reset and full reset
+
+From the dashboard:
+
+- `Settings > Operations > Reset monitor`
+- `Settings > Operations > Restart and clean environment`
+
+Important note:
+
+- the full reset requires the API to run in the Docker script mode, with access to the host Docker/Compose runtime
+
+### Kafka and replay
+
+Most common topics:
 
 - `INITIAL_SOLUTION_TOPIC`
 - `NEIGHBORHOOD_RESTART_TOPIC`
@@ -196,55 +311,15 @@ Examples of commonly used topics:
 - `IWSS_TOPIC`
 - `IWSSR_TOPIC`
 
-Recreate or delete them according to your operational workflow. Do not remove `__consumer_offsets`.
-
-Example:
+Delete example:
 
 ```powershell
-docker exec gf-shield-kafka-1 kafka-topics --bootstrap-server localhost:9092 --delete --if-exists --topic BEST_SOLUTION_TOPIC
+docker exec g-fshield-kafka-1 kafka-topics --bootstrap-server localhost:9092 --delete --if-exists --topic BEST_SOLUTION_TOPIC
 ```
 
-### Stop the full stack
+Do not remove `__consumer_offsets`.
 
-```powershell
-docker compose down
-```
-
-### Resource presets
-
-- local stack: `docker compose -f docker-compose.yml -f docker-compose.local.yml up -d`
-- server stack: `docker compose -f docker-compose.yml -f docker-compose.server.yml up -d`
-- local API DB: `docker compose -f docker-compose.db.yml -f docker-compose.db.local.yml up -d`
-- server API DB: `docker compose -f docker-compose.db.yml -f docker-compose.db.server.yml up -d`
-
-### Operational scripts
-
-Windows:
-
-- local start: `.\scripts\start-local-dev.ps1`
-- local stop: `.\scripts\stop-local-dev.ps1`
-- server start: `.\scripts\start-server-dev.ps1`
-- server stop: `.\scripts\stop-server-dev.ps1`
-
-Ubuntu:
-
-- local start: `bash scripts/start-local-dev.sh`
-- local stop: `bash scripts/stop-local-dev.sh`
-- server start: `bash scripts/start-server-dev.sh`
-- server stop: `bash scripts/stop-server-dev.sh`
-
-### Reset the API database
-
-```powershell
-cd .\webservice\api
-docker compose -f .\docker-compose.db.yml down -v
-docker compose -f .\docker-compose.db.yml up -d
-npm.cmd run migrate
-```
-
-### Replay older Kafka data into the monitor
-
-In [`webservice/api/.env`](../webservice/api/.env):
+For monitor replay, adjust [`webservice/api/.env`](../webservice/api/.env):
 
 ```env
 KAFKA_MONITOR_FROM_BEGINNING=true
@@ -253,21 +328,31 @@ KAFKA_MONITOR_GROUP_ID=grasp-fs-monitor-group-replay
 
 Then restart the API. For another replay later, change `KAFKA_MONITOR_GROUP_ID`.
 
-### Clear the web monitor state
+### Selective rebuild
 
-Persisted monitor data lives in these tables:
+DRG:
 
-- `GraspExecutionLaunch`
-- `GraspExecutionRun`
-- `GraspExecutionEvent`
+```powershell
+docker compose -p g-fshield build grasp-fs-rcl-ig grasp-fs-rcl-gr grasp-fs-rcl-su grasp-fs-rcl-rf
+docker compose -p g-fshield up -d --no-deps --force-recreate grasp-fs-rcl-ig grasp-fs-rcl-gr grasp-fs-rcl-su grasp-fs-rcl-rf
+```
 
-If needed, clear those tables in the API PostgreSQL database to reset the dashboard.
+DLS:
 
-`GraspExecutionLaunch` also stores the request parameters used by the webservice queue.
+```powershell
+docker compose -p g-fshield build grasp-fs-dls-bf grasp-fs-dls-iw grasp-fs-dls-iwr grasp-fs-dls-vnd grasp-fs-dls-rvnd grasp-fs.dls.verify
+docker compose -p g-fshield up -d --no-deps --force-recreate grasp-fs-dls-bf grasp-fs-dls-iw grasp-fs-dls-iwr grasp-fs-dls-vnd grasp-fs-dls-rvnd grasp-fs.dls.verify
+```
 
-### Clear browser state
+### Metrics and browser cleanup
 
-In the browser console:
+CSV metrics:
+
+```powershell
+Get-ChildItem .\metrics -File | Where-Object { $_.Name -ne '.gitkeep' } | Remove-Item -Force
+```
+
+Browser state:
 
 ```js
 localStorage.clear()
@@ -281,9 +366,8 @@ This removes:
 - `darkMode`
 - monitor notifications
 
-### Selective rebuild
+### Diagnostic hints
 
-```powershell
-docker compose build grasp-fs-rcl-ig grasp-fs-rcl-gr grasp-fs-rcl-su grasp-fs-rcl-rf
-docker compose build grasp-fs-dls-bf grasp-fs-dls-iw grasp-fs-dls-iwr grasp-fs-dls-vnd grasp-fs-dls-rvnd grasp-fs.dls.verify
-```
+- if the dashboard feels heavy, check whether the browser is still serving an older cached build
+- if `DLS Outcome Summary` shows fewer algorithms than expected, inspect the `VND` and `IWSSR` logs to confirm actual activity
+- if remote login fails, review `CORS_ORIGINS` and the public front-end port

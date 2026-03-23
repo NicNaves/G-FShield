@@ -2,7 +2,7 @@
 
 ## PT-BR
 
-Esta API fornece autenticacao, gestao de usuarios, disparo de execucao GRASP-FS, acesso ao catalogo de datasets e os endpoints de monitor usados pelo dashboard.
+Esta API concentra autenticacao, usuarios, fila de execucoes GRASP-FS, persistencia do monitor e endpoints usados pelo dashboard.
 
 ### Stack
 
@@ -14,7 +14,7 @@ Esta API fornece autenticacao, gestao de usuarios, disparo de execucao GRASP-FS,
 
 ### Rotas principais
 
-#### Auth e usuarios
+Auth e usuarios:
 
 - `POST /api/register`
 - `POST /api/login`
@@ -23,7 +23,7 @@ Esta API fornece autenticacao, gestao de usuarios, disparo de execucao GRASP-FS,
 - `GET /api/users/:id`
 - `PUT /api/users/:id`
 
-#### GRASP
+GRASP:
 
 - `GET /api/grasp/services`
 - `GET /api/grasp/datasets`
@@ -40,31 +40,38 @@ Esta API fornece autenticacao, gestao de usuarios, disparo de execucao GRASP-FS,
 - `POST /api/grasp/monitor/reset`
 - `POST /api/grasp/environment/reset`
 
-#### Swagger
+Swagger:
 
 - `GET /api-docs`
 
-### Banco
+### Persistencia
 
-O schema em modo real e pequeno e focado no GF-Shield:
+As tabelas principais sao:
 
 - `User`
 - `GraspExecutionLaunch`
 - `GraspExecutionRun`
 - `GraspExecutionEvent`
 
-`GraspExecutionLaunch` persiste:
+`GraspExecutionLaunch` guarda:
 
 - parametros da request
-- algoritmos selecionados
-- datasets e classificador
-- estado da fila
+- algoritmos, datasets e classificador
+- `queueState`
+- `status`
 - historico de dispatch
-- contagem esperada, observada e concluida de seeds para reconciliar o `status` real da execucao
+- contadores de seeds esperadas, observadas e concluidas
 
-### Variaveis de ambiente
+### Endpoints importantes para o front atual
 
-Principais variaveis de [`.env.example`](./.env.example):
+- `GET /api/grasp/executions/:requestId?includeMonitor=true`
+  retorna o bundle completo da request, usado pela exportacao do dashboard
+- `POST /api/grasp/environment/reset`
+  executa reset do ambiente distribuido quando a API roda com acesso ao Docker/Compose do host
+
+### Variaveis de ambiente principais
+
+Exemplo de base:
 
 ```env
 DATABASE_URL="postgresql://postgres:password@localhost:5432/g-fshield?schema=public"
@@ -74,27 +81,57 @@ API_PORT=4000
 GRASP_DATASETS_DIR="../../datasets"
 AUTH_DISABLED=false
 MOCK_DATA_ENABLED=false
+CORS_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:4000"
 GRASP_PERSIST_PROGRESS_EVENTS=true
 GRASP_EXPOSE_PROGRESS_EVENTS=true
-GRASP_MONITOR_HISTORY_LIMIT=2000
-GRASP_MONITOR_EVENT_LIMIT=2000
-GRASP_MONITOR_SNAPSHOT_LIMIT=1000
-GRASP_MONITOR_SNAPSHOT_EVENT_LIMIT=2000
-GRASP_RUN_SUMMARY_HISTORY_LIMIT=200
-GRASP_RUN_HISTORY_LIMIT=5000
+GRASP_MONITOR_HISTORY_LIMIT=500
+GRASP_MONITOR_EVENT_LIMIT=300
+GRASP_MONITOR_SNAPSHOT_LIMIT=200
+GRASP_MONITOR_SNAPSHOT_EVENT_LIMIT=200
+GRASP_RUN_SUMMARY_HISTORY_LIMIT=30
+GRASP_RUN_HISTORY_LIMIT=2000
 KAFKA_MONITOR_FROM_BEGINNING=true
 KAFKA_MONITOR_GROUP_ID=grasp-fs-monitor-group-replay
+GF_SHIELD_PROJECT_ROOT=/workspace-repo
+GF_SHIELD_COMPOSE_PROJECT_NAME=g-fshield
+GF_SHIELD_COMPOSE_FILES=docker-compose.yml,docker-compose.server.yml
+GF_SHIELD_DOCKER_BIN=docker
 ```
 
-### Inicializacao local
+### Reset completo do ambiente
+
+Para `POST /api/grasp/environment/reset` funcionar, a API precisa:
+
+- conhecer a raiz real do repo
+- conhecer o projeto Compose
+- ter acesso ao Docker/Compose do host
+
+No fluxo atual dos scripts em modo Docker, isso e configurado automaticamente.
+
+### Inicializacao
+
+Modo recomendado pelo projeto:
+
+```powershell
+..\..\scripts\start-local-dev.ps1 -DevNodeImage node:24
+```
+
+Fluxo manual minimo:
 
 ```powershell
 docker compose -f docker-compose.db.yml up -d
 npm.cmd run migrate
+npm.cmd run seed
 npm.cmd run dev
 ```
 
-### Notas sobre o monitor
+### Semantica operacional
+
+- `queueState`: estado do despacho da request
+- `status`: estado real monitorado da pipeline
+- `completedAt`: conclusao real das seeds esperadas
+
+### Monitor
 
 O monitor assina:
 
@@ -103,22 +140,17 @@ O monitor assina:
 - `SOLUTIONS_TOPIC`
 - `BEST_SOLUTION_TOPIC`
 
-O monitor persiste snapshots intermediarios e resultados finais. A API expoe:
+A API expoe:
 
 - runs consolidadas por `seedId`
-- eventos do feed visivel do monitor
-- resumo estatistico por topico e algoritmo
-- reconciliacao de `status` da launch com base nas seeds esperadas x concluidas
-
-### Semantica da launch
-
-- `queueState`: mostra o estado do despacho da request
-- `status`: fica `running` depois do dispatch e so muda para `completed` quando todas as seeds esperadas forem concluidas no pipeline
-- `completedAt` passa a representar a conclusao real do pipeline, nao apenas o fim do envio para os servicos RCL
+- eventos visiveis do monitor
+- resumo estatistico
+- bundles por request
+- reconciliacao real do status das launches
 
 ## EN-US
 
-This API provides authentication, user management, GRASP-FS execution dispatch, dataset catalog access, and the monitor endpoints used by the dashboard.
+This API handles authentication, users, GRASP-FS execution queueing, persisted monitor state, and the endpoints used by the dashboard.
 
 ### Stack
 
@@ -130,7 +162,7 @@ This API provides authentication, user management, GRASP-FS execution dispatch, 
 
 ### Main routes
 
-#### Auth and users
+Auth and users:
 
 - `POST /api/register`
 - `POST /api/login`
@@ -139,7 +171,7 @@ This API provides authentication, user management, GRASP-FS execution dispatch, 
 - `GET /api/users/:id`
 - `PUT /api/users/:id`
 
-#### GRASP
+GRASP:
 
 - `GET /api/grasp/services`
 - `GET /api/grasp/datasets`
@@ -156,31 +188,38 @@ This API provides authentication, user management, GRASP-FS execution dispatch, 
 - `POST /api/grasp/monitor/reset`
 - `POST /api/grasp/environment/reset`
 
-#### Swagger
+Swagger:
 
 - `GET /api-docs`
 
-### Database
+### Persistence
 
-The real-mode schema is intentionally small and focused on GF-Shield:
+Main tables:
 
 - `User`
 - `GraspExecutionLaunch`
 - `GraspExecutionRun`
 - `GraspExecutionEvent`
 
-`GraspExecutionLaunch` persists:
+`GraspExecutionLaunch` stores:
 
 - request parameters
-- selected algorithms
-- datasets and classifier
-- queue state
+- algorithms, datasets, and classifier
+- `queueState`
+- `status`
 - dispatch history
-- expected, observed, and completed seed counters used to reconcile true execution status
+- expected, observed, and completed seed counters
 
-### Environment variables
+### Important endpoints for the current front-end
 
-Important variables from [`.env.example`](./.env.example):
+- `GET /api/grasp/executions/:requestId?includeMonitor=true`
+  returns the full request bundle used by dashboard export
+- `POST /api/grasp/environment/reset`
+  performs the distributed environment reset when the API runs with access to the host Docker/Compose runtime
+
+### Main environment variables
+
+Base example:
 
 ```env
 DATABASE_URL="postgresql://postgres:password@localhost:5432/g-fshield?schema=public"
@@ -190,27 +229,57 @@ API_PORT=4000
 GRASP_DATASETS_DIR="../../datasets"
 AUTH_DISABLED=false
 MOCK_DATA_ENABLED=false
+CORS_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:4000"
 GRASP_PERSIST_PROGRESS_EVENTS=true
 GRASP_EXPOSE_PROGRESS_EVENTS=true
-GRASP_MONITOR_HISTORY_LIMIT=2000
-GRASP_MONITOR_EVENT_LIMIT=2000
-GRASP_MONITOR_SNAPSHOT_LIMIT=1000
-GRASP_MONITOR_SNAPSHOT_EVENT_LIMIT=2000
-GRASP_RUN_SUMMARY_HISTORY_LIMIT=200
-GRASP_RUN_HISTORY_LIMIT=5000
+GRASP_MONITOR_HISTORY_LIMIT=500
+GRASP_MONITOR_EVENT_LIMIT=300
+GRASP_MONITOR_SNAPSHOT_LIMIT=200
+GRASP_MONITOR_SNAPSHOT_EVENT_LIMIT=200
+GRASP_RUN_SUMMARY_HISTORY_LIMIT=30
+GRASP_RUN_HISTORY_LIMIT=2000
 KAFKA_MONITOR_FROM_BEGINNING=true
 KAFKA_MONITOR_GROUP_ID=grasp-fs-monitor-group-replay
+GF_SHIELD_PROJECT_ROOT=/workspace-repo
+GF_SHIELD_COMPOSE_PROJECT_NAME=g-fshield
+GF_SHIELD_COMPOSE_FILES=docker-compose.yml,docker-compose.server.yml
+GF_SHIELD_DOCKER_BIN=docker
 ```
 
-### Local startup
+### Full environment reset
+
+For `POST /api/grasp/environment/reset` to work, the API must:
+
+- know the real repo root
+- know the Compose project name
+- have access to the host Docker/Compose runtime
+
+In the current script-driven Docker flow, this is configured automatically.
+
+### Startup
+
+Recommended project flow:
+
+```powershell
+..\..\scripts\start-local-dev.ps1 -DevNodeImage node:24
+```
+
+Minimal manual flow:
 
 ```powershell
 docker compose -f docker-compose.db.yml up -d
 npm.cmd run migrate
+npm.cmd run seed
 npm.cmd run dev
 ```
 
-### Monitor notes
+### Operational semantics
+
+- `queueState`: request dispatch state
+- `status`: real monitored pipeline state
+- `completedAt`: real completion time for the expected seeds
+
+### Monitor
 
 The monitor subscribes to:
 
@@ -219,15 +288,10 @@ The monitor subscribes to:
 - `SOLUTIONS_TOPIC`
 - `BEST_SOLUTION_TOPIC`
 
-The monitor persists intermediate snapshots and final results. The API exposes:
+The API exposes:
 
 - consolidated runs by `seedId`
-- visible monitor feed events
-- statistical summaries by topic and algorithm
-- launch status reconciliation based on expected-vs-completed seeds
-
-### Launch semantics
-
-- `queueState`: request dispatch state
-- `status`: remains `running` after dispatch and only becomes `completed` when all expected seeds finish in the pipeline
-- `completedAt` represents real pipeline completion, not just the end of RCL dispatch
+- visible monitor events
+- statistical summaries
+- request bundles
+- true launch status reconciliation

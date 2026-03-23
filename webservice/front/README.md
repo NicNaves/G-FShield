@@ -2,15 +2,7 @@
 
 ## PT-BR
 
-Este front-end e o dashboard operacional do GF-Shield. Ele substitui grande parte do conteudo padrao do template por paginas especificas do projeto:
-
-- autenticacao
-- monitoramento de execucoes
-- datasets
-- administracao de usuarios
-- disparo de execucao
-- fila de execucoes e request summary
-- operacoes administrativas de reset
+Este front-end e o dashboard operacional do GF-Shield.
 
 ### Stack
 
@@ -20,7 +12,7 @@ Este front-end e o dashboard operacional do GF-Shield. Ele substitui grande part
 - React Router
 - React Toastify
 
-### Paginas principais
+### Principais areas
 
 - `/dashboard`
 - `/dashboard/runs/:seedId`
@@ -30,29 +22,34 @@ Este front-end e o dashboard operacional do GF-Shield. Ele substitui grande part
 - `/authentication/sign-in`
 - `/authentication/sign-up`
 
-### Experiencia principal
+### Recursos atuais do dashboard
 
-- `Overview`: monitor em tempo real e improvement alerts
-- `Performance`: metricas por algoritmo e servico
-- `Algorithms`: tabelas consolidadas por algoritmo
-- `Analytics`: volume por topico, resumo por topico e feed visivel de solucoes
-- `Executions`: tabelas por seed e comparacao entre execucoes
-- `Run Details`: timeline e historico persistido por seed
-- `Settings > Operations`: limpeza local, reset do monitor e reset completo do ambiente com modal de confirmacao
+- monitor em tempo real via SSE
+- `Run Details` por `seedId`
+- exportacao em CSV/JSON nas tabelas compartilhadas
+- exportacao por request inteira, run inteira e recorte visivel da timeline
+- filtros de tempo com calendario
+- busca por timestamp na timeline
+- grafico de atividade por horario
+- `DLS Outcome Summary`
+- `Run Comparison Studio`
+- tema escuro refinado e tipografia ajustada
 
-### Semantica da fila de execucao
+### Performance
 
-- `queueState` mostra o estado de despacho da launch
-- `status` mostra o estado real do pipeline monitorado
-- a fila exibe `expectedSeedCount`, `observedSeedCount` e `completedSeedCount` para explicar por que uma launch ainda esta `running`
+As ultimas mudancas do front reduziram o volume inicial de historico carregado no dashboard e usam um limite mais leve para o monitor, o que melhora o comportamento com muitos dados sem perder os detalhes por request e por run.
 
-### Modo local
+### Inicializacao
+
+Se voce estiver rodando o projeto completo, prefira os scripts da raiz.
+
+Execucao isolada do front:
 
 ```powershell
 npm.cmd start
 ```
 
-### Build
+Build:
 
 ```powershell
 npm.cmd run build
@@ -68,15 +65,7 @@ npm.cmd run build
 
 ## EN-US
 
-This front-end is the GF-Shield operational dashboard. It replaces most of the template-only content with project-specific pages for:
-
-- authentication
-- execution monitoring
-- datasets
-- user administration
-- execution dispatch
-- execution queue and request summary
-- administrative reset operations
+This front-end is the GF-Shield operational dashboard.
 
 ### Stack
 
@@ -86,7 +75,7 @@ This front-end is the GF-Shield operational dashboard. It replaces most of the t
 - React Router
 - React Toastify
 
-### Main pages
+### Main areas
 
 - `/dashboard`
 - `/dashboard/runs/:seedId`
@@ -96,29 +85,34 @@ This front-end is the GF-Shield operational dashboard. It replaces most of the t
 - `/authentication/sign-in`
 - `/authentication/sign-up`
 
-### Main experience
+### Current dashboard capabilities
 
-- `Overview`: real-time monitoring and improvement alerts
-- `Performance`: metrics by algorithm and service
-- `Algorithms`: consolidated tables by algorithm
-- `Analytics`: topic volume, topic summary, and visible solution feed
-- `Executions`: per-seed tables and execution comparison
-- `Run Details`: persisted timeline and history by seed
-- `Settings > Operations`: browser cleanup, monitor reset, and full environment reset with confirmation modal
+- real-time monitor through SSE
+- `Run Details` by `seedId`
+- CSV/JSON export in shared tables
+- export by full request, full run, and visible timeline slice
+- time filters with calendar inputs
+- timeline timestamp search
+- hourly activity chart
+- `DLS Outcome Summary`
+- `Run Comparison Studio`
+- refined dark theme and typography
 
-### Execution queue semantics
+### Performance
 
-- `queueState` shows launch dispatch state
-- `status` shows the real monitored pipeline state
-- the queue exposes `expectedSeedCount`, `observedSeedCount`, and `completedSeedCount` so a launch can stay `running` until the whole pipeline finishes
+Recent front-end changes reduced the initial history volume loaded by the dashboard and use a lighter monitor limit, improving behavior with larger datasets while keeping request-level and run-level detail views available.
 
-### Local mode
+### Startup
+
+If you are running the full project, prefer the root-level scripts.
+
+Standalone front-end run:
 
 ```powershell
 npm.cmd start
 ```
 
-### Build
+Build:
 
 ```powershell
 npm.cmd run build

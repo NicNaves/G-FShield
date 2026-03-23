@@ -1,6 +1,6 @@
 # GF-Shield
 
-Distributed feature selection for intrusion detection systems with DRG, DLS, Kafka, and a web monitoring layer.
+Distributed feature selection for intrusion detection systems with GRASP-FS, Kafka, DRG, DLS, and a web monitoring layer.
 
 ![Architecture Overview](./figures/ArquiteturaFull.drawio.png)
 
@@ -8,26 +8,12 @@ Distributed feature selection for intrusion detection systems with DRG, DLS, Kaf
 
 ### Visao geral
 
-O **GF-Shield** e uma arquitetura distribuida baseada na metaheuristica **GRASP-FS** para selecao de atributos em cenarios de IDS. O fluxo do projeto combina:
+O **GF-Shield** combina:
 
-- **DRG (Distributed RCL Generator)** para gerar solucoes iniciais
-- **DLS (Distributed Local Search)** para refinar essas solucoes
-- **Kafka** para orquestrar o pipeline
-- **Webservice** para autenticacao, disparo de execucoes e monitoramento
-
-### Arquitetura
-
-#### Visao completa
-
-![Arquitetura completa](./figures/ArquiteturaFull.drawio.png)
-
-#### Fluxo da busca local
-
-![Distributed Local Search](./figures/dls.png)
-
-#### Visao tecnologica
-
-![Project Tech](./figures/ProjectTech.png)
+- **DRG (Distributed RCL Generator)** para gerar solucoes iniciais.
+- **DLS (Distributed Local Search)** para refinar as seeds geradas.
+- **Kafka** para orquestrar o pipeline distribuido.
+- **Webservice** para autenticacao, disparo de execucoes, persistencia e dashboard.
 
 ### Estrutura do repositorio
 
@@ -44,16 +30,16 @@ GF-Shield/
 `- docker-compose.yml
 ```
 
-### Mapa de servicos
+### Mapa rapido de portas
 
-#### DRG
+- Front-end: `3000`
+- API: `4000`
+- Swagger: `4000/api-docs`
+- Kafbat UI: `8080`
+- Kafka: `9092`
+- Zookeeper: `2181`
 
-- Relief: `8086`
-- Symmetrical Uncertainty: `8087`
-- Gain Ratio: `8088`
-- Information Gain: `8089`
-
-#### DLS
+Servicos DLS:
 
 - BitFlip: `8082`
 - IWSS: `8083`
@@ -62,87 +48,90 @@ GF-Shield/
 - RVND: `8090`
 - VND: `8091`
 
-#### Infraestrutura e suporte
+Servicos DRG:
 
-- Kafbat UI: `8080`
-- Kafka: `9092`
-- Zookeeper: `2181`
-- Web front-end: `3000`
-- Web API: `4000`
-- Swagger: `4000/api-docs`
+- Relief: `8086`
+- Symmetrical Uncertainty: `8087`
+- Gain Ratio: `8088`
+- Information Gain: `8089`
+
+### Modos recomendados de execucao
+
+Hoje o projeto suporta dois jeitos principais de subir API e front:
+
+- **Node no host**: mais simples quando o ambiente ja tem Node/npm.
+- **Node em Docker**: recomendado para alinhar local e servidor, evitar instalacao de Node no host e permitir o reset completo do ambiente pelo dashboard.
+
+Nos scripts, o modo Docker e ativado por `DEV_NODE_IMAGE=node:24`.
 
 ### Inicio rapido
 
-Windows local:
+Windows local, no modo mais parecido com o servidor:
+
+```powershell
+.\scripts\start-local-dev.ps1 -DevNodeImage node:24
+```
+
+Windows local, usando Node no host:
 
 ```powershell
 .\scripts\start-local-dev.ps1
+```
+
+Ubuntu servidor, com Node em Docker:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-server-dev.sh --frontend-port 3001 --public-front-origin http://SEU_IP:3001
+```
+
+Para parar:
+
+```powershell
 .\scripts\stop-local-dev.ps1
 ```
 
-Windows server:
-
-```powershell
-.\scripts\start-server-dev.ps1
-.\scripts\stop-server-dev.ps1
-```
-
-Ubuntu local:
-
 ```bash
-bash scripts/start-local-dev.sh
-bash scripts/stop-local-dev.sh
-```
-
-Ubuntu server:
-
-```bash
-bash scripts/start-server-dev.sh
+export DEV_NODE_IMAGE=node:24
 bash scripts/stop-server-dev.sh
 ```
 
-### Scripts auxiliares
+### O que os scripts fazem
 
-Os scripts em [`scripts`](./scripts) cobrem os dois presets de recurso (`local` e `server`) e os dois ambientes operacionais principais:
+Os scripts em [`scripts`](./scripts):
 
-- PowerShell para Windows:
-  `start-local-dev.ps1`, `stop-local-dev.ps1`, `start-server-dev.ps1`, `stop-server-dev.ps1`
-- Shell para Ubuntu:
-  `start-local-dev.sh`, `stop-local-dev.sh`, `start-server-dev.sh`, `stop-server-dev.sh`
+- sobem a stack principal com o preset correto (`local` ou `server`)
+- sobem o PostgreSQL da API
+- podem instalar dependencias automaticamente
+- podem iniciar API e front usando Node no host ou em container Docker
+- mantem estados separados em `.local-dev` e `.server-dev`
+- configuram CORS, portas e healthcheck
+- no modo Docker, deixam o reset completo do ambiente funcional no dashboard
 
-Todos eles:
+Observacao:
 
-- sobem a stack principal com o compose base + preset correto
-- sobem o banco da API com o compose base + preset correto
-- iniciam API e front fora do Docker
-- mantem estado separado entre `local` e `server`
+- quando o repositorio real esta em uma pasta como `G-FShield`, o nome do projeto Compose fica normalizado como `g-fshield`
 
-### Monitoramento e persistencia
+### Dashboard e operacao
 
-- eventos de execucao usados no dashboard sao persistidos pela API
-- metricas CSV ficam na pasta [`metrics`](./metrics)
-- o front persiste `token`, `role`, `userId`, `darkMode` e notificacoes em `localStorage`
-- launches da fila de execucao sao persistidas em `GraspExecutionLaunch`
-- `queueState` representa o estado do despacho; `status` representa o termino real do pipeline monitorado
+O dashboard atual cobre monitoramento operacional e analise:
 
-### Funcionalidades recentes
+- `Overview`: monitor em tempo real, cards principais e eventos recentes
+- `Performance`: metricas por algoritmo e por busca local
+- `Algorithms`: resumos por RCL e por DLS
+- `Analytics`: feed visivel do monitor, volume por topico e graficos auxiliares
+- `Executions`: workflow final por seed, comparacao entre runs e detalhes de request
+- `Run Details`: historico persistido completo por `seedId`
 
-- fila de execucoes com cancelamento best-effort
-- pagina `Run Details` por `seedId`
-- comparacao entre execucoes no dashboard
-- aba `Analytics` com feed visivel de solucoes, volume por topico e estatisticas do monitor
-- catalogo enriquecido de datasets
-- `Request Summary` persistido em `Settings > Operations`
-- `Settings > Operations` com limpeza local, reset do monitor e reset completo do ambiente com modal de confirmacao
-- progresso de seeds esperadas x concluidas na fila de execucao
-- links clicaveis de seed nas tabelas e alerts
+Melhorias recentes refletidas no front:
 
-### Presets de recursos
-
-- [`docker-compose.local.yml`](./docker-compose.local.yml)
-- [`docker-compose.server.yml`](./docker-compose.server.yml)
-- [`webservice/api/docker-compose.db.local.yml`](./webservice/api/docker-compose.db.local.yml)
-- [`webservice/api/docker-compose.db.server.yml`](./webservice/api/docker-compose.db.server.yml)
+- exportacao em CSV e JSON no dashboard e nas tabelas compartilhadas
+- exportacao por request inteira, run inteira e recorte visivel da timeline
+- filtros de tempo com calendario, busca por timestamp e janela padrao de `15m`
+- grafico de atividade por horario
+- `DLS Outcome Summary` mostrando atividade visivel de `BIT_FLIP`, `IWSS` e `IWSSR`, nao apenas a busca final vencedora
+- `Run Comparison Studio`
+- modo escuro e tipografia refinados
 
 ### Autenticacao
 
@@ -151,7 +140,7 @@ Perfis principais:
 - `ADMIN`: gerencia usuarios e dispara execucoes
 - `VIEWER`: acompanha dashboard, datasets e monitor
 
-Login padrao em ambiente real seedado:
+Login seedado padrao:
 
 - email: `admin@admin.com`
 - senha: `senhaSegura123`
@@ -165,35 +154,16 @@ Login padrao em ambiente real seedado:
 - [`webservice/api/README.md`](./webservice/api/README.md)
 - [`webservice/front/README.md`](./webservice/front/README.md)
 
-### Colaboradores
-
-- [Silvio Ereno Quincozes](https://github.com/sequincozes)
-- [Estevao Filipe Cardoso](https://github.com/EstevaoFCardoso)
-
 ## EN-US
 
 ### Overview
 
-**GF-Shield** is a distributed architecture built around the **GRASP-FS** metaheuristic for feature selection in IDS scenarios. The project combines:
+**GF-Shield** combines:
 
 - **DRG (Distributed RCL Generator)** to produce initial solutions
-- **DLS (Distributed Local Search)** to refine those solutions
-- **Kafka** to orchestrate the pipeline
-- **Webservice** for authentication, execution dispatch, and monitoring
-
-### Architecture
-
-#### Full view
-
-![Full architecture](./figures/ArquiteturaFull.drawio.png)
-
-#### Local-search flow
-
-![Distributed Local Search](./figures/dls.png)
-
-#### Technology view
-
-![Project Tech](./figures/ProjectTech.png)
+- **DLS (Distributed Local Search)** to refine those seeds
+- **Kafka** to orchestrate the distributed pipeline
+- **Webservice** for authentication, execution dispatch, persistence, and the dashboard
 
 ### Repository layout
 
@@ -210,16 +180,16 @@ GF-Shield/
 `- docker-compose.yml
 ```
 
-### Service map
+### Quick port map
 
-#### DRG
+- Front-end: `3000`
+- API: `4000`
+- Swagger: `4000/api-docs`
+- Kafbat UI: `8080`
+- Kafka: `9092`
+- Zookeeper: `2181`
 
-- Relief: `8086`
-- Symmetrical Uncertainty: `8087`
-- Gain Ratio: `8088`
-- Information Gain: `8089`
-
-#### DLS
+DLS services:
 
 - BitFlip: `8082`
 - IWSS: `8083`
@@ -228,87 +198,90 @@ GF-Shield/
 - RVND: `8090`
 - VND: `8091`
 
-#### Infrastructure and support
+DRG services:
 
-- Kafbat UI: `8080`
-- Kafka: `9092`
-- Zookeeper: `2181`
-- Web front-end: `3000`
-- Web API: `4000`
-- Swagger: `4000/api-docs`
+- Relief: `8086`
+- Symmetrical Uncertainty: `8087`
+- Gain Ratio: `8088`
+- Information Gain: `8089`
+
+### Recommended runtime modes
+
+The project now supports two main ways to run the API and front-end:
+
+- **Node on the host**: simpler when the machine already has Node/npm.
+- **Node inside Docker**: recommended to align local and server behavior, avoid host Node installation, and keep the full environment reset working from the dashboard.
+
+In the scripts, Docker Node mode is enabled by `DEV_NODE_IMAGE=node:24`.
 
 ### Quick start
 
-Windows local:
+Windows local, in the mode closest to the server:
+
+```powershell
+.\scripts\start-local-dev.ps1 -DevNodeImage node:24
+```
+
+Windows local, using host Node:
 
 ```powershell
 .\scripts\start-local-dev.ps1
+```
+
+Ubuntu server, with Node in Docker:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-server-dev.sh --frontend-port 3001 --public-front-origin http://YOUR_IP:3001
+```
+
+To stop:
+
+```powershell
 .\scripts\stop-local-dev.ps1
 ```
 
-Windows server:
-
-```powershell
-.\scripts\start-server-dev.ps1
-.\scripts\stop-server-dev.ps1
-```
-
-Ubuntu local:
-
 ```bash
-bash scripts/start-local-dev.sh
-bash scripts/stop-local-dev.sh
-```
-
-Ubuntu server:
-
-```bash
-bash scripts/start-server-dev.sh
+export DEV_NODE_IMAGE=node:24
 bash scripts/stop-server-dev.sh
 ```
 
-### Helper scripts
+### What the scripts handle
 
-The scripts under [`scripts`](./scripts) cover both resource presets (`local` and `server`) and both main operating-system flows:
+The scripts under [`scripts`](./scripts):
 
-- PowerShell for Windows:
-  `start-local-dev.ps1`, `stop-local-dev.ps1`, `start-server-dev.ps1`, `stop-server-dev.ps1`
-- Shell for Ubuntu:
-  `start-local-dev.sh`, `stop-local-dev.sh`, `start-server-dev.sh`, `stop-server-dev.sh`
+- start the main stack with the proper preset (`local` or `server`)
+- start the API PostgreSQL database
+- can install dependencies automatically
+- can start the API and front-end using host Node or Docker Node
+- keep separate state under `.local-dev` and `.server-dev`
+- configure CORS, ports, and healthchecks
+- in Docker mode, keep the full environment reset working from the dashboard
 
-All of them:
+Note:
 
-- start the main stack with the base compose file plus the correct preset
-- start the API database with the base DB compose file plus the correct preset
-- start the API and front-end outside Docker
-- keep separate state for `local` and `server`
+- when the real repository folder is something like `G-FShield`, the Compose project name is normalized as `g-fshield`
 
-### Monitoring and persistence
+### Dashboard and operations
 
-- execution events used by the dashboard are persisted by the API
-- CSV metrics are stored under [`metrics`](./metrics)
-- the front-end stores `token`, `role`, `userId`, `darkMode`, and notifications in `localStorage`
-- execution queue launches are persisted in `GraspExecutionLaunch`
-- `queueState` represents dispatch state; `status` represents real monitored pipeline completion
+The current dashboard covers both operational monitoring and analysis:
 
-### Recent features
+- `Overview`: real-time monitor, main cards, and recent events
+- `Performance`: metrics by algorithm and by local search
+- `Algorithms`: summaries by RCL and DLS
+- `Analytics`: visible monitor feed, topic volume, and supporting charts
+- `Executions`: per-seed final workflow, run comparison, and request-level details
+- `Run Details`: full persisted history by `seedId`
 
-- execution queue with best-effort cancellation
-- `Run Details` page by `seedId`
-- execution comparison in the dashboard
-- `Analytics` tab with visible solution feed, topic volume, and monitor statistics
-- enriched dataset catalog
-- persisted `Request Summary` under `Settings > Operations`
-- `Settings > Operations` with local cleanup, monitor reset, and full environment reset with confirmation modal
-- expected-vs-completed seed progress in the execution queue
-- clickable seed links across tables and alerts
+Recent front-end improvements now documented in the project:
 
-### Resource presets
-
-- [`docker-compose.local.yml`](./docker-compose.local.yml)
-- [`docker-compose.server.yml`](./docker-compose.server.yml)
-- [`webservice/api/docker-compose.db.local.yml`](./webservice/api/docker-compose.db.local.yml)
-- [`webservice/api/docker-compose.db.server.yml`](./webservice/api/docker-compose.db.server.yml)
+- CSV and JSON export in the dashboard and shared tables
+- export by full request, full run, and visible timeline slice
+- time filters with calendar inputs, timestamp search, and a default `15m` window
+- hourly activity chart
+- `DLS Outcome Summary` showing visible `BIT_FLIP`, `IWSS`, and `IWSSR` activity instead of only the winning final search
+- `Run Comparison Studio`
+- refined dark theme and typography
 
 ### Authentication
 
@@ -317,7 +290,7 @@ Main roles:
 - `ADMIN`: manages users and dispatches executions
 - `VIEWER`: follows the dashboard, datasets, and monitor
 
-Default seeded login in real mode:
+Default seeded login:
 
 - email: `admin@admin.com`
 - password: `senhaSegura123`
@@ -330,8 +303,3 @@ Default seeded login in real mode:
 - [`webservice/README.md`](./webservice/README.md)
 - [`webservice/api/README.md`](./webservice/api/README.md)
 - [`webservice/front/README.md`](./webservice/front/README.md)
-
-### Contributors
-
-- [Silvio Ereno Quincozes](https://github.com/sequincozes)
-- [Estevao Filipe Cardoso](https://github.com/EstevaoFCardoso)
