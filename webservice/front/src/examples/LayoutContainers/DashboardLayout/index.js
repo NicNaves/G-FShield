@@ -29,7 +29,7 @@ import { useMaterialUIController, setLayout } from "context";
 
 function DashboardLayout({ children }) {
   const [controller, dispatch] = useMaterialUIController();
-  const { miniSidenav } = controller;
+  const { miniSidenav, darkMode } = controller;
   const { pathname } = useLocation();
 
   useEffect(() => {
@@ -41,6 +41,10 @@ function DashboardLayout({ children }) {
       sx={({ breakpoints, transitions, functions: { pxToRem } }) => ({
         p: 3,
         position: "relative",
+        minHeight: "100vh",
+        background: darkMode
+          ? "radial-gradient(circle at top right, rgba(78, 161, 255, 0.08), transparent 26%), transparent"
+          : "radial-gradient(circle at top right, rgba(61, 142, 245, 0.08), transparent 24%), transparent",
 
         [breakpoints.up("xl")]: {
           marginLeft: miniSidenav ? pxToRem(120) : pxToRem(274),

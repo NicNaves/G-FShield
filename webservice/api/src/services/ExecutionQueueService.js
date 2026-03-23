@@ -137,9 +137,9 @@ class ExecutionQueueService {
     return executionLaunchService.listLaunches(limit);
   }
 
-  async getLaunch(requestId) {
+  async getLaunch(requestId, options = {}) {
     await this.start();
-    return executionLaunchService.getLaunch(requestId);
+    return executionLaunchService.getLaunch(requestId, options);
   }
 
   async reset() {

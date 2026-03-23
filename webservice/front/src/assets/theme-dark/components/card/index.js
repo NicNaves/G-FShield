@@ -21,7 +21,7 @@ import boxShadows from "assets/theme-dark/base/boxShadows";
 // Material Dashboard 2 React Helper Function
 import rgba from "assets/theme-dark/functions/rgba";
 
-const { black, background } = colors;
+const { background, white } = colors;
 const { borderWidth, borderRadius } = borders;
 const { md } = boxShadows;
 
@@ -34,11 +34,12 @@ const card = {
       minWidth: 0,
       wordWrap: "break-word",
       backgroundImage: "none",
-      backgroundColor: background.card,
+      backgroundColor: "rgba(18, 28, 47, 0.86)",
+      backdropFilter: "blur(18px)",
       backgroundClip: "border-box",
-      border: `${borderWidth[0]} solid ${rgba(black.main, 0.125)}`,
+      border: `${borderWidth[0]} solid ${rgba(white.main, 0.08)}`,
       borderRadius: borderRadius.xl,
-      boxShadow: md,
+      boxShadow: `0 22px 44px rgba(2, 6, 23, 0.42), ${md}`,
       overflow: "visible",
     },
   },

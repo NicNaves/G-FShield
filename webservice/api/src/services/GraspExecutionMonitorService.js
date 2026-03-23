@@ -343,6 +343,7 @@ class GraspExecutionMonitorService {
     const now = new Date().toISOString();
     const stage = this.resolveStage(topic, payload);
     const eventType = topic === "LOCAL_SEARCH_PROGRESS_TOPIC" ? "kafka.progress" : "kafka.update";
+    const requestId = payload.requestId ? String(payload.requestId) : null;
 
     const current = this.runs.get(seedId) || {
       seedId,
@@ -367,6 +368,7 @@ class GraspExecutionMonitorService {
     const rclSize = rclFeatures.length;
     const historyEntry = {
       timestamp: now,
+      requestId: requestId || current.requestId || null,
       stage,
       topic,
       eventType,
@@ -398,6 +400,7 @@ class GraspExecutionMonitorService {
     const run = {
       ...current,
       seedId,
+      requestId: requestId || current.requestId || null,
       updatedAt: now,
       completedAt: preserveTerminalSnapshot
         ? current.completedAt || now
@@ -487,6 +490,7 @@ class GraspExecutionMonitorService {
       type: eventType,
       fingerprint: `${topic}:${source.partition ?? "na"}:${source.offset ?? now}`,
       seedId,
+      requestId: requestId || run.requestId || null,
       topic,
       stage,
       status,

@@ -26,14 +26,15 @@ import colors from "assets/theme/base/colors";
 import pxToRem from "assets/theme/functions/pxToRem";
 
 const { dark } = colors;
+const fontFamily = '"Manrope", "Segoe UI", "Helvetica Neue", sans-serif';
 
 const baseProperties = {
-  fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+  fontFamily,
   fontWeightLighter: 100,
   fontWeightLight: 300,
   fontWeightRegular: 400,
   fontWeightMedium: 600,
-  fontWeightBold: 700,
+  fontWeightBold: 800,
   fontSizeXXS: pxToRem(10.4),
   fontSizeXS: pxToRem(12),
   fontSizeSM: pxToRem(14),
@@ -48,6 +49,7 @@ const baseHeadingProperties = {
   fontFamily: baseProperties.fontFamily,
   color: dark.main,
   fontWeight: baseProperties.fontWeightBold,
+  letterSpacing: "-0.02em",
 };
 
 const baseDisplayProperties = {
@@ -98,50 +100,53 @@ const typography = {
   h6: {
     fontSize: pxToRem(16),
     lineHeight: 1.625,
+    letterSpacing: "-0.01em",
     ...baseHeadingProperties,
   },
 
   subtitle1: {
     fontFamily: baseProperties.fontFamily,
     fontSize: baseProperties.fontSizeXL,
-    fontWeight: baseProperties.fontWeightLight,
-    lineHeight: 1.625,
+    fontWeight: baseProperties.fontWeightMedium,
+    lineHeight: 1.5,
   },
 
   subtitle2: {
     fontFamily: baseProperties.fontFamily,
     fontSize: baseProperties.fontSizeMD,
-    fontWeight: baseProperties.fontWeightLight,
+    fontWeight: baseProperties.fontWeightMedium,
     lineHeight: 1.6,
   },
 
   body1: {
     fontFamily: baseProperties.fontFamily,
-    fontSize: baseProperties.fontSizeXL,
+    fontSize: baseProperties.fontSizeLG,
     fontWeight: baseProperties.fontWeightRegular,
-    lineHeight: 1.625,
+    lineHeight: 1.65,
   },
 
   body2: {
     fontFamily: baseProperties.fontFamily,
     fontSize: baseProperties.fontSizeMD,
-    fontWeight: baseProperties.fontWeightLight,
-    lineHeight: 1.6,
+    fontWeight: baseProperties.fontWeightRegular,
+    lineHeight: 1.65,
   },
 
   button: {
     fontFamily: baseProperties.fontFamily,
     fontSize: baseProperties.fontSizeSM,
-    fontWeight: baseProperties.fontWeightLight,
+    fontWeight: baseProperties.fontWeightMedium,
     lineHeight: 1.5,
-    textTransform: "uppercase",
+    letterSpacing: "0.01em",
+    textTransform: "none",
   },
 
   caption: {
     fontFamily: baseProperties.fontFamily,
     fontSize: baseProperties.fontSizeXS,
-    fontWeight: baseProperties.fontWeightLight,
+    fontWeight: baseProperties.fontWeightMedium,
     lineHeight: 1.25,
+    letterSpacing: "0.01em",
   },
 
   overline: {

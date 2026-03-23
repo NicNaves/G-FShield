@@ -30,7 +30,7 @@ async function main() {
     users.push(user);
   }
 
-  console.log("Usuarios admin GF-Shield garantidos pelo seed:", users.map((user) => ({
+  console.log("Usuarios admin G-FShield garantidos pelo seed:", users.map((user) => ({
     id: user.id,
     email: user.email,
     role: user.role,

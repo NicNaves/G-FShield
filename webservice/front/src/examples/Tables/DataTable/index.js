@@ -13,7 +13,7 @@ Coded by www.creative-tim.com
 * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 
-import { useMemo, useEffect, useState } from "react";
+import { isValidElement, useMemo, useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import { useTable, usePagination, useGlobalFilter, useAsyncDebounce, useSortBy } from "react-table";
 import Table from "@mui/material/Table";
@@ -23,16 +23,111 @@ import TableRow from "@mui/material/TableRow";
 import Icon from "@mui/material/Icon";
 import Autocomplete from "@mui/material/Autocomplete";
 import MDBox from "components/MDBox";
+import MDButton from "components/MDButton";
 import MDTypography from "components/MDTypography";
 import MDInput from "components/MDInput";
 import MDPagination from "components/MDPagination";
 import DataTableHeadCell from "examples/Tables/DataTable/DataTableHeadCell";
 import DataTableBodyCell from "examples/Tables/DataTable/DataTableBodyCell";
 import useI18n from "hooks/useI18n";
+import { downloadTextFile } from "utils/graspDashboardExport";
+
+const EXPORT_TEXT_PROP_KEYS = [
+  "label",
+  "title",
+  "aria-label",
+  "alt",
+  "value",
+  "name",
+  "primary",
+  "secondary",
+];
+
+const EXPORT_ACTION_COLUMN_PATTERN = /\b(action|actions|acao|acoes)\b/i;
+
+const sanitizeFilePart = (value, fallback = "table") => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return normalized || fallback;
+};
+
+const flattenExportValue = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => flattenExportValue(entry))
+      .filter(Boolean)
+      .join(" | ");
+  }
+
+  if (value === null || value === undefined || typeof value === "boolean") {
+    return "";
+  }
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "bigint") {
+    return String(value).trim();
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (isValidElement(value)) {
+    const propValues = EXPORT_TEXT_PROP_KEYS.map((key) => flattenExportValue(value.props?.[key])).filter(Boolean);
+    const childrenValue = flattenExportValue(value.props?.children);
+
+    return [...new Set([...propValues, childrenValue].filter(Boolean))].join(" ").trim();
+  }
+
+  if (typeof value === "object") {
+    const namedValue = ["label", "value", "name", "title"]
+      .map((key) => flattenExportValue(value[key]))
+      .filter(Boolean)
+      .join(" ");
+
+    if (namedValue) {
+      return namedValue.trim();
+    }
+
+    try {
+      return JSON.stringify(value);
+    } catch (error) {
+      return String(value);
+    }
+  }
+
+  return String(value).trim();
+};
+
+const escapeCsvValue = (value) => {
+  const serialized = flattenExportValue(value).replace(/"/g, '""');
+
+  if (/[",\n\r]/.test(serialized)) {
+    return `"${serialized}"`;
+  }
+
+  return serialized;
+};
+
+const buildExportFileName = (baseName, extension) => {
+  const pathContext =
+    typeof window !== "undefined"
+      ? window.location.pathname.split("/").filter(Boolean).slice(-1)[0]
+      : "table";
+  const prefix = sanitizeFilePart(baseName || pathContext || "table");
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+
+  return `${prefix}-${stamp}.${extension}`;
+};
 
 function DataTable({
   entriesPerPage,
   canSearch,
+  canExport,
+  exportFileName,
   showTotalEntries,
   table,
   pagination,
@@ -77,6 +172,105 @@ function DataTable({
   }, [defaultValue, setPageSize]);
 
   const setEntriesPerPage = (value) => setPageSize(value);
+
+  const leafColumns = useMemo(() => headerGroups[headerGroups.length - 1]?.headers || [], [headerGroups]);
+
+  const exportColumns = useMemo(
+    () =>
+      leafColumns
+        .map((column, index) => {
+          const headerLabel = flattenExportValue(column.render("Header"));
+          const fallbackLabel =
+            flattenExportValue(column.Header) ||
+            (typeof column.accessor === "string" ? column.accessor : "") ||
+            `column_${index + 1}`;
+          const label = (headerLabel || fallbackLabel || `column_${index + 1}`).trim();
+          const identifier = [column.id, typeof column.accessor === "string" ? column.accessor : "", label]
+            .filter(Boolean)
+            .join(" ");
+
+          return {
+            id: column.id,
+            label,
+            skip:
+              column.disableExport === true ||
+              column.export === false ||
+              EXPORT_ACTION_COLUMN_PATTERN.test(identifier),
+          };
+        })
+        .filter((column) => column.id && !column.skip),
+    [leafColumns]
+  );
+
+  const buildExportDataset = () => {
+    const preparedRows = rows.map((row) => {
+      prepareRow(row);
+      return row;
+    });
+
+    const exportRows = preparedRows.map((row) =>
+      exportColumns.reduce((record, column) => {
+        const cell = row.cells.find((candidate) => candidate.column.id === column.id);
+        const rawValue = flattenExportValue(cell?.value ?? row.values?.[column.id]);
+        const renderedValue = flattenExportValue(cell?.render("Cell"));
+
+        return {
+          ...record,
+          [column.id]: renderedValue || rawValue,
+        };
+      }, {})
+    );
+
+    const nonEmptyColumns = exportColumns.filter(
+      (column) =>
+        exportRows.length === 0 ||
+        exportRows.some((row) => flattenExportValue(row[column.id]).length > 0)
+    );
+
+    return {
+      columns: nonEmptyColumns,
+      rows: exportRows.map((row) =>
+        nonEmptyColumns.reduce(
+          (record, column) => ({
+            ...record,
+            [column.id]: row[column.id] ?? "",
+          }),
+          {}
+        )
+      ),
+    };
+  };
+
+  const handleExportCsv = () => {
+    const dataset = buildExportDataset();
+    const csvRows = [
+      dataset.columns.map((column) => escapeCsvValue(column.label)).join(","),
+      ...dataset.rows.map((row) =>
+        dataset.columns.map((column) => escapeCsvValue(row[column.id])).join(",")
+      ),
+    ];
+
+    downloadTextFile(buildExportFileName(exportFileName, "csv"), csvRows.join("\n"), "text/csv;charset=utf-8");
+  };
+
+  const handleExportJson = () => {
+    const dataset = buildExportDataset();
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      rowCount: dataset.rows.length,
+      columns: dataset.columns.map((column) => ({
+        id: column.id,
+        label: column.label,
+      })),
+      rows: dataset.rows,
+    };
+
+    downloadTextFile(
+      buildExportFileName(exportFileName, "json"),
+      JSON.stringify(payload, null, 2),
+      "application/json;charset=utf-8"
+    );
+  };
 
   const renderPagination = pageOptions.map((option) => (
     <MDPagination
@@ -123,13 +317,21 @@ function DataTable({
   const entriesStart = totalEntries === 0 ? 0 : pageIndex * pageSize + 1;
   const entriesEnd = totalEntries === 0 ? 0 : Math.min(totalEntries, pageSize * (pageIndex + 1));
   const totalLabel = totalEntries === 1 ? t("datatable.itemSingular") : t("datatable.itemPlural");
+  const hasToolbar = entriesPerPage || canSearch || canExport;
 
   return (
     <TableContainer sx={{ boxShadow: "none" }}>
-      {entriesPerPage || canSearch ? (
-        <MDBox display="flex" justifyContent="space-between" alignItems="center" p={3}>
-          {entriesPerPage && (
-            <MDBox display="flex" alignItems="center">
+      {hasToolbar ? (
+        <MDBox
+          display="flex"
+          justifyContent="space-between"
+          alignItems={{ xs: "stretch", md: "center" }}
+          flexDirection={{ xs: "column", md: "row" }}
+          gap={1.5}
+          p={3}
+        >
+          <MDBox display="flex" alignItems="center" flexWrap="wrap" gap={1.25}>
+            {entriesPerPage && (
               <Autocomplete
                 disableClearable
                 value={pageSize.toString()}
@@ -141,13 +343,39 @@ function DataTable({
                 sx={{ width: "5rem" }}
                 renderInput={(params) => <MDInput {...params} />}
               />
+            )}
+            {entriesPerPage && (
               <MDTypography variant="caption" color="secondary">
-                &nbsp;&nbsp;{t("datatable.itemsPerPage")}
+                {t("datatable.itemsPerPage")}
               </MDTypography>
-            </MDBox>
-          )}
+            )}
+            {canExport && (
+              <MDBox display="flex" alignItems="center" flexWrap="wrap" gap={1}>
+                <MDButton
+                  variant="outlined"
+                  color="info"
+                  size="small"
+                  startIcon={<Icon>table_view</Icon>}
+                  onClick={handleExportCsv}
+                  disabled={totalEntries === 0}
+                >
+                  {t("datatable.exportCsv")}
+                </MDButton>
+                <MDButton
+                  variant="outlined"
+                  color="secondary"
+                  size="small"
+                  startIcon={<Icon>data_object</Icon>}
+                  onClick={handleExportJson}
+                  disabled={totalEntries === 0}
+                >
+                  {t("datatable.exportJson")}
+                </MDButton>
+              </MDBox>
+            )}
+          </MDBox>
           {canSearch && (
-            <MDBox width="12rem" ml="auto">
+            <MDBox width={{ xs: "100%", md: "12rem" }} ml={{ md: "auto" }}>
               <MDInput
                 placeholder={t("datatable.searchPlaceholder")}
                 value={search || ""}
@@ -256,6 +484,8 @@ function DataTable({
 DataTable.defaultProps = {
   entriesPerPage: { defaultValue: 10, entries: [5, 10, 15, 20, 25] },
   canSearch: false,
+  canExport: true,
+  exportFileName: null,
   showTotalEntries: true,
   pagination: { variant: "gradient", color: "info" },
   isSorted: true,
@@ -271,6 +501,8 @@ DataTable.propTypes = {
     PropTypes.bool,
   ]),
   canSearch: PropTypes.bool,
+  canExport: PropTypes.bool,
+  exportFileName: PropTypes.string,
   showTotalEntries: PropTypes.bool,
   table: PropTypes.objectOf(PropTypes.array).isRequired,
   pagination: PropTypes.shape({

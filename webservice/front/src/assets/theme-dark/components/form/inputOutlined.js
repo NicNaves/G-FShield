@@ -22,39 +22,42 @@ import typography from "assets/theme-dark/base/typography";
 import pxToRem from "assets/theme-dark/functions/pxToRem";
 import rgba from "assets/theme-dark/functions/rgba";
 
-const { inputBorderColor, info, grey, transparent, white } = colors;
+const { background, inputBorderColor, info, text, transparent, white } = colors;
 const { borderRadius } = borders;
 const { size } = typography;
 
 const inputOutlined = {
   styleOverrides: {
     root: {
-      backgroundColor: transparent.main,
+      backgroundColor: rgba(background.default, 0.22),
       fontSize: size.sm,
       borderRadius: borderRadius.md,
+      transition: "border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease",
 
       "&:hover .MuiOutlinedInput-notchedOutline": {
-        borderColor: rgba(inputBorderColor, 0.6),
+        borderColor: rgba(white.main, 0.22),
       },
 
       "&.Mui-focused": {
+        backgroundColor: rgba(background.default, 0.34),
         "& .MuiOutlinedInput-notchedOutline": {
           borderColor: info.main,
+          boxShadow: `0 0 0 3px ${rgba(info.main, 0.18)}`,
         },
       },
     },
 
     notchedOutline: {
-      borderColor: rgba(inputBorderColor, 0.6),
+      borderColor: rgba(inputBorderColor, 0.72),
     },
 
     input: {
-      color: white.main,
+      color: text.focus,
       padding: pxToRem(12),
       backgroundColor: transparent.main,
 
       "&::-webkit-input-placeholder": {
-        color: grey[100],
+        color: rgba(white.main, 0.44),
       },
     },
 
@@ -64,7 +67,7 @@ const inputOutlined = {
     },
 
     multiline: {
-      color: grey[700],
+      color: text.main,
       padding: 0,
     },
   },

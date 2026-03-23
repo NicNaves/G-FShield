@@ -67,7 +67,7 @@ O schema em modo real e pequeno e focado no GF-Shield:
 Principais variaveis de [`.env.example`](./.env.example):
 
 ```env
-DATABASE_URL="postgresql://postgres:password@localhost:5432/graspfs?schema=public"
+DATABASE_URL="postgresql://postgres:password@localhost:5432/g-fshield?schema=public"
 JWT_SECRET="teste"
 SERVER_URL="http://localhost:4000"
 API_PORT=4000
@@ -183,7 +183,7 @@ The real-mode schema is intentionally small and focused on GF-Shield:
 Important variables from [`.env.example`](./.env.example):
 
 ```env
-DATABASE_URL="postgresql://postgres:password@localhost:5432/graspfs?schema=public"
+DATABASE_URL="postgresql://postgres:password@localhost:5432/g-fshield?schema=public"
 JWT_SECRET="teste"
 SERVER_URL="http://localhost:4000"
 API_PORT=4000

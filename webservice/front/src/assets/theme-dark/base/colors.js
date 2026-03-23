@@ -21,14 +21,14 @@ Coded by www.creative-tim.com
 
 const colors = {
   background: {
-    default: "#1a2035",
-    sidenav: "#1f283e",
-    card: "#202940",
+    default: "#0b1220",
+    sidenav: "#101826",
+    card: "#121c2f",
   },
 
   text: {
-    main: "#ffffffcc",
-    focus: "#ffffffcc",
+    main: "#d4deee",
+    focus: "#edf4ff",
   },
 
   transparent: {
@@ -52,13 +52,13 @@ const colors = {
   },
 
   secondary: {
-    main: "#7b809a",
-    focus: "#8f93a9",
+    main: "#8fa0bf",
+    focus: "#aab8d0",
   },
 
   info: {
-    main: "#1A73E8",
-    focus: "#1662C4",
+    main: "#4ea1ff",
+    focus: "#76b7ff",
   },
 
   success: {
@@ -77,13 +77,13 @@ const colors = {
   },
 
   light: {
-    main: "#f0f2f566",
-    focus: "#f0f2f566",
+    main: "#f0f2f526",
+    focus: "#f0f2f540",
   },
 
   dark: {
-    main: "#344767",
-    focus: "#2c3c58",
+    main: "#1e2b43",
+    focus: "#172238",
   },
 
   grey: {
@@ -110,8 +110,8 @@ const colors = {
     },
 
     info: {
-      main: "#49a3f1",
-      state: "#1A73E8",
+      main: "#7cc2ff",
+      state: "#4ea1ff",
     },
 
     success: {
@@ -135,8 +135,8 @@ const colors = {
     },
 
     dark: {
-      main: "#323a54",
-      state: "#1a2035",
+      main: "#1d2a43",
+      state: "#0b1220",
     },
   },
 
@@ -255,10 +255,10 @@ const colors = {
     dark: "#404040",
   },
 
-  inputBorderColor: "#d2d6da",
+  inputBorderColor: "#3a4962",
 
   tabs: {
-    indicator: { boxShadow: "#ddd" },
+    indicator: { boxShadow: "rgba(78, 161, 255, 0.36)" },
   },
 };
 

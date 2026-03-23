@@ -27,7 +27,7 @@ public class KafkaConsumerConfig {
     @Value("${spring.kafka.consumer.auto-offset-reset:earliest}")
     private String autoOffsetReset;
 
-    @Value("${spring.kafka.consumer.max-poll-interval-ms:1800000}")
+    @Value("${spring.kafka.consumer.max-poll-interval-ms:14400000}")
     private Integer maxPollIntervalMs;
 
     @Value("${spring.kafka.consumer.max-poll-records:1}")

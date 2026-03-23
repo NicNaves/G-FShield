@@ -70,8 +70,10 @@ export const getExecutionLaunches = async (limit = 25) => {
   return data.launches || [];
 };
 
-export const getExecutionLaunch = async (requestId) => {
-  const { data } = await api.get(`/grasp/executions/${requestId}`);
+export const getExecutionLaunch = async (requestId, options = {}) => {
+  const { data } = await api.get(`/grasp/executions/${requestId}`, {
+    params: options,
+  });
   return data.launch || null;
 };
 

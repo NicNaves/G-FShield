@@ -6,6 +6,9 @@ x-dls-service: &dls-service
   cpus: 1.00
   mem_limit: 1536m
 
+x-dls-environment: &dls-environment
+  KAFKA_MAX_POLL_INTERVAL_MS: "14400000"
+
 x-neighborhood-service: &neighborhood-service
   cpus: 0.75
   mem_limit: 768m
@@ -99,6 +102,7 @@ services:
     build:
       context: ./grasp-fs-distributed-ls/Local Search/BitFlip/grasp-fs-dls-bf
     environment:
+      <<: *dls-environment
       JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
       KAFKA_LISTENER_CONCURRENCY: "1"
     ports:
@@ -114,6 +118,7 @@ services:
     build:
       context: ./grasp-fs-distributed-ls/Local Search/IWSS/grasp-fs-dls-iw
     environment:
+      <<: *dls-environment
       JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
       KAFKA_LISTENER_CONCURRENCY: "1"
     ports:
@@ -129,6 +134,7 @@ services:
     build:
       context: ./grasp-fs-distributed-ls/Local Search/IWSSR/grasp-fs-dls-iwr
     environment:
+      <<: *dls-environment
       JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
       KAFKA_LISTENER_CONCURRENCY: "1"
     ports:

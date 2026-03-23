@@ -16,15 +16,34 @@ Coded by www.creative-tim.com
 // Material Dashboard 2 React Base Styles
 import colors from "assets/theme/base/colors";
 
-const { info, dark } = colors;
+const { info, dark, background, text, white } = colors;
+const fontFamily = '"Manrope", "Segoe UI", "Helvetica Neue", sans-serif';
 
 const globals = {
   html: {
     scrollBehavior: "smooth",
+    minHeight: "100%",
+    backgroundColor: background.default,
+  },
+  body: {
+    minHeight: "100%",
+    fontFamily,
+    color: text.focus,
+    textRendering: "optimizeLegibility",
+    WebkitFontSmoothing: "antialiased",
+    MozOsxFontSmoothing: "grayscale",
+    backgroundColor: background.default,
+    backgroundImage:
+      "radial-gradient(circle at top left, rgba(61, 142, 245, 0.12), transparent 32%), linear-gradient(180deg, #f7fbff 0%, #edf3f8 52%, #e7eef7 100%)",
+    backgroundAttachment: "fixed",
+  },
+  "#app": {
+    minHeight: "100vh",
   },
   "*, *::before, *::after": {
     margin: 0,
     padding: 0,
+    boxSizing: "border-box",
   },
   "a, a:link, a:visited": {
     textDecoration: "none !important",
@@ -35,6 +54,25 @@ const globals = {
   },
   "a.link:hover, .link:hover, a.link:focus, .link:focus": {
     color: `${info.main} !important`,
+  },
+  "::selection": {
+    backgroundColor: "rgba(61, 142, 245, 0.18)",
+    color: dark.main,
+  },
+  "*::-webkit-scrollbar": {
+    width: "10px",
+    height: "10px",
+  },
+  "*::-webkit-scrollbar-track": {
+    background: "rgba(148, 163, 184, 0.14)",
+  },
+  "*::-webkit-scrollbar-thumb": {
+    background: "rgba(31, 43, 66, 0.26)",
+    borderRadius: "999px",
+    border: `2px solid ${white.main}`,
+  },
+  "*::-webkit-scrollbar-thumb:hover": {
+    background: "rgba(61, 142, 245, 0.45)",
   },
 };
 

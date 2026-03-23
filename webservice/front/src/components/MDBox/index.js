@@ -48,7 +48,7 @@ MDBox.propTypes = {
   bgColor: PropTypes.string,
   color: PropTypes.string,
   opacity: PropTypes.number,
-  borderRadius: PropTypes.string,
+  borderRadius: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   shadow: PropTypes.string,
   coloredShadow: PropTypes.oneOf([
     "primary",

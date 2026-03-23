@@ -23,9 +23,33 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
+function Get-NormalizedProjectName {
+  param(
+    [string]$Name
+  )
+
+  return (($Name.ToLowerInvariant() -replace "[^a-z0-9]+", "-") -replace "^-+", "") -replace "-+$", ""
+}
+
+function Resolve-RepoRootPath {
+  param(
+    [string]$Path
+  )
+
+  $item = Get-Item -LiteralPath $Path
+  if ($item.LinkType -and $item.Target) {
+    return [string]($item.Target | Select-Object -First 1)
+  }
+
+  return $item.FullName
+}
+
+$scriptRepoRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Resolve-RepoRootPath -Path $scriptRepoRoot
 $repoName = Split-Path -Leaf $repoRoot
-$composeProjectName = (($repoName.ToLowerInvariant() -replace "[^a-z0-9]+", "-") -replace "^-+", "") -replace "-+$", ""
+$composeProjectName = Get-NormalizedProjectName -Name $repoName
+$legacyRepoName = Split-Path -Leaf $scriptRepoRoot
+$legacyComposeProjectName = Get-NormalizedProjectName -Name $legacyRepoName
 $apiDir = Join-Path $repoRoot "webservice/api"
 $frontDir = Join-Path $repoRoot "webservice/front"
 $datasetsDir = Join-Path $repoRoot "datasets"
@@ -38,12 +62,15 @@ $stateFile = Join-Path $stateDir "processes.json"
 $bashStateFile = Join-Path $stateDir "processes.env"
 $apiContainerName = "$composeProjectName-api-dev-local"
 $frontContainerName = "$composeProjectName-front-dev-local"
+$legacyApiContainerName = if ($legacyComposeProjectName -and $legacyComposeProjectName -ne $composeProjectName) { "$legacyComposeProjectName-api-dev-local" } else { $null }
+$legacyFrontContainerName = if ($legacyComposeProjectName -and $legacyComposeProjectName -ne $composeProjectName) { "$legacyComposeProjectName-front-dev-local" } else { $null }
 $apiNodeModulesVolume = "$composeProjectName-api-node-modules-local"
 $frontNodeModulesVolume = "$composeProjectName-front-node-modules-local"
 $apiHomeVolume = "$composeProjectName-api-home-local"
 $frontHomeVolume = "$composeProjectName-front-home-local"
 $apiCacheVolume = "$composeProjectName-api-cache-local"
 $frontCacheVolume = "$composeProjectName-front-cache-local"
+$composeNetworkName = "$composeProjectName`_default"
 $useDockerNode = -not [string]::IsNullOrWhiteSpace($DevNodeImage)
 
 function Get-NpmCommand {
@@ -63,11 +90,17 @@ function Get-NpmCommand {
 function Invoke-Compose {
   param(
     [string]$WorkingDirectory,
-    [string[]]$Arguments
+    [string[]]$Arguments,
+    [string]$ProjectName = ""
   )
 
   Push-Location $WorkingDirectory
   try {
+    if ($ProjectName) {
+      & docker compose -p $ProjectName @Arguments
+      return
+    }
+
     & docker compose @Arguments
   }
   finally {
@@ -318,12 +351,17 @@ function Start-DockerNodeContainer {
     [string[]]$Mounts,
     [hashtable]$Environment,
     [string[]]$PublishedPorts,
+    [string]$NetworkName = "",
     [string]$ShellCommand
   )
 
   Remove-DockerContainerIfExists -Name $Name
 
   $arguments = @("run", "-d", "--name", $Name)
+
+  if ($NetworkName) {
+    $arguments += @("--network", $NetworkName)
+  }
 
   foreach ($port in $PublishedPorts) {
     $arguments += @("-p", $port)
@@ -375,14 +413,21 @@ if (-not (Test-Path $stateDir)) {
 Stop-RecordedProcesses
 Remove-DockerContainerIfExists -Name $apiContainerName
 Remove-DockerContainerIfExists -Name $frontContainerName
+Remove-DockerContainerIfExists -Name $legacyApiContainerName
+Remove-DockerContainerIfExists -Name $legacyFrontContainerName
+
+if ($legacyComposeProjectName -and $legacyComposeProjectName -ne $composeProjectName) {
+  Write-Host "Encerrando stack compose legada ($legacyComposeProjectName)..."
+  Invoke-Compose -WorkingDirectory $repoRoot -Arguments @("-f", $rootComposeFile, "-f", $rootPresetComposeFile, "down") -ProjectName $legacyComposeProjectName
+}
 
 $rootComposeArgs = @("-f", $rootComposeFile, "-f", $rootPresetComposeFile, "up", "-d")
 if ($Rebuild) {
   $rootComposeArgs += "--build"
 }
 
-Write-Host "Subindo stack principal do GF-Shield..."
-Invoke-Compose -WorkingDirectory $repoRoot -Arguments $rootComposeArgs
+Write-Host "Subindo stack principal do G-FShield..."
+Invoke-Compose -WorkingDirectory $repoRoot -Arguments $rootComposeArgs -ProjectName $composeProjectName
 
 Write-Host "Subindo banco local do webservice/api..."
 Invoke-Compose -WorkingDirectory $repoRoot -Arguments @("-f", $dbComposeFile, "-f", $dbPresetComposeFile, "up", "-d")
@@ -426,12 +471,12 @@ if ($useDockerNode) {
     GF_SHIELD_DOCKER_BIN = "/usr/bin/docker"
     GF_SHIELD_COMPOSE_PROJECT_NAME = $composeProjectName
     GF_SHIELD_COMPOSE_FILES = "docker-compose.yml,docker-compose.local.yml"
-    KAFKA_BROKERS = "host.docker.internal:9092"
-    DATABASE_URL = "postgresql://postgres:password@host.docker.internal:5432/graspfs?schema=public"
-    GRASP_FS_IG_URL = "http://host.docker.internal:8089"
-    GRASP_FS_GR_URL = "http://host.docker.internal:8088"
-    GRASP_FS_RF_URL = "http://host.docker.internal:8086"
-    GRASP_FS_SU_URL = "http://host.docker.internal:8087"
+    KAFKA_BROKERS = "kafka:29092"
+    DATABASE_URL = "postgresql://postgres:password@host.docker.internal:5432/g-fshield?schema=public"
+    GRASP_FS_IG_URL = "http://grasp-fs-rcl-ig:8089"
+    GRASP_FS_GR_URL = "http://grasp-fs-rcl-gr:8088"
+    GRASP_FS_RF_URL = "http://grasp-fs-rcl-rf:8086"
+    GRASP_FS_SU_URL = "http://grasp-fs-rcl-su:8087"
   }
 
   $frontEnvironment = @{
@@ -467,7 +512,7 @@ npm start
 "@
 
   Write-Host "Iniciando API local em container..."
-  Start-DockerNodeContainer -Name $apiContainerName -Image $DevNodeImage -WorkingDirectory $apiDir -Mounts $apiMounts -Environment $apiEnvironment -PublishedPorts @("${ApiPort}:${ApiPort}") -ShellCommand $apiShellCommand | Out-Null
+  Start-DockerNodeContainer -Name $apiContainerName -Image $DevNodeImage -WorkingDirectory $apiDir -Mounts $apiMounts -Environment $apiEnvironment -PublishedPorts @("${ApiPort}:${ApiPort}") -NetworkName $composeNetworkName -ShellCommand $apiShellCommand | Out-Null
 
   Write-Host "Iniciando front local em container..."
   Start-DockerNodeContainer -Name $frontContainerName -Image $DevNodeImage -WorkingDirectory $frontDir -Mounts $frontMounts -Environment $frontEnvironment -PublishedPorts @("${FrontendPort}:${FrontendPort}") -ShellCommand $frontShellCommand | Out-Null

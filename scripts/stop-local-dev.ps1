@@ -6,9 +6,33 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
+function Get-NormalizedProjectName {
+  param(
+    [string]$Name
+  )
+
+  return (($Name.ToLowerInvariant() -replace "[^a-z0-9]+", "-") -replace "^-+", "") -replace "-+$", ""
+}
+
+function Resolve-RepoRootPath {
+  param(
+    [string]$Path
+  )
+
+  $item = Get-Item -LiteralPath $Path
+  if ($item.LinkType -and $item.Target) {
+    return [string]($item.Target | Select-Object -First 1)
+  }
+
+  return $item.FullName
+}
+
+$scriptRepoRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Resolve-RepoRootPath -Path $scriptRepoRoot
 $repoName = Split-Path -Leaf $repoRoot
-$composeProjectName = (($repoName.ToLowerInvariant() -replace "[^a-z0-9]+", "-") -replace "^-+", "") -replace "-+$", ""
+$composeProjectName = Get-NormalizedProjectName -Name $repoName
+$legacyRepoName = Split-Path -Leaf $scriptRepoRoot
+$legacyComposeProjectName = Get-NormalizedProjectName -Name $legacyRepoName
 $apiDir = Join-Path $repoRoot "webservice/api"
 $rootComposeFile = Join-Path $repoRoot "docker-compose.yml"
 $rootPresetComposeFile = Join-Path $repoRoot "docker-compose.local.yml"
@@ -20,15 +44,27 @@ $defaultDockerContainers = @(
   "$composeProjectName-api-dev-local",
   "$composeProjectName-front-dev-local"
 )
+if ($legacyComposeProjectName -and $legacyComposeProjectName -ne $composeProjectName) {
+  $defaultDockerContainers += @(
+    "$legacyComposeProjectName-api-dev-local",
+    "$legacyComposeProjectName-front-dev-local"
+  )
+}
 
 function Invoke-Compose {
   param(
     [string]$WorkingDirectory,
-    [string[]]$Arguments
+    [string[]]$Arguments,
+    [string]$ProjectName = ""
   )
 
   Push-Location $WorkingDirectory
   try {
+    if ($ProjectName) {
+      & docker compose -p $ProjectName @Arguments
+      return
+    }
+
     & docker compose @Arguments
   }
   finally {
@@ -136,8 +172,11 @@ foreach ($containerName in $defaultDockerContainers) {
 }
 
 if (-not $KeepDocker) {
-  Write-Host "Parando stack principal do GF-Shield..."
-  Invoke-Compose -WorkingDirectory $repoRoot -Arguments @("-f", $rootComposeFile, "-f", $rootPresetComposeFile, "down")
+  Write-Host "Parando stack principal do G-FShield..."
+  Invoke-Compose -WorkingDirectory $repoRoot -Arguments @("-f", $rootComposeFile, "-f", $rootPresetComposeFile, "down") -ProjectName $composeProjectName
+  if ($legacyComposeProjectName -and $legacyComposeProjectName -ne $composeProjectName) {
+    Invoke-Compose -WorkingDirectory $repoRoot -Arguments @("-f", $rootComposeFile, "-f", $rootPresetComposeFile, "down") -ProjectName $legacyComposeProjectName
+  }
 
   $dbDownArgs = @("-f", $dbComposeFile, "-f", $dbPresetComposeFile, "down")
   if ($ResetDatabase) {

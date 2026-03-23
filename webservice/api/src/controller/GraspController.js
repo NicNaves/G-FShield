@@ -196,7 +196,11 @@ class GraspController {
 
   async getExecutionLaunch(req, res, next) {
     try {
-      const launch = await executionQueueService.getLaunch(req.params.requestId);
+      const launch = await executionQueueService.getLaunch(req.params.requestId, {
+        includeMonitor: String(req.query.includeMonitor || "false").toLowerCase() === "true",
+        historyLimit: Number(req.query.historyLimit || process.env.GRASP_RUN_HISTORY_LIMIT || 2000),
+        eventLimit: Number(req.query.eventLimit || process.env.GRASP_EVENT_EXPORT_LIMIT || 5000),
+      });
       if (!launch) {
         return res.status(404).json({ error: "Execution launch not found." });
       }

@@ -1,4 +1,5 @@
 const prisma = require("../lib/prisma");
+const graspExecutionStoreService = require("./GraspExecutionStoreService");
 
 class ExecutionLaunchService {
   normalizeStatus(status, fallback = "REQUESTED") {
@@ -367,6 +368,147 @@ class ExecutionLaunchService {
     return candidates.find((candidate) => this.resolveLaunchStartedAt(candidate)) || null;
   }
 
+  resolveLaunchMonitorWindow(record, nextStartedLaunch = null) {
+    const metadata = record?.metadata && typeof record.metadata === "object" ? record.metadata : {};
+    const params = metadata?.params && typeof metadata.params === "object" ? metadata.params : {};
+    const algorithms = Array.isArray(record?.algorithms)
+      ? record.algorithms.map((algorithm) => String(algorithm || "").trim().toUpperCase()).filter(Boolean)
+      : [];
+    const requestedAt = this.parseDate(record?.requestedAt || metadata.queueRequestedAt || null);
+    const startedAt = this.resolveLaunchStartedAt(record) || requestedAt;
+    const nextStartedAt = this.resolveLaunchStartedAt(nextStartedLaunch);
+
+    return {
+      algorithms,
+      requestedAt,
+      startedAt,
+      nextStartedAt,
+      datasetTrainingName: record?.datasetTrainingName || params.datasetTrainingName || "",
+      datasetTestingName: record?.datasetTestingName || params.datasetTestingName || "",
+      classifier: record?.classifier || params.classifier || "",
+    };
+  }
+
+  buildLaunchRunWhere(record, nextStartedLaunch = null) {
+    const window = this.resolveLaunchMonitorWindow(record, nextStartedLaunch);
+
+    if (!window.startedAt || window.algorithms.length === 0) {
+      return null;
+    }
+
+    return {
+      rclAlgorithm: { in: window.algorithms },
+      ...(window.datasetTrainingName ? { trainingFileName: window.datasetTrainingName } : {}),
+      ...(window.datasetTestingName ? { testingFileName: window.datasetTestingName } : {}),
+      ...(window.classifier ? { classifier: window.classifier } : {}),
+      createdAt: {
+        gte: window.startedAt,
+        ...(window.nextStartedAt ? { lt: window.nextStartedAt } : {}),
+      },
+    };
+  }
+
+  buildLaunchEventWhere(record, seedIds = [], nextStartedLaunch = null) {
+    const window = this.resolveLaunchMonitorWindow(record, nextStartedLaunch);
+    const startAt = window.requestedAt || window.startedAt;
+    const orClauses = [];
+
+    if (record?.id) {
+      orClauses.push({ launchId: record.id });
+    }
+
+    if (record?.requestId) {
+      orClauses.push({ requestId: record.requestId });
+    }
+
+    if (Array.isArray(seedIds) && seedIds.length > 0) {
+      orClauses.push({ seedId: { in: seedIds } });
+    }
+
+    if (!startAt || orClauses.length === 0) {
+      return null;
+    }
+
+    return {
+      OR: orClauses,
+      createdAt: {
+        gte: startAt,
+        ...(window.nextStartedAt ? { lt: window.nextStartedAt } : {}),
+      },
+    };
+  }
+
+  async buildLaunchMonitorBundle(record, nextStartedLaunch = null, options = {}) {
+    const historyLimit = Math.max(Number(options.historyLimit || process.env.GRASP_RUN_HISTORY_LIMIT || 2000), 0);
+    const eventLimit = Math.max(Number(options.eventLimit || process.env.GRASP_EVENT_EXPORT_LIMIT || 5000), 0);
+    const monitorWindow = this.resolveLaunchMonitorWindow(record, nextStartedLaunch);
+    const runWhere = this.buildLaunchRunWhere(record, nextStartedLaunch);
+
+    const runs = runWhere
+      ? await prisma.graspExecutionRun.findMany({
+          where: runWhere,
+          orderBy: { updatedAt: "desc" },
+          include: {
+            events: {
+              where: { eventType: { in: ["kafka.update", "kafka.progress"] } },
+              orderBy: { createdAt: "desc" },
+              ...(historyLimit > 0 ? { take: historyLimit } : {}),
+            },
+          },
+        })
+      : [];
+
+    const seedIds = runs.map((run) => run.seedId).filter(Boolean);
+    const bestSolutionEvents = seedIds.length > 0
+      ? await prisma.graspExecutionEvent.findMany({
+          where: {
+            seedId: { in: seedIds },
+            topic: "BEST_SOLUTION_TOPIC",
+            createdAt: {
+              gte: monitorWindow.startedAt || monitorWindow.requestedAt || new Date(0),
+              ...(monitorWindow.nextStartedAt ? { lt: monitorWindow.nextStartedAt } : {}),
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        })
+      : [];
+
+    const bestEventBySeedId = new Map();
+    bestSolutionEvents.forEach((event) => {
+      if (event.seedId && !bestEventBySeedId.has(event.seedId)) {
+        bestEventBySeedId.set(event.seedId, event);
+      }
+    });
+
+    const mappedRuns = runs.map((run) =>
+      graspExecutionStoreService.mapRun({
+        ...run,
+        bestSolutionEvents: bestEventBySeedId.has(run.seedId) ? [bestEventBySeedId.get(run.seedId)] : [],
+      })
+    );
+
+    const eventWhere = this.buildLaunchEventWhere(record, seedIds, nextStartedLaunch);
+    const events = eventWhere
+      ? await prisma.graspExecutionEvent.findMany({
+          where: eventWhere,
+          orderBy: { createdAt: "desc" },
+          ...(eventLimit > 0 ? { take: eventLimit } : {}),
+        })
+      : [];
+
+    return {
+      requestId: record?.requestId || null,
+      requestedAt: monitorWindow.requestedAt?.toISOString?.() || null,
+      startedAt: monitorWindow.startedAt?.toISOString?.() || null,
+      endsBefore: monitorWindow.nextStartedAt?.toISOString?.() || null,
+      runCount: mappedRuns.length,
+      eventCount: events.length,
+      seedIds,
+      runs: mappedRuns,
+      events: events.map((event) => graspExecutionStoreService.mapEvent(event)),
+    };
+  }
+
   buildLaunchData(preparedExecution, requestedById = null, metadata = {}, status = "REQUESTED") {
     return {
       status: this.normalizeStatus(status),
@@ -518,7 +660,7 @@ class ExecutionLaunchService {
     return this.mapLaunch(launch);
   }
 
-  async getLaunch(requestId) {
+  async getLaunch(requestId, options = {}) {
     const launch = await prisma.graspExecutionLaunch.findUnique({
       where: { requestId },
       include: {
@@ -530,8 +672,18 @@ class ExecutionLaunchService {
       return null;
     }
 
-    const enrichedLaunch = await this.enrichLaunchRecord(launch, await this.findNextStartedLaunch(launch));
-    return this.mapLaunch(enrichedLaunch);
+    const nextStartedLaunch = await this.findNextStartedLaunch(launch);
+    const enrichedLaunch = await this.enrichLaunchRecord(launch, nextStartedLaunch);
+    const mappedLaunch = this.mapLaunch(enrichedLaunch);
+
+    if (!options.includeMonitor) {
+      return mappedLaunch;
+    }
+
+    return {
+      ...mappedLaunch,
+      monitor: await this.buildLaunchMonitorBundle(enrichedLaunch, nextStartedLaunch, options),
+    };
   }
 
   async listLaunches(limit = 50) {

@@ -92,7 +92,16 @@ const mergeEvents = (currentEvents, incomingEvents = [], limit = 100) => {
     .slice(0, limit);
 };
 
-export default function useGraspMonitor(limit = 100) {
+export default function useGraspMonitor(limit = 100, options = {}) {
+  const safeLimit = Math.max(Number(limit) || 100, 1);
+  const configuredHistoryLimit = Math.max(
+    Number(options.historyLimit ?? process.env.REACT_APP_GRASP_MONITOR_HISTORY_LIMIT ?? 40) || 40,
+    1
+  );
+  const configuredSummaryEventLimit = Math.max(
+    Number(options.summaryEventLimit ?? Math.min(safeLimit, 300)) || Math.min(safeLimit, 300),
+    1
+  );
   const [runs, setRuns] = useState([]);
   const [events, setEvents] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -190,12 +199,12 @@ export default function useGraspMonitor(limit = 100) {
         setLoading(true);
         setError("");
 
-        const historyWindow = Math.max(200, Math.min(limit, 500));
+        const historyWindow = Math.min(configuredHistoryLimit, 120);
 
         const [runsResponse, eventsResponse, summaryResponse] = await Promise.all([
-          getMonitorRuns(limit, historyWindow),
-          getMonitorEvents(limit),
-          getMonitorSummary(limit, limit),
+          getMonitorRuns(safeLimit, historyWindow),
+          getMonitorEvents(safeLimit),
+          getMonitorSummary(safeLimit, configuredSummaryEventLimit),
         ]);
 
         if (cancelled) {
@@ -238,7 +247,7 @@ export default function useGraspMonitor(limit = 100) {
               registerCurrentRuns(nextRuns);
               return nextRuns;
             });
-            setEvents((currentEvents) => mergeEvents(currentEvents, payload.events || [], limit));
+            setEvents((currentEvents) => mergeEvents(currentEvents, payload.events || [], safeLimit));
             if (payload.summary) {
               setSummary(payload.summary);
             }
@@ -248,7 +257,7 @@ export default function useGraspMonitor(limit = 100) {
         }
 
         if (!cancelled) {
-          setEvents((currentEvents) => mergeEvents(currentEvents, [payload], limit));
+          setEvents((currentEvents) => mergeEvents(currentEvents, [payload], safeLimit));
         }
 
         if ((payload.type === "kafka.update" || payload.type === "kafka.progress")
@@ -278,7 +287,7 @@ export default function useGraspMonitor(limit = 100) {
       cancelled = true;
       stream.close();
     };
-  }, [limit]);
+  }, [configuredHistoryLimit, configuredSummaryEventLimit, safeLimit]);
 
   return {
     runs,

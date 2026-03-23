@@ -20,8 +20,8 @@ async function authMiddleware(req, res, next) {
 
   try {
     const verified = jwt.verify(token, process.env.JWT_SECRET, {
-      issuer: process.env.JWT_ISSUER || "gf-shield-webservice",
-      audience: process.env.JWT_AUDIENCE || "gf-shield-front",
+      issuer: process.env.JWT_ISSUER || "g-fshield-webservice",
+      audience: process.env.JWT_AUDIENCE || "g-fshield-front",
     });
     const user = await userService.getUserById(Number(verified.id));
 

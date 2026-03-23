@@ -21,12 +21,12 @@ Coded by www.creative-tim.com
 
 const colors = {
   background: {
-    default: "#f0f2f5",
+    default: "#edf3f8",
   },
 
   text: {
-    main: "#7b809a",
-    focus: "#7b809a",
+    main: "#5b687c",
+    focus: "#475569",
   },
 
   transparent: {
@@ -50,13 +50,13 @@ const colors = {
   },
 
   secondary: {
-    main: "#7b809a",
-    focus: "#8f93a9",
+    main: "#72809a",
+    focus: "#8794ab",
   },
 
   info: {
-    main: "#1A73E8",
-    focus: "#1662C4",
+    main: "#3d8ef5",
+    focus: "#2b78d8",
   },
 
   success: {
@@ -80,8 +80,8 @@ const colors = {
   },
 
   dark: {
-    main: "#344767",
-    focus: "#2c3c58",
+    main: "#1f2b42",
+    focus: "#172135",
   },
 
   grey: {
@@ -108,8 +108,8 @@ const colors = {
     },
 
     info: {
-      main: "#49a3f1",
-      state: "#1A73E8",
+      main: "#6fb6ff",
+      state: "#3d8ef5",
     },
 
     success: {
@@ -133,8 +133,8 @@ const colors = {
     },
 
     dark: {
-      main: "#42424a",
-      state: "#191919",
+      main: "#25334d",
+      state: "#101725",
     },
   },
 
@@ -253,7 +253,7 @@ const colors = {
     dark: "#404040",
   },
 
-  inputBorderColor: "#d2d6da",
+  inputBorderColor: "#cbd6e2",
 
   tabs: {
     indicator: { boxShadow: "#ddd" },

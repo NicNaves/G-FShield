@@ -62,6 +62,13 @@ class GraspExecutionStoreService {
     return payload;
   }
 
+  resolveEventRequestId(event = {}) {
+    const payload = event?.payload || {};
+    const snapshot = this.extractSnapshotFromEventPayload(payload);
+
+    return event?.requestId || snapshot?.requestId || payload?.requestId || null;
+  }
+
   buildLaunchData(dispatchResult) {
     return {
       status: this.normalizeStatus(dispatchResult.status, "REQUESTED"),
@@ -118,6 +125,7 @@ class GraspExecutionStoreService {
 
         return {
           timestamp: event.createdAt.toISOString(),
+          requestId: this.resolveEventRequestId(event),
           stage: historyEntry.stage || event.stage || snapshot.stage || null,
           topic: historyEntry.topic || event.topic || snapshot.topic || null,
           eventType: event.eventType || null,
@@ -148,6 +156,10 @@ class GraspExecutionStoreService {
     const latestEvent = (runRecord.events || [])[0] || null;
     const latestSnapshot = this.extractSnapshotFromEventPayload(latestEvent?.payload);
     const history = this.buildHistory(runRecord.events || []);
+    const requestId = this.resolveEventRequestId(bestSolutionEvent)
+      || this.resolveEventRequestId(latestEvent)
+      || history.map((entry) => entry.requestId).find(Boolean)
+      || null;
     const bestSolutionFeatures = bestSnapshot.solutionFeatures || runRecord.solutionFeatures || [];
     const bestRclFeatures = bestSnapshot.rclfeatures
       || bestSnapshot.rclFeatures
@@ -161,6 +173,7 @@ class GraspExecutionStoreService {
       createdAt: runRecord.createdAt.toISOString(),
       updatedAt: runRecord.updatedAt.toISOString(),
       completedAt: runRecord.completedAt ? runRecord.completedAt.toISOString() : null,
+      requestId,
       status: runRecord.status.toLowerCase(),
       stage: runRecord.stage,
       topic: runRecord.topic,
@@ -201,6 +214,8 @@ class GraspExecutionStoreService {
   }
 
   mapEvent(eventRecord) {
+    const payloadRequestId = this.extractSnapshotFromEventPayload(eventRecord.payload)?.requestId || null;
+
     return {
       fingerprint: eventRecord.fingerprint,
       timestamp: eventRecord.createdAt.toISOString(),
@@ -209,7 +224,7 @@ class GraspExecutionStoreService {
       stage: eventRecord.stage,
       status: eventRecord.status ? eventRecord.status.toLowerCase() : null,
       seedId: eventRecord.seedId,
-      requestId: eventRecord.requestId,
+      requestId: eventRecord.requestId || payloadRequestId,
       sourcePartition: eventRecord.sourcePartition,
       sourceOffset: eventRecord.sourceOffset,
       schemaVersion: MONITOR_SCHEMA_VERSION,
@@ -282,6 +297,7 @@ class GraspExecutionStoreService {
         stage: event.stage || null,
         status: this.normalizeStatus(event.status, "RUNNING"),
         seedId: event.seedId,
+        requestId: event.requestId || null,
         sourcePartition: event.sourcePartition ?? null,
         sourceOffset: event.sourceOffset ?? null,
         payload: event,
@@ -294,6 +310,7 @@ class GraspExecutionStoreService {
         stage: event.stage || null,
         status: this.normalizeStatus(event.status, "RUNNING"),
         seedId: event.seedId,
+        requestId: event.requestId || null,
         sourcePartition: event.sourcePartition ?? null,
         sourceOffset: event.sourceOffset ?? null,
         payload: event,

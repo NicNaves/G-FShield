@@ -1,4 +1,4 @@
 services:
-  webservice-postgres:
+  g-fshield-postgres:
     cpus: 0.50
     mem_limit: 512m

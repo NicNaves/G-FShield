@@ -1,23 +1,23 @@
 services:
-  webservice-postgres:
+  g-fshield-postgres:
     cpus: 0.50
     mem_limit: 512m
     image: postgres:14
-    container_name: grasp-webservice-postgres
+    container_name: g-fshield-postgres
     restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: graspfs
+      POSTGRES_DB: g-fshield
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
     volumes:
-      - webservice_api_pg_data:/var/lib/postgresql/data
+      - g-fshield-webservice-api-pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d graspfs"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d g-fshield"]
       interval: 10s
       timeout: 5s
       retries: 10
 
 volumes:
-  webservice_api_pg_data:
+  g-fshield-webservice-api-pg-data:

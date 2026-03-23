@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 
-const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "gfshield_session";
+const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "g-fshield_session";
 const AUTH_COOKIE_MAX_AGE_MS = Math.max(Number(process.env.AUTH_COOKIE_MAX_AGE_MS || 24 * 60 * 60 * 1000), 60 * 1000);
 
 function isSecureCookieEnabled() {
@@ -23,8 +23,8 @@ function signAuthToken(user = {}) {
 
   const token = jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || "1d",
-    issuer: process.env.JWT_ISSUER || "gf-shield-webservice",
-    audience: process.env.JWT_AUDIENCE || "gf-shield-front",
+    issuer: process.env.JWT_ISSUER || "g-fshield-webservice",
+    audience: process.env.JWT_AUDIENCE || "g-fshield-front",
   });
 
   return {
