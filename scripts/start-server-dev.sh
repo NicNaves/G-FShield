@@ -174,7 +174,10 @@ echo "Iniciando API em background..."
 API_PID="$(start_managed_process "$API_DIR" "$API_LOG" env API_PORT="$API_PORT" AUTH_DISABLED="$API_AUTH_DISABLED" MOCK_DATA_ENABLED="$API_MOCK_DATA_ENABLED" CORS_ORIGINS="$CORS_ORIGINS" GF_SHIELD_COMPOSE_FILES="docker-compose.yml,docker-compose.server.yml" "$NPM_COMMAND" run dev)"
 
 echo "Gerando build estatico do front..."
-if ! env REACT_APP_API_URL="http://localhost:${API_PORT}/api" REACT_APP_AUTH_DISABLED="$FRONT_AUTH_DISABLED" "$NPM_COMMAND" run build >>"$FRONT_LOG" 2>&1; then
+if ! (
+  cd "$FRONT_DIR"
+  env REACT_APP_API_URL="http://localhost:${API_PORT}/api" REACT_APP_AUTH_DISABLED="$FRONT_AUTH_DISABLED" "$NPM_COMMAND" run build
+) >>"$FRONT_LOG" 2>&1; then
   print_log_tail "front" "$FRONT_LOG"
   exit 1
 fi
