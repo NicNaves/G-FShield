@@ -124,6 +124,8 @@ if [[ -z "$API_HEALTHCHECK_URL" ]]; then
   API_HEALTHCHECK_URL="http://localhost:${API_PORT}/api-docs"
 fi
 
+FRONT_HEALTHCHECK_URL="http://localhost:${FRONTEND_PORT}"
+
 REPO_ROOT="${DEV_REPO_ROOT}"
 API_DIR="${REPO_ROOT}/webservice/api"
 FRONT_DIR="${REPO_ROOT}/webservice/front"
@@ -171,13 +173,26 @@ FRONT_LOG="${STATE_DIR}/front.log"
 echo "Iniciando API em background..."
 API_PID="$(start_managed_process "$API_DIR" "$API_LOG" env API_PORT="$API_PORT" AUTH_DISABLED="$API_AUTH_DISABLED" MOCK_DATA_ENABLED="$API_MOCK_DATA_ENABLED" CORS_ORIGINS="$CORS_ORIGINS" GF_SHIELD_COMPOSE_FILES="docker-compose.yml,docker-compose.server.yml" "$NPM_COMMAND" run dev)"
 
-echo "Iniciando front em background..."
-FRONT_PID="$(start_managed_process "$FRONT_DIR" "$FRONT_LOG" env BROWSER=none PORT="$FRONTEND_PORT" REACT_APP_API_URL="http://localhost:${API_PORT}/api" REACT_APP_AUTH_DISABLED="$FRONT_AUTH_DISABLED" "$NPM_COMMAND" start)"
+echo "Gerando build estatico do front..."
+if ! env REACT_APP_API_URL="http://localhost:${API_PORT}/api" REACT_APP_AUTH_DISABLED="$FRONT_AUTH_DISABLED" "$NPM_COMMAND" run build >>"$FRONT_LOG" 2>&1; then
+  print_log_tail "front" "$FRONT_LOG"
+  exit 1
+fi
+
+echo "Iniciando front estatico em background..."
+FRONT_PID="$(start_managed_process "$FRONT_DIR" "$FRONT_LOG" "$NPM_COMMAND" exec --yes serve -s build -l "$FRONTEND_PORT")"
 
 write_state_file "$STATE_FILE" "$(date -Iseconds)" "$AUTH_MODE" "$API_PID" "$FRONT_PID" "$API_LOG" "$FRONT_LOG"
 
 echo "Aguardando API responder em ${API_HEALTHCHECK_URL} ..."
 if ! wait_for_http "$API_HEALTHCHECK_URL" 120; then
+  print_log_tail "API" "$API_LOG"
+  print_log_tail "front" "$FRONT_LOG"
+  exit 1
+fi
+
+echo "Aguardando front responder em ${FRONT_HEALTHCHECK_URL} ..."
+if ! wait_for_http "$FRONT_HEALTHCHECK_URL" 120; then
   print_log_tail "API" "$API_LOG"
   print_log_tail "front" "$FRONT_LOG"
   exit 1

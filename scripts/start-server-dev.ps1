@@ -27,6 +27,7 @@ $dbComposeFile = Join-Path $apiDir "docker-compose.db.yml"
 $dbPresetComposeFile = Join-Path $apiDir "docker-compose.db.server.yml"
 $stateDir = Join-Path $repoRoot ".server-dev"
 $stateFile = Join-Path $stateDir "processes.json"
+$frontHealthcheckUrl = "http://localhost:$FrontendPort"
 
 function Get-NpmCommand {
   $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
@@ -189,6 +190,27 @@ Invoke-Compose -WorkingDirectory $repoRoot -Arguments $rootComposeArgs
 Write-Host "Subindo banco server do webservice/api..."
 Invoke-Compose -WorkingDirectory $repoRoot -Arguments @("-f", $dbComposeFile, "-f", $dbPresetComposeFile, "up", "-d")
 
+$apiLog = Join-Path $stateDir "api.log"
+$frontLog = Join-Path $stateDir "front.log"
+Set-Content -Path $apiLog -Value ""
+Set-Content -Path $frontLog -Value ""
+
+Write-Host "Gerando build estatico do front..."
+Push-Location $frontDir
+try {
+  $env:REACT_APP_API_URL = "http://localhost:$ApiPort/api"
+  $env:REACT_APP_AUTH_DISABLED = $frontAuthDisabled
+  & $npmCommand run build *>&1 | Tee-Object -FilePath $frontLog -Append | Out-Host
+  if ($LASTEXITCODE -ne 0) {
+    throw "Falha ao gerar o build do front."
+  }
+}
+finally {
+  Remove-Item Env:REACT_APP_API_URL -ErrorAction SilentlyContinue
+  Remove-Item Env:REACT_APP_AUTH_DISABLED -ErrorAction SilentlyContinue
+  Pop-Location
+}
+
 $apiCommand = @"
 Set-Location '$apiDir'
 `$env:API_PORT = '$ApiPort'
@@ -199,9 +221,7 @@ Set-Location '$apiDir'
 
 $frontCommand = @"
 Set-Location '$frontDir'
-`$env:REACT_APP_API_URL = 'http://localhost:$ApiPort/api'
-`$env:REACT_APP_AUTH_DISABLED = '$frontAuthDisabled'
-& '$npmCommand' start
+& '$npmCommand' exec --yes serve -s build -l $FrontendPort
 "@
 
 Write-Host "Abrindo API em nova janela..."
@@ -220,6 +240,9 @@ $state | ConvertTo-Json -Depth 4 | Set-Content -Path $stateFile
 
 Write-Host "Aguardando API responder em http://localhost:$ApiPort/api/grasp/services ..."
 Wait-ForHttp -Url "http://localhost:$ApiPort/api/grasp/services"
+
+Write-Host "Aguardando front responder em $frontHealthcheckUrl ..."
+Wait-ForHttp -Url $frontHealthcheckUrl
 
 if ($DispatchSampleRun) {
   foreach ($port in @(8086, 8087, 8088, 8089)) {
