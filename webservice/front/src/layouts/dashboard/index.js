@@ -284,6 +284,15 @@ const parseDateTimeValue = (value) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
 };
 
+const formatTimelineAxisTick = (value, spanMs = 0) => {
+  const parsed = parseDateTimeValue(value);
+  if (parsed === null) {
+    return "--";
+  }
+
+  return spanMs > 24 * 60 * 60 * 1000 ? formatDateTime(parsed) : formatShortTime(parsed);
+};
+
 const toDateTimeLocalValue = (value) => {
   if (!value) {
     return "";
@@ -752,11 +761,6 @@ const promoteBestSolutionEvent = (event = {}) => ({
   solutionFeatures: event.solutionFeatures || [],
 });
 
-const buildSeriesLabels = (entries) =>
-  entries.map((entry, index) =>
-    entries.length > 24 ? `#${index + 1}` : formatShortTime(entry.timestamp)
-  );
-
 const timelineSeriesPalette = [
   "#4361ee",
   "#ff8c42",
@@ -772,27 +776,32 @@ const timelineSeriesPalette = [
 
 const getTimelineSeriesColor = (index = 0) => timelineSeriesPalette[index % timelineSeriesPalette.length];
 
-const buildEmptyLineData = (primaryLabel, secondaryLabel) => ({
-  labels: ["#1"],
-  datasets: [
-    {
-      label: primaryLabel,
-      data: [0],
-      borderColor: "#4361ee",
-      backgroundColor: "rgba(67, 97, 238, 0.10)",
-      tension: 0.35,
-      fill: true,
-    },
-    {
-      label: secondaryLabel,
-      data: [0],
-      borderColor: "#36c56c",
-      backgroundColor: "rgba(54, 197, 108, 0.08)",
-      tension: 0.35,
-      fill: true,
-    },
-  ],
-});
+const buildTimelineComparisonRuns = (filteredRuns = [], requestRuns = [], featuredRun = null) => {
+  const visibleRunsBySeed = new Map(
+    filteredRuns
+      .filter((run) => run?.seedId)
+      .map((run) => [run.seedId, run])
+  );
+
+  (requestRuns || []).forEach((run) => {
+    if (!run?.seedId || !visibleRunsBySeed.has(run.seedId)) {
+      return;
+    }
+
+    visibleRunsBySeed.set(run.seedId, mergeRunDetail(visibleRunsBySeed.get(run.seedId) || {}, run));
+  });
+
+  if (featuredRun?.seedId && visibleRunsBySeed.has(featuredRun.seedId)) {
+    visibleRunsBySeed.set(
+      featuredRun.seedId,
+      mergeRunDetail(visibleRunsBySeed.get(featuredRun.seedId) || {}, featuredRun)
+    );
+  }
+
+  return [...visibleRunsBySeed.values()].sort(
+    (left, right) => getSortableDateValue(right?.updatedAt) - getSortableDateValue(left?.updatedAt)
+  );
+};
 
 const buildEmptyBarData = (label) => ({
   labels: ["No data"],
@@ -887,6 +896,213 @@ const resolveRunEndTimestamp = (run = {}) => {
   return run?.updatedAt || Date.now();
 };
 
+const buildFallbackRunHistoryEntry = (run = {}, fallbackEvent = null) => ({
+  timestamp: resolveRunEndTimestamp(run) || resolveRunStartTimestamp(run, fallbackEvent),
+  f1Score: run?.currentF1Score ?? run?.bestF1Score ?? fallbackEvent?.bestF1Score ?? fallbackEvent?.currentF1Score ?? null,
+  stage: run?.stage || fallbackEvent?.stage || null,
+  cpuUsage: run?.cpuUsage ?? fallbackEvent?.cpuUsage ?? null,
+  memoryUsage: run?.memoryUsage ?? fallbackEvent?.memoryUsage ?? null,
+  memoryUsagePercent: run?.memoryUsagePercent ?? fallbackEvent?.memoryUsagePercent ?? null,
+  order: 1,
+});
+
+const buildRunHistoryEntries = (run = {}, fallbackEvent = null) => {
+  const historyEntries = Array.isArray(run?.history) && run.history.length
+    ? [...run.history]
+        .sort((left, right) => getSortableDateValue(left?.timestamp) - getSortableDateValue(right?.timestamp))
+        .map((entry, index) => ({
+          ...entry,
+          order: index + 1,
+        }))
+    : [];
+
+  if (historyEntries.length) {
+    return historyEntries;
+  }
+
+  const fallbackEntry = buildFallbackRunHistoryEntry(run, fallbackEvent);
+  return fallbackEntry.timestamp ? [fallbackEntry] : [];
+};
+
+const resolveLatestRunsTimestamp = (runs = [], initialEventBySeed = new Map()) => {
+  let latestTimestamp = null;
+  let latestTimestampMs = null;
+
+  runs.forEach((run) => {
+    const fallbackEvent = initialEventBySeed.get(run?.seedId);
+    const historyEntries = buildRunHistoryEntries(run, fallbackEvent);
+    const latestHistoryTimestamp = historyEntries[historyEntries.length - 1]?.timestamp || null;
+    const candidates = [
+      latestHistoryTimestamp,
+      run?.updatedAt,
+      run?.completedAt,
+      run?.createdAt,
+      resolveRunStartTimestamp(run, fallbackEvent),
+    ];
+
+    candidates.forEach((candidate) => {
+      const candidateMs = parseDateTimeValue(candidate);
+      if (candidateMs === null) {
+        return;
+      }
+
+      if (latestTimestampMs === null || candidateMs > latestTimestampMs) {
+        latestTimestamp = candidate;
+        latestTimestampMs = candidateMs;
+      }
+    });
+  });
+
+  return latestTimestamp;
+};
+
+const resolveResourceBucketSizeMs = (minTimestampMs, maxTimestampMs, pointCount = 0) => {
+  const spanMs = Math.max((maxTimestampMs || 0) - (minTimestampMs || 0), 0);
+
+  if (spanMs > 24 * 60 * 60 * 1000 || pointCount > 2000) {
+    return 10 * 60 * 1000;
+  }
+
+  if (spanMs > 6 * 60 * 60 * 1000 || pointCount > 1200) {
+    return 5 * 60 * 1000;
+  }
+
+  if (spanMs > 2 * 60 * 60 * 1000 || pointCount > 600) {
+    return 2 * 60 * 1000;
+  }
+
+  if (spanMs > 30 * 60 * 1000 || pointCount > 200) {
+    return 60 * 1000;
+  }
+
+  if (spanMs > 10 * 60 * 1000 || pointCount > 120) {
+    return 30 * 1000;
+  }
+
+  return 10 * 1000;
+};
+
+const buildAggregatedResourceSeries = (runs = [], options = {}) => {
+  const {
+    initialEventBySeed = new Map(),
+    range = {},
+    query = "",
+  } = options;
+
+  const rawPoints = runs
+    .flatMap((run) => {
+      const fallbackEvent = initialEventBySeed.get(run?.seedId);
+
+      return buildRunHistoryEntries(run, fallbackEvent)
+        .filter(
+          (entry) =>
+            isTimestampWithinRange(entry?.timestamp, range)
+            && matchesTimelineTimestampQuery(entry, query)
+        )
+        .map((entry) => {
+          const timestampMs = parseDateTimeValue(entry?.timestamp);
+          const cpuUsage = getFiniteMetric(entry?.cpuUsage);
+          const memoryUsagePercent = getFiniteMetric(entry?.memoryUsagePercent);
+
+          if (timestampMs === null || (cpuUsage === null && memoryUsagePercent === null)) {
+            return null;
+          }
+
+          return {
+            seedId: run?.seedId || null,
+            timestampMs,
+            cpuUsage,
+            memoryUsagePercent,
+          };
+        })
+        .filter(Boolean);
+    })
+    .sort((left, right) => left.timestampMs - right.timestampMs);
+
+  if (!rawPoints.length) {
+    return {
+      cpuPoints: [],
+      memoryPoints: [],
+      snapshotCount: 0,
+      bucketCount: 0,
+      runCount: 0,
+      minTimestampMs: null,
+      maxTimestampMs: null,
+    };
+  }
+
+  const bucketSizeMs = resolveResourceBucketSizeMs(
+    rawPoints[0]?.timestampMs,
+    rawPoints[rawPoints.length - 1]?.timestampMs,
+    rawPoints.length
+  );
+  const buckets = new Map();
+  const runIds = new Set();
+
+  rawPoints.forEach((point) => {
+    const bucketTimestampMs = Math.floor(point.timestampMs / bucketSizeMs) * bucketSizeMs;
+    const bucket = buckets.get(bucketTimestampMs) || {
+      timestampMs: bucketTimestampMs,
+      cpuValues: [],
+      memoryValues: [],
+      sampleCount: 0,
+      runIds: new Set(),
+    };
+
+    if (point.cpuUsage !== null) {
+      bucket.cpuValues.push(point.cpuUsage);
+    }
+
+    if (point.memoryUsagePercent !== null) {
+      bucket.memoryValues.push(point.memoryUsagePercent);
+    }
+
+    bucket.sampleCount += 1;
+    if (point.seedId) {
+      bucket.runIds.add(point.seedId);
+      runIds.add(point.seedId);
+    }
+
+    buckets.set(bucketTimestampMs, bucket);
+  });
+
+  const orderedBuckets = [...buckets.values()].sort((left, right) => left.timestampMs - right.timestampMs);
+
+  return {
+    cpuPoints: orderedBuckets
+      .map((bucket) => {
+        const value = averageMetric(bucket.cpuValues);
+        return value === null
+          ? null
+          : {
+              x: bucket.timestampMs,
+              y: value,
+              sampleCount: bucket.sampleCount,
+              runCount: bucket.runIds.size,
+            };
+      })
+      .filter(Boolean),
+    memoryPoints: orderedBuckets
+      .map((bucket) => {
+        const value = averageMetric(bucket.memoryValues);
+        return value === null
+          ? null
+          : {
+              x: bucket.timestampMs,
+              y: value,
+              sampleCount: bucket.sampleCount,
+              runCount: bucket.runIds.size,
+            };
+      })
+      .filter(Boolean),
+    snapshotCount: rawPoints.length,
+    bucketCount: orderedBuckets.length,
+    runCount: runIds.size,
+    minTimestampMs: orderedBuckets[0]?.timestampMs ?? null,
+    maxTimestampMs: orderedBuckets[orderedBuckets.length - 1]?.timestampMs ?? null,
+  };
+};
+
 const buildRunTimelinePoints = (run = {}, options = {}) => {
   const {
     fallbackEvent = null,
@@ -900,21 +1116,7 @@ const buildRunTimelinePoints = (run = {}, options = {}) => {
     return [];
   }
 
-  const historyEntries = Array.isArray(run?.history) && run.history.length
-    ? [...run.history]
-        .sort((left, right) => getSortableDateValue(left?.timestamp) - getSortableDateValue(right?.timestamp))
-        .map((entry, index) => ({
-          ...entry,
-          order: index + 1,
-        }))
-    : [
-        {
-          timestamp: resolveRunEndTimestamp(run),
-          f1Score: run?.currentF1Score ?? run?.bestF1Score ?? fallbackEvent?.bestF1Score ?? fallbackEvent?.currentF1Score ?? null,
-          stage: run?.stage || fallbackEvent?.stage || null,
-          order: 1,
-        },
-      ];
+  const historyEntries = buildRunHistoryEntries(run, fallbackEvent);
 
   return historyEntries
     .filter(
@@ -931,9 +1133,10 @@ const buildRunTimelinePoints = (run = {}, options = {}) => {
       }
 
       return {
-        x: Math.max(timestampMs - startMs, 0),
+        x: timestampMs,
         y: score,
         timestamp: entry.timestamp,
+        elapsedMs: Math.max(timestampMs - startMs, 0),
         order: entry.order,
         stage: entry.stage || run?.stage || fallbackEvent?.stage || null,
       };
@@ -1963,7 +2166,7 @@ function Dashboard() {
     setSelectedTimeWindow("all");
     setCustomRangeStart("");
     setCustomRangeEnd("");
-    setSelectedTimelineWindow("15m");
+    setSelectedTimelineWindow("all");
     setTimelineRangeStart("");
     setTimelineRangeEnd("");
     setTimelineTimestampQuery("");
@@ -2019,6 +2222,11 @@ function Dashboard() {
     [selectedRequestDetails]
   );
 
+  const timelineComparisonRuns = useMemo(
+    () => buildTimelineComparisonRuns(filteredRuns, selectedRequestBundle.runs, featuredRun),
+    [featuredRun, filteredRuns, selectedRequestBundle.runs]
+  );
+
   const exportDisabled = useMemo(() => {
     if (selectedExportScope === "request") {
       return !selectedRequestId || requestDetailsLoading;
@@ -2062,8 +2270,12 @@ function Dashboard() {
   }, [featuredRun]);
 
   const timelineAnchorTimestamp = useMemo(
-    () => fullHistorySource[fullHistorySource.length - 1]?.timestamp || featuredRun?.updatedAt || null,
-    [featuredRun?.updatedAt, fullHistorySource]
+    () =>
+      resolveLatestRunsTimestamp(timelineComparisonRuns, initialEventBySeed)
+      || fullHistorySource[fullHistorySource.length - 1]?.timestamp
+      || featuredRun?.updatedAt
+      || null,
+    [featuredRun?.updatedAt, fullHistorySource, initialEventBySeed, timelineComparisonRuns]
   );
 
   const customTimelineRangeHelper = useMemo(() => {
@@ -2190,33 +2402,6 @@ function Dashboard() {
         : [],
     [featuredRun, fullHistory]
   );
-
-  const timelineComparisonRuns = useMemo(() => {
-    const visibleRunsBySeed = new Map(
-      filteredRuns
-        .filter((run) => run?.seedId)
-        .map((run) => [run.seedId, run])
-    );
-
-    (selectedRequestBundle.runs || []).forEach((run) => {
-      if (!run?.seedId || !visibleRunsBySeed.has(run.seedId)) {
-        return;
-      }
-
-      visibleRunsBySeed.set(run.seedId, mergeRunDetail(visibleRunsBySeed.get(run.seedId) || {}, run));
-    });
-
-    if (featuredRun?.seedId && visibleRunsBySeed.has(featuredRun.seedId)) {
-      visibleRunsBySeed.set(
-        featuredRun.seedId,
-        mergeRunDetail(visibleRunsBySeed.get(featuredRun.seedId) || {}, featuredRun)
-      );
-    }
-
-    return [...visibleRunsBySeed.values()].sort(
-      (left, right) => getSortableDateValue(right?.updatedAt) - getSortableDateValue(left?.updatedAt)
-    );
-  }, [featuredRun, filteredRuns, selectedRequestBundle.runs]);
 
   const requestExportSnapshots = useMemo(
     () =>
@@ -2345,7 +2530,8 @@ function Dashboard() {
 
   const fullTimelineComparison = useMemo(() => {
     let snapshotCount = 0;
-    let maxElapsedMs = 0;
+    let minTimestampMs = null;
+    let maxTimestampMs = null;
 
     const datasets = timelineComparisonRuns
       .map((run, index) => {
@@ -2360,7 +2546,12 @@ function Dashboard() {
         }
 
         snapshotCount += points.length;
-        maxElapsedMs = Math.max(maxElapsedMs, points[points.length - 1]?.x || 0);
+        minTimestampMs = minTimestampMs === null
+          ? points[0]?.x ?? null
+          : Math.min(minTimestampMs, points[0]?.x ?? minTimestampMs);
+        maxTimestampMs = maxTimestampMs === null
+          ? points[points.length - 1]?.x ?? null
+          : Math.max(maxTimestampMs, points[points.length - 1]?.x ?? maxTimestampMs);
 
         const color = getTimelineSeriesColor(index);
         const isFocused = run.seedId === featuredRun?.seedId;
@@ -2383,7 +2574,12 @@ function Dashboard() {
     return {
       datasets,
       snapshotCount,
-      maxElapsedMs,
+      minTimestampMs,
+      maxTimestampMs,
+      timeSpanMs:
+        minTimestampMs !== null && maxTimestampMs !== null
+          ? Math.max(maxTimestampMs - minTimestampMs, 0)
+          : 0,
     };
   }, [featuredRun?.seedId, initialEventBySeed, timelineComparisonRuns, timelineRangeBounds, timelineTimestampQuery]);
 
@@ -2393,7 +2589,7 @@ function Dashboard() {
         datasets: [
           {
             label: "F1-Score",
-            data: [{ x: 0, y: 0 }],
+            data: [],
             borderColor: "#4361ee",
             backgroundColor: "rgba(67, 97, 238, 0.10)",
             pointRadius: 0,
@@ -2415,7 +2611,8 @@ function Dashboard() {
       maintainAspectRatio: false,
       parsing: false,
       interaction: {
-        mode: "index",
+        mode: "nearest",
+        axis: "x",
         intersect: false,
       },
       plugins: {
@@ -2428,15 +2625,12 @@ function Dashboard() {
         },
         tooltip: {
           callbacks: {
-            title: (items) => {
-              const elapsedValue = items?.[0]?.parsed?.x;
-              return `${t("dashboard.timelineElapsedAxis")}: ${formatDuration(elapsedValue)}`;
-            },
+            title: (items) => formatDateTime(items?.[0]?.raw?.timestamp ?? items?.[0]?.parsed?.x),
             label: (context) => {
               const rawPoint = context.raw || {};
               const summary = `${context.dataset.label}: ${formatCompactPercent(context.parsed?.y)}`;
-              const timestampLabel = rawPoint.timestamp ? formatDateTime(rawPoint.timestamp) : "--";
-              return `${summary} · ${timestampLabel}`;
+              const elapsedLabel = rawPoint.elapsedMs !== undefined ? formatDuration(rawPoint.elapsedMs) : "--";
+              return `${summary} | ${t("dashboard.timelineElapsedAxis")}: ${elapsedLabel}`;
             },
           },
         },
@@ -2457,14 +2651,14 @@ function Dashboard() {
         },
         x: {
           type: "linear",
-          beginAtZero: true,
-          suggestedMax: fullTimelineComparison.maxElapsedMs || undefined,
+          min: fullTimelineComparison.minTimestampMs || undefined,
+          suggestedMax: fullTimelineComparison.maxTimestampMs || undefined,
           title: {
             display: true,
-            text: t("dashboard.timelineElapsedAxis"),
+            text: t("dashboard.timelineTimestampAxis"),
           },
           ticks: {
-            callback: (value) => formatDuration(value),
+            callback: (value) => formatTimelineAxisTick(value, fullTimelineComparison.timeSpanMs),
           },
           grid: {
             display: false,
@@ -2472,20 +2666,54 @@ function Dashboard() {
         },
       },
     }),
-    [fullTimelineComparison.maxElapsedMs, fullTimelineComparison.snapshotCount, t]
+    [
+      fullTimelineComparison.maxTimestampMs,
+      fullTimelineComparison.minTimestampMs,
+      fullTimelineComparison.snapshotCount,
+      fullTimelineComparison.timeSpanMs,
+      t,
+    ]
+  );
+
+  const aggregatedResourceSeries = useMemo(
+    () =>
+      buildAggregatedResourceSeries(timelineComparisonRuns, {
+        initialEventBySeed,
+        range: timelineRangeBounds,
+        query: timelineTimestampQuery,
+      }),
+    [initialEventBySeed, timelineComparisonRuns, timelineRangeBounds, timelineTimestampQuery]
   );
 
   const resourceChartData = useMemo(() => {
-    if (!fullHistory.length) {
-      return buildEmptyLineData("CPU Usage", "Memory Usage");
+    if (!aggregatedResourceSeries.cpuPoints.length && !aggregatedResourceSeries.memoryPoints.length) {
+      return {
+        datasets: [
+          {
+            label: "CPU Usage (%)",
+            data: [],
+            borderColor: "#ff8c42",
+            backgroundColor: "rgba(255, 140, 66, 0.10)",
+            tension: 0.25,
+            fill: true,
+          },
+          {
+            label: "Memory Usage (%)",
+            data: [],
+            borderColor: "#11b5ae",
+            backgroundColor: "rgba(17, 181, 174, 0.10)",
+            tension: 0.25,
+            fill: true,
+          },
+        ],
+      };
     }
 
     return {
-      labels: buildSeriesLabels(fullHistory),
       datasets: [
         {
           label: "CPU Usage (%)",
-          data: fullHistory.map((entry) => entry.cpuUsage ?? 0),
+          data: aggregatedResourceSeries.cpuPoints,
           borderColor: "#ff8c42",
           backgroundColor: "rgba(255, 140, 66, 0.10)",
           tension: 0.25,
@@ -2493,7 +2721,7 @@ function Dashboard() {
         },
         {
           label: "Memory Usage (%)",
-          data: fullHistory.map((entry) => entry.memoryUsagePercent ?? 0),
+          data: aggregatedResourceSeries.memoryPoints,
           borderColor: "#11b5ae",
           backgroundColor: "rgba(17, 181, 174, 0.10)",
           tension: 0.25,
@@ -2501,14 +2729,16 @@ function Dashboard() {
         },
       ],
     };
-  }, [fullHistory]);
+  }, [aggregatedResourceSeries.cpuPoints, aggregatedResourceSeries.memoryPoints]);
 
   const resourceChartOptions = useMemo(
     () => ({
       responsive: true,
       maintainAspectRatio: false,
+      parsing: false,
       interaction: {
-        mode: "index",
+        mode: "nearest",
+        axis: "x",
         intersect: false,
       },
       plugins: {
@@ -2519,11 +2749,26 @@ function Dashboard() {
             boxWidth: 8,
           },
         },
+        tooltip: {
+          callbacks: {
+            title: (items) => formatDateTime(items?.[0]?.raw?.x ?? items?.[0]?.parsed?.x),
+            label: (context) => {
+              const rawPoint = context.raw || {};
+              const summary = `${context.dataset.label}: ${formatCompactPercent(context.parsed?.y)}`;
+              const sampleCount = rawPoint.sampleCount ?? 0;
+              const runCount = rawPoint.runCount ?? 0;
+              return `${summary} | ${t("dashboard.timelineVisibleRuns", {
+                runs: runCount,
+                snapshots: sampleCount,
+              })}`;
+            },
+          },
+        },
       },
       elements: {
         point: {
-          radius: fullHistory.length > 80 ? 0 : 2,
-          hoverRadius: fullHistory.length > 80 ? 3 : 5,
+          radius: aggregatedResourceSeries.bucketCount > 120 ? 0 : 2,
+          hoverRadius: aggregatedResourceSeries.bucketCount > 120 ? 3 : 5,
         },
       },
       scales: {
@@ -2535,13 +2780,30 @@ function Dashboard() {
           },
         },
         x: {
+          type: "linear",
+          min: aggregatedResourceSeries.minTimestampMs || undefined,
+          suggestedMax: aggregatedResourceSeries.maxTimestampMs || undefined,
+          ticks: {
+            callback: (value) =>
+              formatTimelineAxisTick(
+                value,
+                aggregatedResourceSeries.maxTimestampMs !== null && aggregatedResourceSeries.minTimestampMs !== null
+                  ? aggregatedResourceSeries.maxTimestampMs - aggregatedResourceSeries.minTimestampMs
+                  : 0
+              ),
+          },
           grid: {
             display: false,
           },
         },
       },
     }),
-    [fullHistory.length]
+    [
+      aggregatedResourceSeries.bucketCount,
+      aggregatedResourceSeries.maxTimestampMs,
+      aggregatedResourceSeries.minTimestampMs,
+      t,
+    ]
   );
 
   const featureFrequencyChartData = useMemo(() => {

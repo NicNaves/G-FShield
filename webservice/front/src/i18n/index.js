@@ -441,10 +441,10 @@ const translations = {
       offlineSnapshot: "Offline snapshot",
       fullExecutionTimeline: "Full Execution Timeline",
       fullExecutionTimelineComparison:
-        "Comparing {{runs}} visible executions and {{snapshots}} checkpoints on the same elapsed-time axis.",
+        "Comparing {{runs}} visible executions and {{snapshots}} checkpoints on the same real-time axis.",
       timelineFilterTitle: "Timeline time filter",
       timelineFilterSubtitle:
-        "Quick ranges are anchored to the latest checkpoint of the selected execution, with optional timestamp search.",
+        "Quick ranges are anchored to the latest visible checkpoint in the comparison, with optional timestamp search.",
       timelineWindowAll: "Entire execution",
       timelineWindowLast15Minutes: "Last 15 minutes",
       timelineWindowLastHour: "Last hour",
@@ -459,11 +459,12 @@ const translations = {
       timelineVisibleRuns: "{{runs}} runs / {{snapshots}} checkpoints",
       timelineAnchoredToLatest: "Anchored to latest checkpoint",
       timelineElapsedAxis: "Elapsed time",
+      timelineTimestampAxis: "Timestamp",
       waitingMonitorEvents: "Waiting for monitor events",
       persistedCheckpoints: "{{count}} persisted checkpoints",
       resourcePressure: "Resource Pressure",
       resourcePressureSubtitle:
-        "CPU and memory across the persisted checkpoints of the selected execution.",
+        "Average CPU and memory across the persisted checkpoints of the visible executions.",
       featureFrequency: "Feature Frequency",
       featureFrequencySubtitle: "Most frequent features across the currently visible best solutions.",
       liveRunDetails: "Live Run Details",
@@ -1021,10 +1022,10 @@ const translations = {
       offlineSnapshot: "Snapshot offline",
       fullExecutionTimeline: "Timeline completa da execucao",
       fullExecutionTimelineComparison:
-        "Comparando {{runs}} execucoes visiveis e {{snapshots}} checkpoints no mesmo eixo de tempo decorrido.",
+        "Comparando {{runs}} execucoes visiveis e {{snapshots}} checkpoints no mesmo eixo de tempo real.",
       timelineFilterTitle: "Filtro temporal da timeline",
       timelineFilterSubtitle:
-        "Os atalhos rapidos usam como ancora o checkpoint mais recente da execucao selecionada, com busca opcional por timestamp.",
+        "Os atalhos rapidos usam como ancora o checkpoint visivel mais recente da comparacao, com busca opcional por timestamp.",
       timelineWindowAll: "Execucao inteira",
       timelineWindowLast15Minutes: "Ultimos 15 minutos",
       timelineWindowLastHour: "Ultima hora",
@@ -1039,11 +1040,12 @@ const translations = {
       timelineVisibleRuns: "{{runs}} execucoes / {{snapshots}} checkpoints",
       timelineAnchoredToLatest: "Ancorado no checkpoint mais recente",
       timelineElapsedAxis: "Tempo decorrido",
+      timelineTimestampAxis: "Timestamp",
       waitingMonitorEvents: "Aguardando eventos do monitor",
       persistedCheckpoints: "{{count}} checkpoints persistidos",
       resourcePressure: "Pressao de recursos",
       resourcePressureSubtitle:
-        "CPU e memoria ao longo dos checkpoints persistidos da execucao selecionada.",
+        "Media de CPU e memoria ao longo dos checkpoints persistidos das execucoes visiveis.",
       featureFrequency: "Frequencia de features",
       featureFrequencySubtitle:
         "Features mais frequentes entre as melhores solucoes atualmente visiveis.",
