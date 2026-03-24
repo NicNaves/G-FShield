@@ -77,6 +77,15 @@ export DEV_NODE_IMAGE=node:24
 bash scripts/start-server-dev.sh
 ```
 
+Autostart no boot do servidor:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/install-server-autostart.sh --frontend-port 3001 --public-front-origin http://SEU_IP:3001
+```
+
+O agendamento e registrado no `crontab` do usuario e chama `scripts/start-server-autostart.sh` a cada reboot.
+
 ### Derrubar a stack principal
 
 ```powershell
@@ -262,6 +271,15 @@ Ubuntu:
 export DEV_NODE_IMAGE=node:24
 bash scripts/start-server-dev.sh
 ```
+
+Server boot autostart:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/install-server-autostart.sh --frontend-port 3001 --public-front-origin http://YOUR_IP:3001
+```
+
+The scheduler is registered in the user's `crontab` and calls `scripts/start-server-autostart.sh` after each reboot.
 
 ### Stop the main stack
 

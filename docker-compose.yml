@@ -1,8 +1,10 @@
 x-rcl-service: &rcl-service
+  restart: unless-stopped
   cpus: 1.50
   mem_limit: 1536m
 
 x-dls-service: &dls-service
+  restart: unless-stopped
   cpus: 1.00
   mem_limit: 1536m
 
@@ -10,6 +12,7 @@ x-dls-environment: &dls-environment
   KAFKA_MAX_POLL_INTERVAL_MS: "14400000"
 
 x-neighborhood-service: &neighborhood-service
+  restart: unless-stopped
   cpus: 0.75
   mem_limit: 768m
 
@@ -176,6 +179,7 @@ services:
       kafka:
         condition: service_started
   zookeeper:
+    restart: unless-stopped
     cpus: 0.50
     mem_limit: 256m
     image: 'confluentinc/cp-zookeeper:7.4.0'
@@ -186,6 +190,7 @@ services:
       - ZOOKEEPER_TICK_TIME=2000
 
   kafka:
+    restart: unless-stopped
     cpus: 1.00
     mem_limit: 1024m
     image: 'confluentinc/cp-kafka:7.4.0'
@@ -211,6 +216,7 @@ services:
       - zookeeper
 
   kafbat-ui:
+    restart: unless-stopped
     cpus: 0.50
     mem_limit: 512m
     image: ghcr.io/kafbat/kafka-ui:v1.4.2
