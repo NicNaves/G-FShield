@@ -1,3 +1,10 @@
 node_modules
+
+# Local Docker npm/home caches (dev script)
+.docker-home/
+.docker-home;C/
+.docker-npm-cache/
+.docker-npm-cache;C/
+
 # Keep environment variables out of version control
 

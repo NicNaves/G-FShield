@@ -41,6 +41,12 @@ Thumbs.db
 # Estado local dos scripts de desenvolvimento
 .local-dev/
 
+# Cache local de npm em container (scripts dev)
+**/.docker-home/
+**/.docker-home;C/
+**/.docker-npm-cache/
+**/.docker-npm-cache;C/
+
 # Configuração local do Claude Code
 .claude/
 
