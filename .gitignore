@@ -41,6 +41,9 @@ Thumbs.db
 # Estado local dos scripts de desenvolvimento
 .local-dev/
 
+# Configuração local do Claude Code
+.claude/
+
 # Cache local do Maven
 .m2/
 **/.m2/
