@@ -47,8 +47,9 @@ import DataTable from "examples/Tables/DataTable";
 import ExecutionComparison from "./execution-comparison";
 import ResearchSnapshotPanel from "./components/ResearchSnapshotPanel";
 
-import { getExecutionLaunch, getExecutionLaunches, getMonitorRun } from "api/grasp";
+import { getExecutionLaunch, getMonitorRun } from "api/grasp";
 import useI18n from "hooks/useI18n";
+import useExecutionQueue from "hooks/useExecutionQueue";
 import useGraspMonitor from "hooks/useGraspMonitor";
 import { useMaterialUIController } from "context";
 import {
@@ -1177,7 +1178,10 @@ function Dashboard() {
   const [timelineRangeEnd, setTimelineRangeEnd] = useState("");
   const [timelineTimestampQuery, setTimelineTimestampQuery] = useState("");
   const [selectedExportScope, setSelectedExportScope] = useState("visible");
-  const [executionRequests, setExecutionRequests] = useState([]);
+  const {
+    launches: executionRequests,
+    refresh: refreshExecutionRequests,
+  } = useExecutionQueue(50, 6000);
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const [selectedRequestDetails, setSelectedRequestDetails] = useState(null);
   const [selectedRunDetails, setSelectedRunDetails] = useState(null);
@@ -1917,30 +1921,6 @@ function Dashboard() {
     };
   }, [selectedSeedId]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadExecutionRequests = async () => {
-      try {
-        const launches = await getExecutionLaunches(50);
-
-        if (!cancelled) {
-          setExecutionRequests(launches);
-        }
-      } catch (requestError) {
-        if (!cancelled) {
-          console.error(requestError);
-          setExecutionRequests([]);
-        }
-      }
-    };
-
-    loadExecutionRequests();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (!executionRequests.length) {
@@ -1985,6 +1965,7 @@ function Dashboard() {
 
         if (!cancelled) {
           setSelectedRequestDetails(launch);
+          refreshExecutionRequests().catch(() => undefined);
         }
       } catch (requestError) {
         if (!cancelled) {
@@ -2003,7 +1984,7 @@ function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [selectedRequestId]);
+  }, [refreshExecutionRequests, selectedRequestId]);
 
   const overview = useMemo(() => {
     const activeRuns = filteredRuns.filter((run) => run.status !== "completed").length;

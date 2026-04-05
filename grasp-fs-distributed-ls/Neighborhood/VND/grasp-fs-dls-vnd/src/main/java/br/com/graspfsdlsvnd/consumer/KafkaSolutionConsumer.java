@@ -20,7 +20,7 @@ public class KafkaSolutionConsumer {
     private final VndService vndService;
     private final ConcurrentMap<UUID, DataSolution> bestSolutions = new ConcurrentHashMap<>();
 
-    @KafkaListener(topics = "SOLUTIONS_TOPIC", groupId = "VND", containerFactory = "jsonKafkaListenerContainer")
+    @KafkaListener(topics = "SOLUTIONS_TOPIC", containerFactory = "jsonKafkaListenerContainer")
     public void consume(ConsumerRecord<String, DataSolution> record) {
         DataSolution incoming = record.value();
         log.info("Message received from Kafka: {}", incoming);

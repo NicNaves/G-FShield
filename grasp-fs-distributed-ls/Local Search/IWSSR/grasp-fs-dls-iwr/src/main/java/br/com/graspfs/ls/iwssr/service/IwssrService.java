@@ -140,8 +140,7 @@ public class IwssrService {
             AbstractClassifier classifier
     ) throws Exception {
         MetricsCollector collector = new MetricsCollector();
-        Thread monitor = new Thread(collector);
-        monitor.start();
+        collector.startCollecting();
 
         long startTime = System.currentTimeMillis();
 
@@ -157,8 +156,7 @@ public class IwssrService {
         solution.setRecall(scores.getRecall());
         solution.setRunnigTime(endTime - startTime);
 
-        collector.stop();
-        monitor.join();
+        collector.stopCollectingAndAwait();
 
         logMetrics(solution, collector);
         return solution;
@@ -174,8 +172,7 @@ public class IwssrService {
 
         for (int i = 0; i < solution.getSolutionFeatures().size(); i++) {
             MetricsCollector collector = new MetricsCollector();
-            Thread monitor = new Thread(collector);
-            monitor.start();
+            collector.startCollecting();
 
             long startTime = System.currentTimeMillis();
 
@@ -192,8 +189,7 @@ public class IwssrService {
             replaced.setRecall(scores.getRecall());
             replaced.setRunnigTime(endTime - startTime);
 
-            collector.stop();
-            monitor.join();
+            collector.stopCollectingAndAwait();
 
             logMetrics(replaced, collector);
 

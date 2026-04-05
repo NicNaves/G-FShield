@@ -17,7 +17,6 @@ public class KafkaInitialSolutionConsumer {
 
     @KafkaListener(
         topics = {"INITIAL_SOLUTION_TOPIC", "NEIGHBORHOOD_RESTART_TOPIC"},
-        groupId = "RVND",
         containerFactory = "jsonKafkaListenerContainer"
     )
     public void consume(ConsumerRecord<String, DataSolution> record) {

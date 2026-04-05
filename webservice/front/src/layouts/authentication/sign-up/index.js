@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 
 import Card from "@mui/material/Card";
 import Alert from "@mui/material/Alert";
@@ -24,6 +24,7 @@ import {
   normalizeEmail,
 } from "utils/userInputFormatters";
 import useI18n from "hooks/useI18n";
+import { ALLOW_PUBLIC_REGISTRATION } from "config/runtime";
 
 function SignUp() {
   const navigate = useNavigate();
@@ -39,6 +40,10 @@ function SignUp() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  if (!ALLOW_PUBLIC_REGISTRATION) {
+    return <Navigate to="/authentication/sign-in" replace state={{ reason: t("auth.signUpDisabledRouteMessage") }} />;
+  }
 
   const handleChange = (field) => (event) => {
     const valueMap = {

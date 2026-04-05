@@ -1,6 +1,12 @@
 const express = require("express");
 const UserController = require("../controller/UserController");
-const { authMiddleware, roleMiddleware } = require("../middleware/authMiddleware");
+const {
+  authMiddleware,
+  roleMiddleware,
+  registerPolicyMiddleware,
+  loginRateLimitMiddleware,
+  registerRateLimitMiddleware,
+} = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
@@ -10,6 +16,9 @@ const router = express.Router();
  *   post:
  *     tags: [Auth]
  *     summary: Cria uma nova conta de usuario
+ *     description: |
+ *       Por padrao o cadastro publico fica desabilitado.
+ *       Quando `ALLOW_PUBLIC_REGISTRATION=false`, apenas usuarios ADMIN autenticados podem criar contas.
  *     security: []
  *     requestBody:
  *       required: true
@@ -30,8 +39,26 @@ const router = express.Router();
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Sessao invalida para tentativa de cadastro administrativo.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Cadastro publico desabilitado para usuarios nao administradores.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         description: Limite de tentativas excedido.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post("/register", UserController.registrar);
+router.post("/register", registerRateLimitMiddleware, registerPolicyMiddleware, UserController.registrar);
 
 /**
  * @swagger
@@ -79,8 +106,14 @@ router.post("/register", UserController.registrar);
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         description: Limite de tentativas excedido.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post("/login", UserController.login);
+router.post("/login", loginRateLimitMiddleware, UserController.login);
 
 /**
  * @swagger

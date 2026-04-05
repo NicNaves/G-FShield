@@ -10,6 +10,9 @@ import {
 import { DEFAULT_LOCALE, translate } from "i18n";
 import { pushGraspNotification } from "utils/graspNotifications";
 
+const MONITOR_STREAM_FLUSH_MS = 250;
+const MONITOR_STREAM_HIDDEN_FLUSH_MS = 1200;
+
 const topicPriority = (topic) => {
   if (topic === "BEST_SOLUTION_TOPIC") {
     return 2;
@@ -46,7 +49,7 @@ const shouldPreferIncomingRun = (currentRun, incomingRun) => {
   return new Date(incomingRun.updatedAt || 0) >= new Date(currentRun.updatedAt || 0);
 };
 
-const mergeRuns = (currentRuns, incomingRun) => {
+const mergeRuns = (currentRuns, incomingRun, limit = Infinity) => {
   const next = new Map(currentRuns.map((run) => [run.seedId, run]));
   const current = next.get(incomingRun.seedId) || {};
   const preferredRun = shouldPreferIncomingRun(current.seedId ? current : null, incomingRun)
@@ -62,11 +65,13 @@ const mergeRuns = (currentRuns, incomingRun) => {
         : current.history || [],
   });
 
-  return [...next.values()].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  return [...next.values()]
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .slice(0, Math.max(Number(limit) || 1, 1));
 };
 
-const mergeRunList = (currentRuns, incomingRuns = []) =>
-  incomingRuns.reduce((nextRuns, incomingRun) => mergeRuns(nextRuns, incomingRun), currentRuns);
+const mergeRunList = (currentRuns, incomingRuns = [], limit = Infinity) =>
+  incomingRuns.reduce((nextRuns, incomingRun) => mergeRuns(nextRuns, incomingRun, limit), currentRuns);
 
 const buildEventKey = (event) =>
   event?.fingerprint
@@ -92,6 +97,40 @@ const mergeEvents = (currentEvents, incomingEvents = [], limit = 100) => {
     .slice(0, limit);
 };
 
+const buildRunsFingerprint = (runs = []) =>
+  runs
+    .map((run) => [
+      run.seedId,
+      run.topic,
+      run.status,
+      run.bestF1Score,
+      run.currentF1Score,
+      run.updatedAt,
+      run.history?.length || 0,
+    ].join("|"))
+    .join("||");
+
+const buildEventsFingerprint = (events = []) =>
+  events
+    .map((event) => [
+      buildEventKey(event),
+      event?.timestamp,
+      event?.topic,
+      event?.type,
+      event?.payload?.seedId,
+    ].join("|"))
+    .join("||");
+
+const buildSummaryFingerprint = (summary) => JSON.stringify(summary || null);
+
+const IMPROVEMENT_TOPICS = [
+  "INITIAL_SOLUTION_TOPIC",
+  "NEIGHBORHOOD_RESTART_TOPIC",
+  "LOCAL_SEARCH_PROGRESS_TOPIC",
+  "SOLUTIONS_TOPIC",
+  "BEST_SOLUTION_TOPIC",
+];
+
 export default function useGraspMonitor(limit = 100, options = {}) {
   const safeLimit = Math.max(Number(limit) || 100, 1);
   const configuredHistoryLimit = Math.max(
@@ -108,7 +147,16 @@ export default function useGraspMonitor(limit = 100, options = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [connected, setConnected] = useState(false);
+
   const bestScoreBySeedRef = useRef(new Map());
+  const runsRef = useRef([]);
+  const eventsRef = useRef([]);
+  const summaryRef = useRef(null);
+  const runsFingerprintRef = useRef("");
+  const eventsFingerprintRef = useRef("");
+  const summaryFingerprintRef = useRef("");
+  const streamBufferRef = useRef([]);
+  const streamFlushTimerRef = useRef(null);
 
   const registerCurrentRuns = (nextRuns = []) => {
     const nextScores = new Map();
@@ -122,6 +170,42 @@ export default function useGraspMonitor(limit = 100, options = {}) {
     });
 
     bestScoreBySeedRef.current = nextScores;
+  };
+
+  const commitRuns = (nextRuns = []) => {
+    const normalizedRuns = Array.isArray(nextRuns) ? nextRuns.slice(0, safeLimit) : [];
+    const nextFingerprint = buildRunsFingerprint(normalizedRuns);
+
+    runsRef.current = normalizedRuns;
+    registerCurrentRuns(normalizedRuns);
+
+    if (nextFingerprint !== runsFingerprintRef.current) {
+      runsFingerprintRef.current = nextFingerprint;
+      setRuns(normalizedRuns);
+    }
+  };
+
+  const commitEvents = (nextEvents = []) => {
+    const normalizedEvents = Array.isArray(nextEvents) ? nextEvents.slice(0, safeLimit) : [];
+    const nextFingerprint = buildEventsFingerprint(normalizedEvents);
+
+    eventsRef.current = normalizedEvents;
+
+    if (nextFingerprint !== eventsFingerprintRef.current) {
+      eventsFingerprintRef.current = nextFingerprint;
+      setEvents(normalizedEvents);
+    }
+  };
+
+  const commitSummary = (nextSummary) => {
+    const nextFingerprint = buildSummaryFingerprint(nextSummary);
+
+    summaryRef.current = nextSummary;
+
+    if (nextFingerprint !== summaryFingerprintRef.current) {
+      summaryFingerprintRef.current = nextFingerprint;
+      setSummary(nextSummary);
+    }
   };
 
   const rememberObservedScore = (incomingRun) => {
@@ -149,7 +233,7 @@ export default function useGraspMonitor(limit = 100, options = {}) {
       return;
     }
 
-    if (!["INITIAL_SOLUTION_TOPIC", "NEIGHBORHOOD_RESTART_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(incomingRun.topic)) {
+    if (!IMPROVEMENT_TOPICS.includes(incomingRun.topic)) {
       return;
     }
 
@@ -194,6 +278,79 @@ export default function useGraspMonitor(limit = 100, options = {}) {
   useEffect(() => {
     let cancelled = false;
 
+    const clearScheduledFlush = () => {
+      if (streamFlushTimerRef.current !== null) {
+        window.clearTimeout(streamFlushTimerRef.current);
+        streamFlushTimerRef.current = null;
+      }
+    };
+
+    const flushBufferedMessages = () => {
+      const bufferedMessages = streamBufferRef.current;
+      if (!bufferedMessages.length) {
+        return;
+      }
+
+      streamBufferRef.current = [];
+
+      let nextRuns = runsRef.current;
+      let nextSummary = summaryRef.current;
+      const bufferedEvents = [];
+
+      bufferedMessages.forEach((payload) => {
+        if (payload?.type === "snapshot") {
+          nextRuns = mergeRunList(nextRuns, payload.runs || [], safeLimit);
+          bufferedEvents.push(...(payload.events || []));
+
+          if (payload.summary) {
+            nextSummary = payload.summary;
+          }
+
+          return;
+        }
+
+        bufferedEvents.push(payload);
+
+        if ((payload?.type === "kafka.update" || payload?.type === "kafka.progress") && payload?.payload?.seedId) {
+          nextRuns = mergeRuns(nextRuns, payload.payload, safeLimit);
+        }
+      });
+
+      const nextEvents = bufferedEvents.length
+        ? mergeEvents(eventsRef.current, bufferedEvents, safeLimit)
+        : eventsRef.current;
+
+      commitRuns(nextRuns);
+      commitEvents(nextEvents);
+      commitSummary(nextSummary);
+    };
+
+    const scheduleBufferedFlush = () => {
+      if (streamFlushTimerRef.current !== null) {
+        return;
+      }
+
+      const delay = document.hidden ? MONITOR_STREAM_HIDDEN_FLUSH_MS : MONITOR_STREAM_FLUSH_MS;
+      streamFlushTimerRef.current = window.setTimeout(() => {
+        streamFlushTimerRef.current = null;
+
+        if (!cancelled) {
+          flushBufferedMessages();
+        }
+      }, delay);
+    };
+
+    const handleVisibilityChange = () => {
+      if (cancelled) {
+        return;
+      }
+
+      if (!document.hidden) {
+        clearScheduledFlush();
+        flushBufferedMessages();
+      }
+    };
+
     const load = async () => {
       try {
         setLoading(true);
@@ -211,10 +368,9 @@ export default function useGraspMonitor(limit = 100, options = {}) {
           return;
         }
 
-        setRuns(runsResponse);
-        setEvents(eventsResponse);
-        setSummary(summaryResponse);
-        registerCurrentRuns(runsResponse);
+        commitRuns(runsResponse);
+        commitEvents(mergeEvents([], eventsResponse, safeLimit));
+        commitSummary(summaryResponse);
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError.message || "Unable to load monitor data.");
@@ -240,35 +396,21 @@ export default function useGraspMonitor(limit = 100, options = {}) {
       try {
         const payload = JSON.parse(messageEvent.data);
 
-        if (payload.type === "snapshot") {
-          if (!cancelled) {
-            setRuns((currentRuns) => {
-              const nextRuns = mergeRunList(currentRuns, payload.runs || []);
-              registerCurrentRuns(nextRuns);
-              return nextRuns;
-            });
-            setEvents((currentEvents) => mergeEvents(currentEvents, payload.events || [], safeLimit));
-            if (payload.summary) {
-              setSummary(payload.summary);
-            }
-            setConnected(true);
-          }
-          return;
-        }
-
-        if (!cancelled) {
-          setEvents((currentEvents) => mergeEvents(currentEvents, [payload], safeLimit));
-        }
-
         if ((payload.type === "kafka.update" || payload.type === "kafka.progress")
-          && payload.payload?.seedId
-          && !cancelled) {
-          if (["INITIAL_SOLUTION_TOPIC", "NEIGHBORHOOD_RESTART_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC", "SOLUTIONS_TOPIC", "BEST_SOLUTION_TOPIC"].includes(payload.payload.topic)) {
+          && payload.payload?.seedId) {
+          if (IMPROVEMENT_TOPICS.includes(payload.payload.topic)) {
             notifyIfImproved(payload.payload);
           } else {
             rememberObservedScore(payload.payload);
           }
-          setRuns((currentRuns) => mergeRuns(currentRuns, payload.payload));
+        }
+
+        streamBufferRef.current.push(payload);
+
+        if (!cancelled) {
+          setError("");
+          setConnected(true);
+          scheduleBufferedFlush();
         }
       } catch (streamError) {
         if (!cancelled) {
@@ -283,8 +425,13 @@ export default function useGraspMonitor(limit = 100, options = {}) {
       }
     };
 
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       cancelled = true;
+      clearScheduledFlush();
+      streamBufferRef.current = [];
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       stream.close();
     };
   }, [configuredHistoryLimit, configuredSummaryEventLimit, safeLimit]);

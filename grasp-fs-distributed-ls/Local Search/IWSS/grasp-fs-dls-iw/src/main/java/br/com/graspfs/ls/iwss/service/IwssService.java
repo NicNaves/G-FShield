@@ -137,8 +137,7 @@ public class IwssService {
         long startTime = System.currentTimeMillis();
 
         MetricsCollector collector = new MetricsCollector();
-        Thread monitor = new Thread(collector);
-        monitor.start();
+        collector.startCollecting();
 
         solution.getSolutionFeatures().add(solution.getRclfeatures().remove(0));
 
@@ -149,8 +148,7 @@ public class IwssService {
                 classifier
         );
 
-        collector.stop();
-        monitor.join();
+        collector.stopCollectingAndAwait();
 
         solution.setF1Score(scores.getF1Score());
         solution.setAccuracy(scores.getAccuracy());

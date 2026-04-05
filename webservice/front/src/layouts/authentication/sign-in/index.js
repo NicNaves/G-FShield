@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom"; 
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import apiLogin from "../../../api/auth";
 import { useMaterialUIController, setLogin } from "../../../context"; 
 
@@ -17,7 +17,7 @@ import BasicLayout from "layouts/authentication/components/BasicLayout";
 
 
 import bgImage from "assets/images/bg-sign-in-basic.jpeg";
-import { AUTH_DISABLED, DEV_ROLE, DEV_TOKEN, DEV_USER_ID } from "../../../config/runtime";
+import { ALLOW_PUBLIC_REGISTRATION, AUTH_DISABLED, DEV_ROLE, DEV_TOKEN, DEV_USER_ID } from "../../../config/runtime";
 import useI18n from "hooks/useI18n";
 
 function Login() {
@@ -27,7 +27,9 @@ function Login() {
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useI18n();
+  const routeMessage = location.state?.reason;
 
   const handleGuestAccess = () => {
     setLogin(dispatch, DEV_TOKEN, DEV_ROLE, DEV_USER_ID);
@@ -85,6 +87,11 @@ function Login() {
                 {error}
               </MDTypography>
             )}
+            {!AUTH_DISABLED && !ALLOW_PUBLIC_REGISTRATION && (
+              <MDTypography variant="button" color="text" fontWeight="regular">
+                {routeMessage || t("auth.signUpDisabledHint")}
+              </MDTypography>
+            )}
             {!AUTH_DISABLED && (
               <>
                 <MDBox mb={2}>
@@ -121,7 +128,7 @@ function Login() {
                 {AUTH_DISABLED ? t("auth.continueWithoutSignIn") : (submitting ? `${t("auth.signIn")}...` : t("auth.signIn"))}
               </MDButton>
             </MDBox>
-            {!AUTH_DISABLED && (
+            {!AUTH_DISABLED && ALLOW_PUBLIC_REGISTRATION && (
               <MDBox mt={3} textAlign="center">
                 <MDTypography variant="button" color="text">
                   {t("auth.noAccount")}{" "}

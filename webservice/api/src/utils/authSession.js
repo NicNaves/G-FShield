@@ -34,11 +34,16 @@ function signAuthToken(user = {}) {
 }
 
 function serializeCookie(name, value, maxAgeMs) {
+  const sameSite = String(process.env.AUTH_COOKIE_SAMESITE || "Lax").trim();
+  const normalizedSameSite = ["Lax", "Strict", "None"].includes(sameSite)
+    ? sameSite
+    : "Lax";
+
   const parts = [
     `${name}=${encodeURIComponent(value)}`,
     "Path=/",
     "HttpOnly",
-    "SameSite=Lax",
+    `SameSite=${normalizedSameSite}`,
     `Max-Age=${Math.max(Math.floor(maxAgeMs / 1000), 0)}`,
   ];
 

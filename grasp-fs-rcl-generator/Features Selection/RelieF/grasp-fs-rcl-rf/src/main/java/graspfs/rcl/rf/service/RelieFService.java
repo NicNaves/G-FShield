@@ -142,8 +142,7 @@ public class RelieFService {
 
         // Resource metrics are collected around the exact model-evaluation window.
         MetricsCollector collector = new MetricsCollector();
-        Thread monitor = new Thread(collector);
-        monitor.start();
+        collector.startCollecting();
 
         EvaluationResult result = MachineLearning.evaluateSolution(
                 new ArrayList<>(solutionFeatures),
@@ -152,8 +151,7 @@ public class RelieFService {
                 classifier
         );
 
-        collector.stop();
-        monitor.join();
+        collector.stopCollectingAndAwait();
 
         candidate.setF1Score(result.getF1Score());
         candidate.setAccuracy(result.getAccuracy());

@@ -123,8 +123,7 @@ public class BitFlipService {
             long startTime = System.currentTimeMillis();
 
             MetricsCollector collector = new MetricsCollector();
-            Thread monitor = new Thread(collector);
-            monitor.start();
+            collector.startCollecting();
 
             EvaluationResult scores = MachineLearning.evaluateSolution(
                     new ArrayList<>(solution.getSolutionFeatures()),
@@ -133,8 +132,7 @@ public class BitFlipService {
                     classifier
             );
 
-            collector.stop();
-            monitor.join();
+            collector.stopCollectingAndAwait();
 
             solution.setF1Score(scores.getF1Score());
             solution.setPrecision(scores.getPrecision());

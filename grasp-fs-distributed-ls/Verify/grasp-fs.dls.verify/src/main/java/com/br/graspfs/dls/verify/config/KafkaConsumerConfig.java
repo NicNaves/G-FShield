@@ -27,6 +27,12 @@ public class KafkaConsumerConfig {
     @Value("${spring.kafka.consumer.auto-offset-reset:earliest}")
     private String autoOffsetReset;
 
+    @Value("${spring.kafka.consumer.max-poll-interval-ms:14400000}")
+    private Integer maxPollIntervalMs;
+
+    @Value("${spring.kafka.consumer.max-poll-records:1}")
+    private Integer maxPollRecords;
+
     @Value("${kafka.listener.concurrency:1}")
     private Integer listenerConcurrency;
 
@@ -43,6 +49,8 @@ public class KafkaConsumerConfig {
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, autoOffsetReset);
+        props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, maxPollIntervalMs);
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, maxPollRecords);
 
         return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), deserializer);
     }

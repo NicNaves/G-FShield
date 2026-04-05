@@ -1,7 +1,74 @@
 const jwt = require("jsonwebtoken");
-const { authDisabled } = require("../config/runtimeConfig");
+const {
+  authDisabled,
+  allowPublicRegistration,
+  authLoginRateWindowMs,
+  authLoginRateMaxAttempts,
+  authRegisterRateWindowMs,
+  authRegisterRateMaxAttempts,
+} = require("../config/runtimeConfig");
 const userService = require("../services/UserService");
 const { extractAuthToken } = require("../utils/authSession");
+
+const rateBuckets = new Map();
+
+function getClientAddress(req) {
+  const forwardedFor = String(req.headers["x-forwarded-for"] || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .find(Boolean);
+
+  return forwardedFor || req.ip || req.socket?.remoteAddress || "unknown";
+}
+
+function cleanupExpiredBuckets(now = Date.now()) {
+  for (const [key, bucket] of rateBuckets.entries()) {
+    if (!bucket || bucket.expiresAt <= now) {
+      rateBuckets.delete(key);
+    }
+  }
+}
+
+function createRateLimitMiddleware({ scope, windowMs, maxAttempts }) {
+  return (req, res, next) => {
+    const now = Date.now();
+    cleanupExpiredBuckets(now);
+
+    const routeScope = `${scope}:${req.method}:${req.path}`;
+    const clientKey = `${routeScope}:${getClientAddress(req)}`;
+    const currentBucket = rateBuckets.get(clientKey);
+
+    if (!currentBucket || currentBucket.expiresAt <= now) {
+      rateBuckets.set(clientKey, {
+        count: 1,
+        expiresAt: now + windowMs,
+      });
+      return next();
+    }
+
+    if (currentBucket.count >= maxAttempts) {
+      const retryAfterSeconds = Math.max(Math.ceil((currentBucket.expiresAt - now) / 1000), 1);
+      res.setHeader("Retry-After", String(retryAfterSeconds));
+      return res.status(429).json({ error: "Muitas tentativas. Tente novamente em instantes." });
+    }
+
+    currentBucket.count += 1;
+    rateBuckets.set(clientKey, currentBucket);
+    return next();
+  };
+}
+
+const loginRateLimitMiddleware = createRateLimitMiddleware({
+  scope: "auth-login",
+  windowMs: authLoginRateWindowMs,
+  maxAttempts: authLoginRateMaxAttempts,
+});
+
+const registerRateLimitMiddleware = createRateLimitMiddleware({
+  scope: "auth-register",
+  windowMs: authRegisterRateWindowMs,
+  maxAttempts: authRegisterRateMaxAttempts,
+});
 
 async function authMiddleware(req, res, next) {
   if (authDisabled) {
@@ -72,4 +139,19 @@ function anyRoleMiddleware(roles = []) {
   };
 }
 
-module.exports = { authMiddleware, roleMiddleware, anyRoleMiddleware };
+function registerPolicyMiddleware(req, res, next) {
+  if (allowPublicRegistration) {
+    return next();
+  }
+
+  return authMiddleware(req, res, () => roleMiddleware("ADMIN")(req, res, next));
+}
+
+module.exports = {
+  authMiddleware,
+  roleMiddleware,
+  anyRoleMiddleware,
+  registerPolicyMiddleware,
+  loginRateLimitMiddleware,
+  registerRateLimitMiddleware,
+};

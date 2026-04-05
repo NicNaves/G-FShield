@@ -95,11 +95,28 @@ public class SystemMetricsUtils {
 
     public static class MetricsCollector implements Runnable {
 
-        private volatile boolean running = true;
+        private volatile boolean running = false;
         private int samples = 0;
         private float totalCpu = 0;
         private float totalMemory = 0;
         private float totalMemoryPercent = 0;
+        private Thread worker;
+
+        public synchronized void startCollecting() {
+            if (worker != null && worker.isAlive()) {
+                return;
+            }
+
+            samples = 0;
+            totalCpu = 0;
+            totalMemory = 0;
+            totalMemoryPercent = 0;
+            running = true;
+
+            worker = new Thread(this, "system-metrics-collector");
+            worker.setDaemon(true);
+            worker.start();
+        }
 
         public void run() {
             while (running) {
@@ -120,8 +137,24 @@ public class SystemMetricsUtils {
             }
         }
 
-        public void stop() {
+        public synchronized void stop() {
             running = false;
+        }
+
+        public void stopCollectingAndAwait() {
+            Thread localWorker;
+            synchronized (this) {
+                running = false;
+                localWorker = worker;
+            }
+
+            if (localWorker != null && localWorker != Thread.currentThread()) {
+                try {
+                    localWorker.join();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
         }
 
         public float getAvgCpu() {

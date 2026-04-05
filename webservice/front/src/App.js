@@ -14,7 +14,7 @@ import logoShield from "assets/images/logoshield.png";
 import Login from "./layouts/authentication/sign-in";
 import SignUp from "./layouts/authentication/sign-up";
 import PropTypes from "prop-types";
-import { AUTH_DISABLED, DEV_ROLE, DEV_TOKEN, DEV_USER_ID } from "./config/runtime";
+import { ALLOW_PUBLIC_REGISTRATION, AUTH_DISABLED, DEV_ROLE, DEV_TOKEN, DEV_USER_ID } from "./config/runtime";
 import useI18n from "hooks/useI18n";
 import authApi from "./api/auth";
 
@@ -237,7 +237,10 @@ export default function App() {
           path="/authentication/sign-in"
           element={canResolveAuth ? (AUTH_DISABLED || auth.token ? <Navigate to="/dashboard" replace /> : <Login />) : null}
         />
-        <Route path="/authentication/sign-up" element={<SignUp />} />
+        <Route
+          path="/authentication/sign-up"
+          element={ALLOW_PUBLIC_REGISTRATION ? <SignUp /> : <Navigate to="/authentication/sign-in" replace />}
+        />
         {canResolveAuth ? getRoutes(routes) : null}
         <Route path="*" element={<Navigate to={AUTH_DISABLED || auth.token ? "/dashboard" : "/authentication/sign-in"} replace />} />
       </Routes>
