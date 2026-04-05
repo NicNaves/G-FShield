@@ -3,6 +3,16 @@ const UserService = require("../services/UserService");
 const { clearAuthCookie, setAuthCookie, signAuthToken } = require("../utils/authSession");
 
 class UserController {
+  constructor() {
+    this.registrar = this.registrar.bind(this);
+    this.login = this.login.bind(this);
+    this.logout = this.logout.bind(this);
+    this.buscarTodosUsuarios = this.buscarTodosUsuarios.bind(this);
+    this.me = this.me.bind(this);
+    this.buscarUsuarioPorId = this.buscarUsuarioPorId.bind(this);
+    this.atualizarUsuario = this.atualizarUsuario.bind(this);
+  }
+
   obfuscateEmail(email) {
     const normalizedEmail = String(email || "").trim().toLowerCase();
     if (!normalizedEmail.includes("@")) {
