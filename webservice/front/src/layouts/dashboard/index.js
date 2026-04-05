@@ -45,6 +45,7 @@ import Footer from "examples/Footer";
 import ComplexStatisticsCard from "examples/Cards/StatisticsCards/ComplexStatisticsCard";
 import DataTable from "examples/Tables/DataTable";
 import ExecutionComparison from "./execution-comparison";
+import ResearchSnapshotPanel from "./components/ResearchSnapshotPanel";
 
 import { getExecutionLaunch, getExecutionLaunches, getMonitorRun } from "api/grasp";
 import useI18n from "hooks/useI18n";
@@ -3928,6 +3929,12 @@ function Dashboard() {
                 </Stack>
               </MDBox>
             </Card>
+          </MDBox>
+        ) : null}
+
+        {activeTab === "overview" && summary?.quality && summary?.observability && summary?.exploration ? (
+          <MDBox mt={2}>
+            <ResearchSnapshotPanel summary={summary} darkMode={darkMode} t={t} />
           </MDBox>
         ) : null}
 
