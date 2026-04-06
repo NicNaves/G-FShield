@@ -509,7 +509,7 @@ class GraspController {
       const options = {
         bucketLimit: Number(req.query.bucketLimit || process.env.GRASP_DASHBOARD_BUCKET_LIMIT || 72),
       };
-      const cacheKey = appCacheService.buildKey("monitor-dashboard-v2", options);
+      const cacheKey = appCacheService.buildKey("monitor-dashboard-v3", options);
       const dashboard = await appCacheService.remember(
         cacheKey,
         () => graspDashboardAggregateService.getDashboardAggregate(options),
@@ -527,6 +527,7 @@ class GraspController {
       graspExecutionMonitorService.reset();
       await executionQueueService.reset();
       await graspExecutionStoreService.resetMonitorState();
+      await graspDashboardAggregateService.clearReadModel();
       await appCacheService.clear();
       res.json(this.buildEnvelope({
         message: "Monitor state reset successfully.",
@@ -540,6 +541,7 @@ class GraspController {
   async resetEnvironment(req, res, next) {
     try {
       const result = await environmentResetService.resetEnvironment();
+      await graspDashboardAggregateService.clearReadModel();
       await appCacheService.clear();
       res.json(this.buildEnvelope({
         message: "Distributed environment reset successfully.",

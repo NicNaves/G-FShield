@@ -1,4 +1,5 @@
 require("dotenv").config();
+require("./utils/applyKafkaJsPatch")();
 
 const app = require("./app");
 const graspExecutionMonitorService = require("./services/GraspExecutionMonitorService");

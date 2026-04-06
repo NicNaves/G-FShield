@@ -1,0 +1,837 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "GF-Shield Webservice API",
+    "version": "1.1.0",
+    "description": "API do gateway, autenticacao e monitoramento do GF-Shield.\n\nSeguranca:\n- Senhas sao armazenadas com bcrypt no backend.\n- O login emite sessao HTTP-only em cookie (g-fshield_session) e tambem pode retornar JWT para clientes programaticos.\n- Em producao, publique a API atras de HTTPS."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:4000/api",
+      "description": "Servidor local"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Use o token JWT retornado pelo endpoint /login."
+      },
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "g-fshield_session",
+        "description": "Sessao HTTP-only usada pelo frontend web."
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Credenciais invalidas."
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "admin@gfshield.local"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "example": "SenhaSegura123"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Login bem-sucedido."
+          },
+          "token": {
+            "type": "string",
+            "description": "JWT para clientes nao baseados em navegador."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "VIEWER"
+            ],
+            "example": "ADMIN"
+          },
+          "userId": {
+            "type": "integer",
+            "example": 1
+          },
+          "expiresInMs": {
+            "type": "integer",
+            "example": 86400000
+          }
+        }
+      },
+      "LogoutResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Sessao encerrada com sucesso."
+          }
+        }
+      },
+      "UserSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "Admin GF-Shield"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "admin@gfshield.local"
+          },
+          "cpf": {
+            "type": "string",
+            "nullable": true,
+            "example": "12345678901"
+          },
+          "telefone": {
+            "type": "string",
+            "nullable": true,
+            "example": "11999998888"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "VIEWER"
+            ],
+            "example": "ADMIN"
+          },
+          "active": {
+            "type": "boolean",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "password"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Maria Silva"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "maria@gfshield.local"
+          },
+          "cpf": {
+            "type": "string",
+            "example": "12345678901"
+          },
+          "telefone": {
+            "type": "string",
+            "example": "11987654321"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 6,
+            "example": "SenhaSegura123"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "VIEWER"
+            ],
+            "example": "VIEWER"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "cookieAuth": []
+    },
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Autenticacao, sessao e perfil do usuario autenticado."
+    },
+    {
+      "name": "Users",
+      "description": "Gestao de usuarios do webservice."
+    },
+    {
+      "name": "Grasp",
+      "description": "Gateway, catalogo e monitoramento das execucoes GRASP-FS."
+    }
+  ],
+  "paths": {
+    "/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Cria uma nova conta de usuario",
+        "description": "Por padrao o cadastro publico fica desabilitado.\nQuando `ALLOW_PUBLIC_REGISTRATION=false`, apenas usuarios ADMIN autenticados podem criar contas.\n",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Usuario criado com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Payload invalido ou e-mail ja utilizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessao invalida para tentativa de cadastro administrativo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cadastro publico desabilitado para usuarios nao administradores.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite de tentativas excedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Autentica o usuario",
+        "description": "Valida as credenciais, retorna um JWT para clientes programaticos\ne tambem emite uma sessao HTTP-only em cookie para o frontend web.\n",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login efetuado com sucesso.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Cookie HTTP-only com a sessao autenticada.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requisicao invalida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credenciais invalidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Usuario inativo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite de tentativas excedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Encerra a sessao autenticada",
+        "responses": {
+          "200": {
+            "description": "Sessao encerrada com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Retorna o usuario autenticado",
+        "responses": {
+          "200": {
+            "description": "Resumo do usuario autenticado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessao ausente, invalida ou expirada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Lista todos os usuarios",
+        "responses": {
+          "200": {
+            "description": "Lista retornada com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nao autenticado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Requer papel ADMIN.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Busca um usuario por ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usuario encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Usuario nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Atualiza um usuario",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Joao Silva"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "joao@gfshield.local"
+                  },
+                  "telefone": {
+                    "type": "string",
+                    "example": "11987654321"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "minLength": 6,
+                    "example": "NovaSenha123"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "ADMIN",
+                      "VIEWER"
+                    ]
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Usuario atualizado com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados invalidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Usuario nao encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/grasp/services": {
+      "get": {
+        "tags": [
+          "Grasp"
+        ],
+        "summary": "Lista os servicos GRASP-FS disponiveis",
+        "description": "Retorna os endpoints configurados para os microservicos DRG e DLS.",
+        "responses": {
+          "200": {
+            "description": "Servicos retornados com sucesso."
+          }
+        }
+      }
+    },
+    "/grasp/datasets": {
+      "get": {
+        "tags": [
+          "Grasp"
+        ],
+        "summary": "Lista datasets disponiveis",
+        "description": "Retorna os arquivos de dataset encontrados no diretorio configurado.",
+        "responses": {
+          "200": {
+            "description": "Datasets retornados com sucesso."
+          }
+        }
+      }
+    },
+    "/grasp/run": {
+      "post": {
+        "tags": [
+          "Grasp"
+        ],
+        "summary": "Inicia uma execucao GRASP-FS",
+        "description": "Dispara uma execucao distribuida usando algoritmos DRG e DLS configurados.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "algorithms",
+                  "maxGenerations",
+                  "rclCutoff",
+                  "sampleSize",
+                  "datasetTrainingName",
+                  "datasetTestingName",
+                  "classifier",
+                  "neighborhoodStrategy",
+                  "localSearches"
+                ],
+                "properties": {
+                  "algorithms": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "example": [
+                      "IG",
+                      "GR",
+                      "RF",
+                      "SU"
+                    ]
+                  },
+                  "maxGenerations": {
+                    "type": "integer",
+                    "example": 2
+                  },
+                  "rclCutoff": {
+                    "type": "integer",
+                    "example": 30
+                  },
+                  "sampleSize": {
+                    "type": "integer",
+                    "example": 5
+                  },
+                  "datasetTrainingName": {
+                    "type": "string",
+                    "example": "ereno1ktrain.arff"
+                  },
+                  "datasetTestingName": {
+                    "type": "string",
+                    "example": "ereno1ktest.arff"
+                  },
+                  "classifier": {
+                    "type": "string",
+                    "example": "J48"
+                  },
+                  "useTrainingCache": {
+                    "type": "boolean",
+                    "description": "Reaproveita em memoria o dataset de treino dentro de cada microservico para acelerar novas execucoes com o mesmo arquivo.",
+                    "example": true
+                  },
+                  "neighborhoodMaxIterations": {
+                    "type": "integer",
+                    "example": 10
+                  },
+                  "neighborhoodStrategy": {
+                    "type": "string",
+                    "example": "VND"
+                  },
+                  "localSearches": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "example": [
+                      "BIT_FLIP",
+                      "IWSS",
+                      "IWSSR"
+                    ]
+                  },
+                  "bitFlipMaxIterations": {
+                    "type": "integer",
+                    "example": 100
+                  },
+                  "iwssMaxIterations": {
+                    "type": "integer",
+                    "example": 20
+                  },
+                  "iwssrMaxIterations": {
+                    "type": "integer",
+                    "example": 20
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Execucao aceita para processamento."
+          },
+          "400": {
+            "description": "Parametros invalidos."
+          }
+        }
+      }
+    },
+    "/grasp/monitor/runs": {
+      "get": {
+        "tags": [
+          "Grasp"
+        ],
+        "summary": "Lista execucoes monitoradas",
+        "description": "Retorna o historico recente de execucoes acompanhadas pelo monitor.",
+        "responses": {
+          "200": {
+            "description": "Lista de execucoes retornada com sucesso."
+          }
+        }
+      }
+    },
+    "/grasp/monitor/runs/{seedId}": {
+      "get": {
+        "tags": [
+          "Grasp"
+        ],
+        "summary": "Busca uma execucao por seedId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "seedId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Execucao encontrada."
+          },
+          "404": {
+            "description": "Execucao nao encontrada."
+          }
+        }
+      }
+    },
+    "/grasp/monitor/events": {
+      "get": {
+        "tags": [
+          "Grasp"
+        ],
+        "summary": "Lista eventos do monitor",
+        "description": "Retorna eventos persistidos ou em memoria associados as execucoes.",
+        "responses": {
+          "200": {
+            "description": "Eventos retornados com sucesso."
+          }
+        }
+      }
+    },
+    "/grasp/monitor/summary": {
+      "get": {
+        "tags": [
+          "Grasp"
+        ],
+        "summary": "Retorna metricas agregadas do monitor",
+        "description": "Consolida execucoes, topicos, etapas e medias por algoritmo para o dashboard.",
+        "responses": {
+          "200": {
+            "description": "Resumo do monitor retornado com sucesso."
+          }
+        }
+      }
+    },
+    "/grasp/monitor/reset": {
+      "post": {
+        "tags": [
+          "Grasp"
+        ],
+        "summary": "Limpa o estado do monitor",
+        "description": "Remove o estado em memoria e os registros persistidos do monitor para um novo ciclo de validacao.",
+        "responses": {
+          "200": {
+            "description": "Estado do monitor limpo com sucesso."
+          }
+        }
+      }
+    },
+    "/grasp/environment/reset": {
+      "post": {
+        "tags": [
+          "Grasp"
+        ],
+        "summary": "Reinicia o ambiente distribuido e limpa o estado experimental",
+        "description": "Derruba e sobe novamente o docker compose do pipeline, limpa CSVs de metricas e remove o historico persistido do monitor.",
+        "responses": {
+          "200": {
+            "description": "Ambiente resetado com sucesso."
+          }
+        }
+      }
+    },
+    "/grasp/monitor/stream": {
+      "get": {
+        "tags": [
+          "Grasp"
+        ],
+        "summary": "Abre stream de eventos em tempo real",
+        "description": "Mantem uma conexao Server-Sent Events para acompanhar a execucao em tempo real. Para o frontend web, use a sessao HTTP-only; nao envie token na query string.",
+        "responses": {
+          "200": {
+            "description": "Stream SSE iniciada com sucesso."
+          }
+        }
+      }
+    }
+  }
+}

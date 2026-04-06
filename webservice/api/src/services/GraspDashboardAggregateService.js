@@ -84,6 +84,15 @@ class GraspDashboardAggregateService {
   constructor() {
     this.bucketIntervalMs = 60 * 60 * 1000;
     this.defaultBucketLimit = Math.max(Number(process.env.GRASP_DASHBOARD_BUCKET_LIMIT || 72) || 72, 1);
+    this.readModelKey = process.env.GRASP_DASHBOARD_READ_MODEL_KEY || "monitor-dashboard-default";
+    this.readModelBucketLimit = Math.max(
+      Number(process.env.GRASP_DASHBOARD_READ_MODEL_BUCKET_LIMIT || 336) || 336,
+      this.defaultBucketLimit
+    );
+    this.readModelMaxAgeMs = Math.max(
+      Number(process.env.GRASP_DASHBOARD_READ_MODEL_MAX_AGE_MS || 10 * 60 * 1000) || (10 * 60 * 1000),
+      30_000
+    );
   }
 
   normalizeCount(value) {
@@ -315,7 +324,377 @@ class GraspDashboardAggregateService {
       );
   }
 
-  async getDashboardAggregate(options = {}) {
+  serializeDate(value) {
+    if (!value) {
+      return null;
+    }
+
+    const parsedValue = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(parsedValue.getTime()) ? null : parsedValue.toISOString();
+  }
+
+  normalizeBucketLimit(value, fallback = this.defaultBucketLimit) {
+    const requestedBucketLimit = Number(value);
+    return Number.isFinite(requestedBucketLimit) && requestedBucketLimit > 0
+      ? Math.max(Math.floor(requestedBucketLimit), 1)
+      : fallback;
+  }
+
+  sliceDashboardAggregate(aggregate, bucketLimit) {
+    const normalizedBucketLimit = this.normalizeBucketLimit(bucketLimit);
+    const activityBuckets = Array.isArray(aggregate?.activityBuckets)
+      ? aggregate.activityBuckets.slice(-normalizedBucketLimit)
+      : [];
+
+    return {
+      ...(aggregate || {}),
+      bucketIntervalMs: Number(aggregate?.bucketIntervalMs || this.bucketIntervalMs),
+      activityBuckets,
+    };
+  }
+
+  mapBestPayload(payload = {}) {
+    if (!payload || typeof payload !== "object") {
+      return null;
+    }
+
+    return {
+      seedId: payload.seedId || null,
+      solutionFeatures: this.normalizeSolutionFeatures(payload.solutionFeatures),
+      bestF1Score: this.normalizeMetric(payload.bestF1Score),
+      currentF1Score: this.normalizeMetric(payload.currentF1Score),
+      localSearch: payload.localSearch || null,
+      neighborhood: payload.neighborhood || null,
+      rclAlgorithm: payload.rclAlgorithm || null,
+      updatedAt: this.serializeDate(payload.updatedAt),
+    };
+  }
+
+  buildMaterializedAggregate(readModel, bucketLimit = this.defaultBucketLimit) {
+    if (!readModel) {
+      return null;
+    }
+
+    const payload = typeof readModel.payload === "object" && readModel.payload ? readModel.payload : {};
+    const overview = payload.overview || {};
+
+    const topicMetrics = (readModel.topicMetrics || [])
+      .sort((left, right) => left.position - right.position)
+      .map((row) => ({
+        topic: row.topic,
+        count: this.normalizeCount(row.count),
+        uniqueSeedCount: this.normalizeCount(row.uniqueSeedCount),
+        averageScore: this.normalizeMetric(row.averageScore),
+        bestScore: this.normalizeMetric(row.bestScore),
+      }));
+
+    const activityBuckets = (readModel.activityBuckets || [])
+      .sort((left, right) => left.position - right.position)
+      .slice(-this.normalizeBucketLimit(bucketLimit))
+      .map((row) => ({
+        timestamp: this.serializeDate(row.timestamp),
+        count: this.normalizeCount(row.count),
+        uniqueSeedCount: this.normalizeCount(row.uniqueSeedCount),
+        averageScore: this.normalizeMetric(row.averageScore),
+        avgCpuUsage: this.normalizeMetric(row.avgCpuUsage),
+        avgMemoryUsagePercent: this.normalizeMetric(row.avgMemoryUsagePercent),
+        bestScore: this.normalizeMetric(row.bestScore),
+      }));
+
+    const resourceMetrics = (readModel.resourceMetrics || []).sort((left, right) => left.position - right.position);
+    const resourceAveragesByAlgorithm = resourceMetrics
+      .filter((row) => row.scope === "algorithm")
+      .map((row) => ({
+        algorithm: row.label,
+        sampleCount: this.normalizeCount(row.sampleCount),
+        avgCpuUsage: this.normalizeMetric(row.avgCpuUsage),
+        avgMemoryUsage: this.normalizeMetric(row.avgMemoryUsage),
+        avgMemoryUsagePercent: this.normalizeMetric(row.avgMemoryUsagePercent),
+      }));
+    const resourceAveragesByLocalSearch = resourceMetrics
+      .filter((row) => row.scope === "localSearch")
+      .map((row) => ({
+        localSearch: row.label,
+        sampleCount: this.normalizeCount(row.sampleCount),
+        avgCpuUsage: this.normalizeMetric(row.avgCpuUsage),
+        avgMemoryUsage: this.normalizeMetric(row.avgMemoryUsage),
+        avgMemoryUsagePercent: this.normalizeMetric(row.avgMemoryUsagePercent),
+      }));
+
+    const algorithmMetrics = (readModel.algorithmMetrics || []).sort((left, right) => left.position - right.position);
+    const finalRunsByAlgorithm = algorithmMetrics
+      .filter((row) => row.summaryType === "finalRunsByAlgorithm")
+      .map((row) => ({
+        algorithm: row.algorithm,
+        runCount: this.normalizeCount(row.runCount),
+        bestRun: this.mapBestPayload(row.bestPayload),
+      }));
+    const finalRunsByRclAlgorithm = algorithmMetrics
+      .filter((row) => row.summaryType === "finalRunsByRclAlgorithm")
+      .map((row) => ({
+        algorithm: row.algorithm,
+        initialSeedCount: this.normalizeCount(row.initialSeedCount),
+        finalSeedCount: this.normalizeCount(row.finalSeedCount),
+        bestRun: this.mapBestPayload(row.bestPayload),
+        avgFinalF1Score: this.normalizeMetric(row.avgScore),
+        avgGain: this.normalizeMetric(row.avgGain),
+        searches: Array.isArray(row.searches) ? row.searches : [],
+        datasets: Array.isArray(row.datasets) ? row.datasets : [],
+      }));
+    const dlsOutcomeSummary = algorithmMetrics
+      .filter((row) => row.summaryType === "dlsOutcomeSummary")
+      .map((row) => ({
+        algorithm: row.algorithm,
+        visibleOutcomeSeedCount: this.normalizeCount(row.visibleOutcomeSeedCount),
+        visibleFinalSeedCount: this.normalizeCount(row.visibleFinalSeedCount),
+        bestOutcome: this.mapBestPayload(row.bestPayload),
+        avgLocalF1Score: this.normalizeMetric(row.avgScore),
+        avgGain: this.normalizeMetric(row.avgGain),
+        rclAlgorithms: Array.isArray(row.rclAlgorithms) ? row.rclAlgorithms : [],
+        datasets: Array.isArray(row.datasets) ? row.datasets : [],
+      }));
+
+    return {
+      schemaVersion: MONITOR_SCHEMA_VERSION,
+      generatedAt: this.serializeDate(readModel.generatedAt) || new Date().toISOString(),
+      source: "database-read-model",
+      bucketIntervalMs: Number(readModel.bucketIntervalMs || this.bucketIntervalMs),
+      overview: {
+        rawEvents: this.normalizeCount(overview.rawEvents),
+        rawSnapshots: this.normalizeCount(overview.rawSnapshots),
+        uniqueSeeds: this.normalizeCount(overview.uniqueSeeds),
+        topics: this.normalizeCount(overview.topics),
+        avgInitialF1: this.normalizeMetric(overview.avgInitialF1),
+      },
+      topicMetrics,
+      activityBuckets,
+      resourceAveragesByAlgorithm,
+      resourceAveragesByLocalSearch,
+      finalRunsByAlgorithm,
+      finalRunsByRclAlgorithm,
+      dlsOutcomeSummary,
+    };
+  }
+
+  buildMaterializedRows(recordId, payload = {}) {
+    const topicMetrics = (payload.topicMetrics || []).map((row, index) => ({
+      readModelId: recordId,
+      position: index,
+      topic: row.topic || "UNSPECIFIED",
+      count: this.normalizeCount(row.count),
+      uniqueSeedCount: this.normalizeCount(row.uniqueSeedCount),
+      averageScore: this.normalizeMetric(row.averageScore),
+      bestScore: this.normalizeMetric(row.bestScore),
+    }));
+
+    const activityBuckets = (payload.activityBuckets || []).map((row, index) => ({
+      readModelId: recordId,
+      position: index,
+      timestamp: row.timestamp ? new Date(row.timestamp) : new Date(0),
+      count: this.normalizeCount(row.count),
+      uniqueSeedCount: this.normalizeCount(row.uniqueSeedCount),
+      averageScore: this.normalizeMetric(row.averageScore),
+      avgCpuUsage: this.normalizeMetric(row.avgCpuUsage),
+      avgMemoryUsagePercent: this.normalizeMetric(row.avgMemoryUsagePercent),
+      bestScore: this.normalizeMetric(row.bestScore),
+    }));
+
+    const resourceAveragesByAlgorithm = (payload.resourceAveragesByAlgorithm || []).map((row, index) => ({
+      readModelId: recordId,
+      scope: "algorithm",
+      label: row.algorithm || "Unknown",
+      position: index,
+      sampleCount: this.normalizeCount(row.sampleCount),
+      avgCpuUsage: this.normalizeMetric(row.avgCpuUsage),
+      avgMemoryUsage: this.normalizeMetric(row.avgMemoryUsage),
+      avgMemoryUsagePercent: this.normalizeMetric(row.avgMemoryUsagePercent),
+    }));
+    const resourceAveragesByLocalSearch = (payload.resourceAveragesByLocalSearch || []).map((row, index) => ({
+      readModelId: recordId,
+      scope: "localSearch",
+      label: row.localSearch || "Unknown",
+      position: index,
+      sampleCount: this.normalizeCount(row.sampleCount),
+      avgCpuUsage: this.normalizeMetric(row.avgCpuUsage),
+      avgMemoryUsage: this.normalizeMetric(row.avgMemoryUsage),
+      avgMemoryUsagePercent: this.normalizeMetric(row.avgMemoryUsagePercent),
+    }));
+
+    const finalRunsByAlgorithm = (payload.finalRunsByAlgorithm || []).map((row, index) => ({
+      readModelId: recordId,
+      summaryType: "finalRunsByAlgorithm",
+      algorithm: row.algorithm || "Unknown",
+      position: index,
+      runCount: this.normalizeCount(row.runCount),
+      bestSeedId: row.bestRun?.seedId || null,
+      bestF1Score: this.normalizeMetric(row.bestRun?.bestF1Score),
+      currentF1Score: this.normalizeMetric(row.bestRun?.currentF1Score),
+      bestPayload: row.bestRun || null,
+      searches: [],
+      datasets: [],
+      rclAlgorithms: [],
+    }));
+    const finalRunsByRclAlgorithm = (payload.finalRunsByRclAlgorithm || []).map((row, index) => ({
+      readModelId: recordId,
+      summaryType: "finalRunsByRclAlgorithm",
+      algorithm: row.algorithm || "Unknown",
+      position: index,
+      initialSeedCount: this.normalizeCount(row.initialSeedCount),
+      finalSeedCount: this.normalizeCount(row.finalSeedCount),
+      runCount: this.normalizeCount(row.finalSeedCount),
+      avgScore: this.normalizeMetric(row.avgFinalF1Score),
+      avgGain: this.normalizeMetric(row.avgGain),
+      bestSeedId: row.bestRun?.seedId || null,
+      bestF1Score: this.normalizeMetric(row.bestRun?.bestF1Score),
+      currentF1Score: this.normalizeMetric(row.bestRun?.currentF1Score),
+      bestPayload: row.bestRun || null,
+      searches: Array.isArray(row.searches) ? row.searches : [],
+      datasets: Array.isArray(row.datasets) ? row.datasets : [],
+      rclAlgorithms: [],
+    }));
+    const dlsOutcomeSummary = (payload.dlsOutcomeSummary || []).map((row, index) => ({
+      readModelId: recordId,
+      summaryType: "dlsOutcomeSummary",
+      algorithm: row.algorithm || "Unknown",
+      position: index,
+      visibleOutcomeSeedCount: this.normalizeCount(row.visibleOutcomeSeedCount),
+      visibleFinalSeedCount: this.normalizeCount(row.visibleFinalSeedCount),
+      avgScore: this.normalizeMetric(row.avgLocalF1Score),
+      avgGain: this.normalizeMetric(row.avgGain),
+      bestSeedId: row.bestOutcome?.seedId || null,
+      bestF1Score: this.normalizeMetric(row.bestOutcome?.bestF1Score),
+      currentF1Score: this.normalizeMetric(row.bestOutcome?.currentF1Score),
+      bestPayload: row.bestOutcome || null,
+      searches: [],
+      datasets: Array.isArray(row.datasets) ? row.datasets : [],
+      rclAlgorithms: Array.isArray(row.rclAlgorithms) ? row.rclAlgorithms : [],
+    }));
+
+    return {
+      topicMetrics,
+      activityBuckets,
+      resourceMetrics: [...resourceAveragesByAlgorithm, ...resourceAveragesByLocalSearch],
+      algorithmMetrics: [...finalRunsByAlgorithm, ...finalRunsByRclAlgorithm, ...dlsOutcomeSummary],
+    };
+  }
+
+  async getSourceWatermark() {
+    const [eventAggregate, runAggregate] = await Promise.all([
+      prisma.graspExecutionEvent.aggregate({
+        _max: { createdAt: true },
+        _count: { _all: true },
+      }),
+      prisma.graspExecutionRun.aggregate({
+        _max: { updatedAt: true },
+        _count: { _all: true },
+      }),
+    ]);
+
+    return {
+      sourceEventCount: Number(eventAggregate?._count?._all || 0),
+      sourceRunCount: Number(runAggregate?._count?._all || 0),
+      sourceMaxEventAt: this.serializeDate(eventAggregate?._max?.createdAt),
+      sourceMaxRunAt: this.serializeDate(runAggregate?._max?.updatedAt),
+    };
+  }
+
+  hasMaterializedRows(readModel) {
+    return (
+      Array.isArray(readModel?.topicMetrics) && readModel.topicMetrics.length > 0
+      && Array.isArray(readModel?.activityBuckets) && readModel.activityBuckets.length > 0
+      && Array.isArray(readModel?.resourceMetrics) && readModel.resourceMetrics.length > 0
+      && Array.isArray(readModel?.algorithmMetrics) && readModel.algorithmMetrics.length > 0
+    );
+  }
+
+  isReadModelFresh(readModel, sourceWatermark) {
+    if (!readModel || !this.hasMaterializedRows(readModel)) {
+      return false;
+    }
+
+    const generatedAt = new Date(readModel.generatedAt || 0).getTime();
+    if (!Number.isFinite(generatedAt) || (Date.now() - generatedAt) > this.readModelMaxAgeMs) {
+      return false;
+    }
+
+    return (
+      Number(readModel.sourceEventCount || 0) === Number(sourceWatermark.sourceEventCount || 0)
+      && Number(readModel.sourceRunCount || 0) === Number(sourceWatermark.sourceRunCount || 0)
+      && this.serializeDate(readModel.sourceMaxEventAt) === sourceWatermark.sourceMaxEventAt
+      && this.serializeDate(readModel.sourceMaxRunAt) === sourceWatermark.sourceMaxRunAt
+    );
+  }
+
+  async persistReadModel(payload, sourceWatermark) {
+    const aggregatePayload = {
+      ...(payload || {}),
+      schemaVersion: MONITOR_SCHEMA_VERSION,
+      bucketIntervalMs: this.bucketIntervalMs,
+      source: "database-read-model",
+    };
+
+    const record = await prisma.$transaction(async (tx) => {
+      const persistedReadModel = await tx.graspDashboardReadModel.upsert({
+        where: { key: this.readModelKey },
+        update: {
+          schemaVersion: MONITOR_SCHEMA_VERSION,
+          bucketIntervalMs: this.bucketIntervalMs,
+          sourceEventCount: Number(sourceWatermark.sourceEventCount || 0),
+          sourceRunCount: Number(sourceWatermark.sourceRunCount || 0),
+          sourceMaxEventAt: sourceWatermark.sourceMaxEventAt ? new Date(sourceWatermark.sourceMaxEventAt) : null,
+          sourceMaxRunAt: sourceWatermark.sourceMaxRunAt ? new Date(sourceWatermark.sourceMaxRunAt) : null,
+          generatedAt: new Date(),
+          payload: aggregatePayload,
+        },
+        create: {
+          key: this.readModelKey,
+          schemaVersion: MONITOR_SCHEMA_VERSION,
+          bucketIntervalMs: this.bucketIntervalMs,
+          sourceEventCount: Number(sourceWatermark.sourceEventCount || 0),
+          sourceRunCount: Number(sourceWatermark.sourceRunCount || 0),
+          sourceMaxEventAt: sourceWatermark.sourceMaxEventAt ? new Date(sourceWatermark.sourceMaxEventAt) : null,
+          sourceMaxRunAt: sourceWatermark.sourceMaxRunAt ? new Date(sourceWatermark.sourceMaxRunAt) : null,
+          generatedAt: new Date(),
+          payload: aggregatePayload,
+        },
+      });
+
+      const rows = this.buildMaterializedRows(persistedReadModel.id, aggregatePayload);
+
+      await tx.graspDashboardTopicMetric.deleteMany({ where: { readModelId: persistedReadModel.id } });
+      await tx.graspDashboardActivityBucket.deleteMany({ where: { readModelId: persistedReadModel.id } });
+      await tx.graspDashboardResourceMetric.deleteMany({ where: { readModelId: persistedReadModel.id } });
+      await tx.graspDashboardAlgorithmMetric.deleteMany({ where: { readModelId: persistedReadModel.id } });
+
+      if (rows.topicMetrics.length) {
+        await tx.graspDashboardTopicMetric.createMany({ data: rows.topicMetrics });
+      }
+      if (rows.activityBuckets.length) {
+        await tx.graspDashboardActivityBucket.createMany({ data: rows.activityBuckets });
+      }
+      if (rows.resourceMetrics.length) {
+        await tx.graspDashboardResourceMetric.createMany({ data: rows.resourceMetrics });
+      }
+      if (rows.algorithmMetrics.length) {
+        await tx.graspDashboardAlgorithmMetric.createMany({ data: rows.algorithmMetrics });
+      }
+
+      return persistedReadModel;
+    });
+
+    return {
+      ...aggregatePayload,
+      generatedAt: this.serializeDate(record.generatedAt) || new Date().toISOString(),
+    };
+  }
+
+  async clearReadModel() {
+    await prisma.graspDashboardReadModel.deleteMany({
+      where: { key: this.readModelKey },
+    });
+  }
+
+  async buildDashboardAggregate(options = {}) {
     const requestedBucketLimit = Number(options.bucketLimit);
     const bucketLimit = Number.isFinite(requestedBucketLimit) && requestedBucketLimit > 0
       ? Math.max(Math.floor(requestedBucketLimit), 1)
@@ -557,7 +936,7 @@ class GraspDashboardAggregateService {
     return {
       schemaVersion: MONITOR_SCHEMA_VERSION,
       generatedAt: new Date().toISOString(),
-      source: "persistent-store",
+      source: "persistent-store-build",
       bucketIntervalMs: this.bucketIntervalMs,
       overview: {
         rawEvents: this.normalizeCount(overviewRow.rawEvents),
@@ -574,6 +953,32 @@ class GraspDashboardAggregateService {
       finalRunsByRclAlgorithm,
       dlsOutcomeSummary,
     };
+  }
+
+  async getDashboardAggregate(options = {}) {
+    const bucketLimit = this.normalizeBucketLimit(options.bucketLimit);
+    const sourceWatermark = await this.getSourceWatermark();
+    const storedReadModel = await prisma.graspDashboardReadModel.findUnique({
+      where: { key: this.readModelKey },
+      include: {
+        topicMetrics: true,
+        activityBuckets: true,
+        resourceMetrics: true,
+        algorithmMetrics: true,
+      },
+    });
+
+    if (this.isReadModelFresh(storedReadModel, sourceWatermark)) {
+      return this.buildMaterializedAggregate(storedReadModel, bucketLimit);
+    }
+
+    const aggregate = await this.buildDashboardAggregate({
+      ...options,
+      bucketLimit: Math.max(bucketLimit, this.readModelBucketLimit),
+    });
+    const storedPayload = await this.persistReadModel(aggregate, sourceWatermark);
+
+    return this.sliceDashboardAggregate(storedPayload, bucketLimit);
   }
 }
 

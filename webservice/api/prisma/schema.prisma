@@ -117,3 +117,111 @@ model GraspExecutionEvent {
   @@index([requestId])
   @@index([createdAt])
 }
+
+model GraspDashboardReadModel {
+  id               Int      @id @default(autoincrement())
+  key              String   @unique
+  schemaVersion    String
+  bucketIntervalMs Int
+  sourceEventCount Int      @default(0)
+  sourceRunCount   Int      @default(0)
+  sourceMaxEventAt DateTime?
+  sourceMaxRunAt   DateTime?
+  generatedAt      DateTime @default(now())
+  payload          Json
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  topicMetrics     GraspDashboardTopicMetric[]
+  activityBuckets  GraspDashboardActivityBucket[]
+  resourceMetrics  GraspDashboardResourceMetric[]
+  algorithmMetrics GraspDashboardAlgorithmMetric[]
+
+  @@index([generatedAt])
+}
+
+model GraspDashboardTopicMetric {
+  id              Int      @id @default(autoincrement())
+  readModelId     Int
+  position        Int
+  topic           String
+  count           Int      @default(0)
+  uniqueSeedCount Int      @default(0)
+  averageScore    Float?
+  bestScore       Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  readModel GraspDashboardReadModel @relation(fields: [readModelId], references: [id], onDelete: Cascade)
+
+  @@index([readModelId, position])
+  @@index([readModelId, topic])
+}
+
+model GraspDashboardActivityBucket {
+  id                    Int      @id @default(autoincrement())
+  readModelId           Int
+  position              Int
+  timestamp             DateTime
+  count                 Int      @default(0)
+  uniqueSeedCount       Int      @default(0)
+  averageScore          Float?
+  avgCpuUsage           Float?
+  avgMemoryUsagePercent Float?
+  bestScore             Float?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  readModel GraspDashboardReadModel @relation(fields: [readModelId], references: [id], onDelete: Cascade)
+
+  @@index([readModelId, position])
+  @@index([readModelId, timestamp])
+}
+
+model GraspDashboardResourceMetric {
+  id                    Int      @id @default(autoincrement())
+  readModelId           Int
+  scope                 String
+  label                 String
+  position              Int
+  sampleCount           Int      @default(0)
+  avgCpuUsage           Float?
+  avgMemoryUsage        Float?
+  avgMemoryUsagePercent Float?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  readModel GraspDashboardReadModel @relation(fields: [readModelId], references: [id], onDelete: Cascade)
+
+  @@index([readModelId, scope, position])
+  @@index([readModelId, scope, label])
+}
+
+model GraspDashboardAlgorithmMetric {
+  id                    Int      @id @default(autoincrement())
+  readModelId           Int
+  summaryType           String
+  algorithm             String
+  position              Int
+  initialSeedCount      Int      @default(0)
+  finalSeedCount        Int      @default(0)
+  visibleOutcomeSeedCount Int    @default(0)
+  visibleFinalSeedCount Int      @default(0)
+  runCount              Int      @default(0)
+  avgScore              Float?
+  avgGain               Float?
+  bestSeedId            String?
+  bestF1Score           Float?
+  currentF1Score        Float?
+  bestPayload           Json?
+  searches              String[]
+  datasets              String[]
+  rclAlgorithms         String[]
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  readModel GraspDashboardReadModel @relation(fields: [readModelId], references: [id], onDelete: Cascade)
+
+  @@index([readModelId, summaryType, position])
+  @@index([readModelId, summaryType, algorithm])
+}
