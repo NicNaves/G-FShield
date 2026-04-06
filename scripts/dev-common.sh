@@ -63,7 +63,12 @@ install_node_dependencies() {
 
   if [[ -f "${workdir}/package-lock.json" ]]; then
     echo "Instalando dependencias de ${label}..."
-    run_npm_command "$workdir" ci
+    if run_npm_command "$workdir" ci; then
+      return 0
+    fi
+
+    echo "npm ci falhou em ${label}. Fazendo fallback para npm install..." >&2
+    run_npm_command "$workdir" install
     return 0
   fi
 
