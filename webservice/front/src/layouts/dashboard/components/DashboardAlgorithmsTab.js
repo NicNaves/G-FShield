@@ -9,6 +9,14 @@ import MDBox from "components/MDBox";
 import MDTypography from "components/MDTypography";
 import DataTable from "examples/Tables/DataTable";
 
+const summaryVirtualizationConfig = {
+  enabled: true,
+  maxHeight: 460,
+  rowHeight: 60,
+  threshold: 12,
+  overscan: 5,
+};
+
 function DashboardAlgorithmsTab({
   t,
   resourceAveragesByAlgorithm,
@@ -52,6 +60,8 @@ function DashboardAlgorithmsTab({
                   canSearch
                   showTotalEntries={false}
                   noEndBorder
+                  virtualization={summaryVirtualizationConfig}
+                  searchDebounceMs={260}
                 />
               </MDBox>
             </Card>
@@ -89,6 +99,8 @@ function DashboardAlgorithmsTab({
                   canSearch
                   showTotalEntries={false}
                   noEndBorder
+                  virtualization={summaryVirtualizationConfig}
+                  searchDebounceMs={260}
                 />
               </MDBox>
             </Card>
@@ -125,6 +137,8 @@ function DashboardAlgorithmsTab({
                   canSearch
                   showTotalEntries={false}
                   noEndBorder
+                  virtualization={summaryVirtualizationConfig}
+                  searchDebounceMs={260}
                 />
               </MDBox>
             </Card>
@@ -157,6 +171,8 @@ function DashboardAlgorithmsTab({
                   canSearch
                   showTotalEntries={false}
                   noEndBorder
+                  virtualization={summaryVirtualizationConfig}
+                  searchDebounceMs={260}
                 />
               </MDBox>
             </Card>

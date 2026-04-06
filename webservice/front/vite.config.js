@@ -5,6 +5,9 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const usePolling = env.CHOKIDAR_USEPOLLING === "true";
   const watchInterval = Number(env.CHOKIDAR_INTERVAL || 1000);
+  const apiProxyTarget = String(
+    env.REACT_APP_API_PROXY_TARGET || "http://localhost:4000"
+  ).trim();
   const clientEnv = {
     ...Object.fromEntries(
       Object.entries(env).filter(([key]) => key.startsWith("REACT_APP_"))
@@ -45,6 +48,12 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "0.0.0.0",
       port: 3000,
+      proxy: {
+        "/api": {
+          target: apiProxyTarget,
+          changeOrigin: true,
+        },
+      },
       watch: {
         usePolling,
         interval: Number.isFinite(watchInterval) ? watchInterval : 1000,

@@ -37,11 +37,12 @@ Este front-end e o dashboard operacional do GF-Shield.
 - `DLS Outcome Summary`
 - `Run Comparison Studio`
 - virtualizacao nas tabelas mais pesadas do feed analitico e do historico de run
+- virtualizacao tambem nas tabelas densas da aba de algoritmos
 - tema escuro refinado e tipografia ajustada
 
 ### Performance
 
-As ultimas mudancas do front reduziram o volume inicial de historico carregado no dashboard, usam cache remoto com `TanStack Query`, carregamento lazy por rota em `Vite`, decimation nos graficos de serie temporal e virtualizacao nas tabelas mais densas. Isso melhora o comportamento com muitos dados sem perder os detalhes por request e por run.
+As ultimas mudancas do front reduziram o volume inicial de historico carregado no dashboard, usam cache remoto com `TanStack Query`, carregamento lazy por rota em `Vite`, proxy `/api` no dev server, build estatico servido por `Nginx` no modo preview/server, decimation nos graficos de serie temporal e virtualizacao nas tabelas mais densas. Isso melhora o comportamento com muitos dados sem perder os detalhes por request e por run.
 
 ### Inicializacao
 

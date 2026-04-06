@@ -13,7 +13,7 @@ Coded by www.creative-tim.com
 * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 
-import { isValidElement, useMemo, useEffect, useRef, useState } from "react";
+import { isValidElement, useDeferredValue, useMemo, useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import { useTable, usePagination, useGlobalFilter, useSortBy } from "react-table";
 import Table from "@mui/material/Table";
@@ -136,6 +136,7 @@ function DataTable({
   noEndBorder,
   virtualization,
   serverPagination,
+  searchDebounceMs,
 }) {
   const { t } = useI18n();
   const defaultValue = entriesPerPage.defaultValue ? entriesPerPage.defaultValue : 10;
@@ -160,6 +161,10 @@ function DataTable({
   );
   const virtualizationThreshold = Math.max(Number(virtualizationConfig.threshold || 32) || 32, 1);
   const virtualizationOverscan = Math.max(Number(virtualizationConfig.overscan || 6) || 6, 1);
+  const resolvedSearchDebounceMs = Math.max(
+    Number(serverPaginationConfig?.searchDebounceMs ?? searchDebounceMs ?? 220) || 220,
+    80
+  );
 
   const tableInstance = useTable(
     { columns, data, initialState: { pageIndex: 0, pageSize: defaultValue || 10 } },
@@ -378,6 +383,7 @@ function DataTable({
   const [search, setSearch] = useState(
     manualPaginationEnabled ? serverPaginationConfig.search || "" : globalFilter || ""
   );
+  const deferredSearch = useDeferredValue(search);
   const latestSetGlobalFilterRef = useRef(setGlobalFilter);
   const lastAppliedGlobalFilterRef = useRef(globalFilter || undefined);
 
@@ -406,19 +412,19 @@ function DataTable({
 
   useEffect(() => {
     if (manualPaginationEnabled) {
-      const nextServerSearch = search || "";
+      const nextServerSearch = deferredSearch || "";
       if ((serverPaginationConfig.search || "") === nextServerSearch) {
         return undefined;
       }
 
       const debounceHandle = window.setTimeout(() => {
         serverPaginationConfig.onSearchChange?.(nextServerSearch);
-      }, 120);
+      }, resolvedSearchDebounceMs);
 
       return () => window.clearTimeout(debounceHandle);
     }
 
-    const nextGlobalFilter = search || undefined;
+    const nextGlobalFilter = deferredSearch || undefined;
     if (lastAppliedGlobalFilterRef.current === nextGlobalFilter) {
       return undefined;
     }
@@ -426,10 +432,10 @@ function DataTable({
     const debounceHandle = window.setTimeout(() => {
       lastAppliedGlobalFilterRef.current = nextGlobalFilter;
       latestSetGlobalFilterRef.current(nextGlobalFilter);
-    }, 120);
+    }, resolvedSearchDebounceMs);
 
     return () => window.clearTimeout(debounceHandle);
-  }, [manualPaginationEnabled, search, serverPaginationConfig]);
+  }, [deferredSearch, manualPaginationEnabled, resolvedSearchDebounceMs, serverPaginationConfig]);
 
   const setSortedValue = (column) => {
     if (!isSorted) {
@@ -443,29 +449,22 @@ function DataTable({
     return "none";
   };
 
-  const preparedPageRows = useMemo(
-    () =>
-      page.map((row) => {
-        prepareRow(row);
-        return row;
-      }),
-    [page, prepareRow]
-  );
+  const currentPageRowCount = page.length;
   const totalEntries = manualPaginationEnabled
     ? Math.max(Number(serverPaginationConfig.totalEntries) || 0, 0)
     : rows.length;
   const entriesStart = totalEntries === 0 ? 0 : resolvedPageIndex * resolvedPageSize + 1;
   const entriesEnd = totalEntries === 0
     ? 0
-    : Math.min(totalEntries, resolvedPageIndex * resolvedPageSize + preparedPageRows.length);
+    : Math.min(totalEntries, resolvedPageIndex * resolvedPageSize + currentPageRowCount);
   const totalLabel = totalEntries === 1 ? t("datatable.itemSingular") : t("datatable.itemPlural");
   const hasToolbar = entriesPerPage || canSearch || canExport;
-  const shouldVirtualize = virtualizationEnabled && preparedPageRows.length >= virtualizationThreshold;
+  const shouldVirtualize = virtualizationEnabled && currentPageRowCount >= virtualizationThreshold;
   const virtualWindow = useMemo(() => {
     if (!shouldVirtualize) {
       return {
         start: 0,
-        end: preparedPageRows.length,
+        end: currentPageRowCount,
         topSpacerHeight: 0,
         bottomSpacerHeight: 0,
       };
@@ -476,17 +475,17 @@ function DataTable({
     const start = Math.max(Math.floor(effectiveScrollTop / virtualizationRowHeight) - virtualizationOverscan, 0);
     const end = Math.min(
       start + visibleRowCount + virtualizationOverscan * 2,
-      preparedPageRows.length
+      currentPageRowCount
     );
 
     return {
       start,
       end,
       topSpacerHeight: start * virtualizationRowHeight,
-      bottomSpacerHeight: Math.max((preparedPageRows.length - end) * virtualizationRowHeight, 0),
+      bottomSpacerHeight: Math.max((currentPageRowCount - end) * virtualizationRowHeight, 0),
     };
   }, [
-    preparedPageRows.length,
+    currentPageRowCount,
     scrollTop,
     shouldVirtualize,
     tableHeadHeight,
@@ -495,8 +494,14 @@ function DataTable({
     virtualizationRowHeight,
   ]);
   const renderedRows = useMemo(
-    () => preparedPageRows.slice(virtualWindow.start, virtualWindow.end),
-    [preparedPageRows, virtualWindow.end, virtualWindow.start]
+    () =>
+      page
+        .slice(virtualWindow.start, virtualWindow.end)
+        .map((row) => {
+          prepareRow(row);
+          return row;
+        }),
+    [page, prepareRow, virtualWindow.end, virtualWindow.start]
   );
 
   useEffect(() => {
@@ -721,6 +726,7 @@ DataTable.defaultProps = {
   noEndBorder: false,
   virtualization: false,
   serverPagination: null,
+  searchDebounceMs: 220,
 };
 
 DataTable.propTypes = {
@@ -751,6 +757,7 @@ DataTable.propTypes = {
   }),
   isSorted: PropTypes.bool,
   noEndBorder: PropTypes.bool,
+  searchDebounceMs: PropTypes.number,
   virtualization: PropTypes.oneOfType([
     PropTypes.bool,
     PropTypes.shape({
@@ -767,6 +774,7 @@ DataTable.propTypes = {
     totalEntries: PropTypes.number.isRequired,
     pageCount: PropTypes.number,
     search: PropTypes.string,
+    searchDebounceMs: PropTypes.number,
     onPageChange: PropTypes.func,
     onPageSizeChange: PropTypes.func,
     onSearchChange: PropTypes.func,

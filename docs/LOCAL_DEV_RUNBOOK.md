@@ -93,7 +93,7 @@ Os scripts de start:
 - sobem a stack principal (`docker-compose.yml` + preset)
 - sobem o PostgreSQL e o Redis opcional da API
 - podem instalar dependencias automaticamente
-- iniciam API e front (`Vite` no front e build estatico no fluxo server)
+- iniciam API e front (`Vite` no modo `Dev` e `Nginx` com build estatico/cache no modo `Preview`)
 - esperam a API responder no healthcheck
 - injetam `GRASP_DATASETS_DIR`, `GF_SHIELD_PROJECT_ROOT`, `GF_SHIELD_METRICS_DIR`, `GF_SHIELD_COMPOSE_PROJECT_NAME` e `GF_SHIELD_COMPOSE_FILES`
 - no modo Docker, montam datasets, repo root e configuracao de reset
@@ -187,7 +187,9 @@ O front atual inclui:
 - bootstrap agregado do monitor em `GET /api/grasp/monitor/bootstrap`
 - projecao incremental em `GET /api/grasp/monitor/projection`
 - cache remoto com `TanStack Query`
+- read model persistido para o aggregate principal do dashboard
 - tabelas virtualizadas para listas densas
+- busca remota com debounce e menos trabalho por pagina nas tabelas compartilhadas
 - decimation nos graficos de serie temporal e limite de seeds visiveis na timeline
 - exportacao em CSV/JSON nas tabelas compartilhadas
 - exportacao por request, run inteira ou recorte de timeline
@@ -218,7 +220,7 @@ Se ainda ficar lento, valide:
 - `GET /api/grasp/monitor/bootstrap` para o carregamento inicial
 - `GET /api/grasp/monitor/projection` para os agregados vivos
 - se `REDIS_ENABLED=true`, confirme se o container `g-fshield-redis` esta ativo
-- se estiver rodando local com Node em Docker no Windows, prefira `-FrontendMode Preview` para evitar o custo do watcher com polling do Vite
+- se estiver rodando local com Node em Docker no Windows, prefira `-FrontendMode Preview`, que agora gera o build e serve pelo `Nginx` com proxy `/api`, gzip e cache de assets
 
 #### Botao `Restart and clean environment` retorna erro
 

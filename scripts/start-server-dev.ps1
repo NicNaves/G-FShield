@@ -48,6 +48,8 @@ $repoName = Split-Path -Leaf $repoRoot
 $composeProjectName = Get-NormalizedProjectName -Name $repoName
 $apiDir = Join-Path $repoRoot "webservice/api"
 $frontDir = Join-Path $repoRoot "webservice/front"
+$frontBuildDir = Join-Path $frontDir "build"
+$frontNginxTemplate = Join-Path $frontDir "nginx/default.conf.template"
 $datasetsDir = Join-Path $repoRoot "datasets"
 $metricsDir = Join-Path $repoRoot "metrics"
 $rootComposeFile = Join-Path $repoRoot "docker-compose.yml"
@@ -57,6 +59,7 @@ $dbPresetComposeFile = Join-Path $apiDir "docker-compose.db.server.yml"
 $stateDir = Join-Path $repoRoot ".server-dev"
 $stateFile = Join-Path $stateDir "processes.json"
 $frontHealthcheckUrl = "http://localhost:$FrontendPort"
+$frontContainerName = "$composeProjectName-front-server-static"
 
 function Get-NpmCommand {
   $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
@@ -110,7 +113,41 @@ function Stop-RecordedProcesses {
     }
   }
 
+  foreach ($containerInfo in @($state.dockerContainers)) {
+    if (-not $containerInfo.name) {
+      continue
+    }
+
+    & docker rm -f $containerInfo.name 2>$null | Out-Null
+  }
+
   Remove-Item -Path $stateFile -Force
+}
+
+function Start-NginxStaticContainer {
+  param(
+    [string]$Name,
+    [string]$BuildDirectory,
+    [string]$TemplatePath,
+    [int]$PublishedPort,
+    [string]$ProxyTarget
+  )
+
+  & docker rm -f $Name 2>$null | Out-Null
+  $arguments = @(
+    "run", "-d", "--name", $Name,
+    "--add-host", "host.docker.internal:host-gateway",
+    "-p", "${PublishedPort}:80",
+    "-e", "API_PROXY_TARGET=$ProxyTarget",
+    "-v", "${BuildDirectory}:/usr/share/nginx/html:ro",
+    "-v", "${TemplatePath}:/etc/nginx/templates/default.conf.template:ro",
+    "nginx:1.27-alpine"
+  )
+
+  & docker @arguments | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    throw "Falha ao iniciar o front estatico com Nginx."
+  }
 }
 
 function Start-ManagedShell {
@@ -244,7 +281,8 @@ Set-Content -Path $frontLog -Value ""
 Write-Host "Gerando build estatico do front..."
 Push-Location $frontDir
 try {
-  $env:REACT_APP_API_URL = "http://localhost:$ApiPort/api"
+  $env:REACT_APP_API_URL = "/api"
+  $env:REACT_APP_API_PROXY_TARGET = "http://localhost:$ApiPort"
   $env:REACT_APP_AUTH_DISABLED = $frontAuthDisabled
   & $npmCommand run build *>&1 | Tee-Object -FilePath $frontLog -Append | Out-Host
   if ($LASTEXITCODE -ne 0) {
@@ -253,6 +291,7 @@ try {
 }
 finally {
   Remove-Item Env:REACT_APP_API_URL -ErrorAction SilentlyContinue
+  Remove-Item Env:REACT_APP_API_PROXY_TARGET -ErrorAction SilentlyContinue
   Remove-Item Env:REACT_APP_AUTH_DISABLED -ErrorAction SilentlyContinue
   Pop-Location
 }
@@ -271,21 +310,19 @@ Set-Location '$apiDir'
 & '$npmCommand' run dev
 "@
 
-$frontCommand = @"
-Set-Location '$frontDir'
-& '$npmCommand' exec --yes --package=serve -- serve -s build -l $FrontendPort
-"@
-
 Write-Host "Abrindo API em nova janela..."
 $apiProcess = Start-ManagedShell -Name "webservice-api-server" -WorkingDirectory $apiDir -Command $apiCommand
 
-Write-Host "Abrindo front em nova janela..."
-$frontProcess = Start-ManagedShell -Name "webservice-front-server" -WorkingDirectory $frontDir -Command $frontCommand
+Write-Host "Iniciando front estatico com Nginx..."
+Start-NginxStaticContainer -Name $frontContainerName -BuildDirectory $frontBuildDir -TemplatePath $frontNginxTemplate -PublishedPort $FrontendPort -ProxyTarget "http://host.docker.internal:$ApiPort"
 
 $state = [PSCustomObject]@{
   startedAt = (Get-Date).ToString("o")
   authMode = $AuthMode
-  processes = @($apiProcess, $frontProcess)
+  processes = @($apiProcess)
+  dockerContainers = @(
+    [PSCustomObject]@{ name = $frontContainerName; role = "front" }
+  )
 }
 
 $state | ConvertTo-Json -Depth 4 | Set-Content -Path $stateFile

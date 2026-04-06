@@ -129,6 +129,8 @@ FRONT_HEALTHCHECK_URL="http://localhost:${FRONTEND_PORT}"
 REPO_ROOT="${DEV_REPO_ROOT}"
 API_DIR="${REPO_ROOT}/webservice/api"
 FRONT_DIR="${REPO_ROOT}/webservice/front"
+FRONT_BUILD_DIR="${FRONT_DIR}/build"
+FRONT_NGINX_TEMPLATE="${FRONT_DIR}/nginx/default.conf.template"
 DATASETS_DIR="${REPO_ROOT}/datasets"
 METRICS_DIR="${REPO_ROOT}/metrics"
 STATE_DIR="${REPO_ROOT}/.server-dev"
@@ -139,6 +141,7 @@ DB_COMPOSE_FILE="${API_DIR}/docker-compose.db.yml"
 DB_PRESET_COMPOSE_FILE="${API_DIR}/docker-compose.db.server.yml"
 COMPOSE_PROJECT_NAME="$(basename "${REPO_ROOT}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
 NPM_COMMAND="$(get_npm_command)"
+FRONT_CONTAINER_NAME="${COMPOSE_PROJECT_NAME}-front-server-static"
 
 API_AUTH_DISABLED="false"
 API_MOCK_DATA_ENABLED="false"
@@ -151,6 +154,7 @@ fi
 
 ensure_dir "$STATE_DIR"
 stop_recorded_processes "$STATE_FILE"
+remove_docker_container_if_exists "$FRONT_CONTAINER_NAME"
 
 if [[ "$INSTALL_DEPENDENCIES" == "true" ]]; then
   install_node_dependencies "$API_DIR" "webservice/api"
@@ -179,16 +183,22 @@ API_PID="$(start_managed_process "$API_DIR" "$API_LOG" env API_PORT="$API_PORT" 
 echo "Gerando build estatico do front..."
 if ! (
   cd "$FRONT_DIR"
-  env REACT_APP_API_URL="http://localhost:${API_PORT}/api" REACT_APP_AUTH_DISABLED="$FRONT_AUTH_DISABLED" "$NPM_COMMAND" run build
+  env REACT_APP_API_URL="/api" REACT_APP_API_PROXY_TARGET="http://localhost:${API_PORT}" REACT_APP_AUTH_DISABLED="$FRONT_AUTH_DISABLED" "$NPM_COMMAND" run build
 ) >>"$FRONT_LOG" 2>&1; then
   print_log_tail "front" "$FRONT_LOG"
   exit 1
 fi
 
-echo "Iniciando front estatico em background..."
-FRONT_PID="$(start_managed_process "$FRONT_DIR" "$FRONT_LOG" "$NPM_COMMAND" exec --yes --package=serve -- serve -s build -l "$FRONTEND_PORT")"
+echo "Iniciando front estatico com Nginx..."
+start_nginx_static_container \
+  "$FRONT_CONTAINER_NAME" \
+  "$FRONT_BUILD_DIR" \
+  "$FRONT_NGINX_TEMPLATE" \
+  "$FRONTEND_PORT" \
+  "http://host.docker.internal:${API_PORT}"
+FRONT_PID=""
 
-write_state_file "$STATE_FILE" "$(date -Iseconds)" "$AUTH_MODE" "$API_PID" "$FRONT_PID" "$API_LOG" "$FRONT_LOG"
+write_state_file "$STATE_FILE" "$(date -Iseconds)" "$AUTH_MODE" "$API_PID" "$FRONT_PID" "$API_LOG" "$FRONT_LOG" "$FRONT_CONTAINER_NAME"
 
 echo "Aguardando API responder em ${API_HEALTHCHECK_URL} ..."
 if ! wait_for_http "$API_HEALTHCHECK_URL" 120; then
@@ -200,7 +210,7 @@ fi
 echo "Aguardando front responder em ${FRONT_HEALTHCHECK_URL} ..."
 if ! wait_for_http "$FRONT_HEALTHCHECK_URL" 120; then
   print_log_tail "API" "$API_LOG"
-  print_log_tail "front" "$FRONT_LOG"
+  docker logs --tail 60 "$FRONT_CONTAINER_NAME" >&2 || true
   exit 1
 fi
 

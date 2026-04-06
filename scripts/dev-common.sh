@@ -105,6 +105,7 @@ write_state_file() {
   local front_pid="$5"
   local api_log="$6"
   local front_log="$7"
+  local front_container="${8:-}"
 
   cat >"$state_file" <<EOF
 STARTED_AT='${started_at}'
@@ -113,7 +114,19 @@ API_PID='${api_pid}'
 FRONT_PID='${front_pid}'
 API_LOG='${api_log}'
 FRONT_LOG='${front_log}'
+FRONT_CONTAINER='${front_container}'
 EOF
+}
+
+remove_docker_container_if_exists() {
+  local name="${1:-}"
+  if [[ -z "$name" ]]; then
+    return 0
+  fi
+
+  if docker ps -a --format '{{.Names}}' | grep -Fxq "$name"; then
+    docker rm -f "$name" >/dev/null 2>&1 || true
+  fi
 }
 
 stop_recorded_processes() {
@@ -122,11 +135,12 @@ stop_recorded_processes() {
     return 0
   fi
 
-  local STARTED_AT="" AUTH_MODE="" API_PID="" FRONT_PID="" API_LOG="" FRONT_LOG=""
+  local STARTED_AT="" AUTH_MODE="" API_PID="" FRONT_PID="" API_LOG="" FRONT_LOG="" FRONT_CONTAINER=""
   load_state_file "$state_file"
 
   kill_pid_if_running "${API_PID:-}"
   kill_pid_if_running "${FRONT_PID:-}"
+  remove_docker_container_if_exists "${FRONT_CONTAINER:-}"
 
   rm -f "$state_file"
 }
@@ -171,6 +185,37 @@ print_log_tail() {
   echo
   echo "Ultimas ${lines} linhas de ${label} (${logfile}):" >&2
   tail -n "$lines" "$logfile" >&2 || true
+}
+
+start_nginx_static_container() {
+  local name="$1"
+  local build_dir="$2"
+  local template_path="$3"
+  local published_port="$4"
+  local proxy_target="$5"
+  local network_name="${6:-}"
+
+  remove_docker_container_if_exists "$name"
+
+  local args=(
+    run -d
+    --name "$name"
+    --add-host "host.docker.internal:host-gateway"
+  )
+
+  if [[ -n "$network_name" ]]; then
+    args+=(--network "$network_name")
+  fi
+
+  args+=(
+    -p "${published_port}:80"
+    -e "API_PROXY_TARGET=${proxy_target}"
+    -v "${build_dir}:/usr/share/nginx/html:ro"
+    -v "${template_path}:/etc/nginx/templates/default.conf.template:ro"
+    nginx:1.27-alpine
+  )
+
+  docker "${args[@]}" >/dev/null
 }
 
 wait_for_tcp_port() {
