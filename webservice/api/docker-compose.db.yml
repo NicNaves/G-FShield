@@ -19,5 +19,18 @@ services:
       timeout: 5s
       retries: 10
 
+  g-fshield-redis:
+    cpus: 0.25
+    mem_limit: 256m
+    image: redis:7-alpine
+    container_name: g-fshield-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
+    volumes:
+      - g-fshield-webservice-api-redis-data:/data
+
 volumes:
   g-fshield-webservice-api-pg-data:
+  g-fshield-webservice-api-redis-data:

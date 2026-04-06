@@ -16,8 +16,10 @@ Coded by www.creative-tim.com
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
+import { QueryClientProvider } from "@tanstack/react-query";
 import App from "App";
 import "assets/theme-fonts.css";
+import queryClient from "lib/queryClient";
 
 // Material Dashboard 2 React Context Provider
 import { MaterialUIControllerProvider } from "context";
@@ -27,8 +29,10 @@ const root = createRoot(container);
 
 root.render(
   <BrowserRouter>
-    <MaterialUIControllerProvider>
-      <App />
-    </MaterialUIControllerProvider>
+    <QueryClientProvider client={queryClient}>
+      <MaterialUIControllerProvider>
+        <App />
+      </MaterialUIControllerProvider>
+    </QueryClientProvider>
   </BrowserRouter>
 );

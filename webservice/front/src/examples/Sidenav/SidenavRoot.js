@@ -19,7 +19,7 @@ import { styled } from "@mui/material/styles";
 
 export default styled(Drawer)(({ theme, ownerState }) => {
   const { palette, boxShadows, transitions, breakpoints, functions } = theme;
-  const { transparentSidenav, whiteSidenav, miniSidenav, darkMode } = ownerState;
+  const { transparentSidenav, whiteSidenav, miniSidenav, darkMode, isMobileSidenav } = ownerState;
 
   const sidebarWidth = 250;
   const { transparent, gradients, white, background } = palette;
@@ -36,6 +36,24 @@ export default styled(Drawer)(({ theme, ownerState }) => {
     backgroundValue = white.main;
   }
 
+  if (isMobileSidenav) {
+    return {
+      "& .MuiBackdrop-root": {
+        backgroundColor: darkMode ? "rgba(2, 6, 23, 0.52)" : "rgba(15, 23, 42, 0.28)",
+        backdropFilter: "blur(3px)",
+      },
+      "& .MuiDrawer-paper": {
+        boxShadow: xxl,
+        border: "none",
+        width: "min(250px, calc(100vw - 48px))",
+        maxWidth: "calc(100vw - 24px)",
+        overflowX: "hidden",
+        background: backgroundValue,
+        borderRadius: "0 1.5rem 1.5rem 0",
+      },
+    };
+  }
+
   // styles for the sidenav when miniSidenav={false}
   const drawerOpenStyles = () => ({
     background: backgroundValue,
@@ -45,7 +63,7 @@ export default styled(Drawer)(({ theme, ownerState }) => {
       duration: transitions.duration.shorter,
     }),
 
-    [breakpoints.up("xl")]: {
+    [breakpoints.up("lg")]: {
       boxShadow: transparentSidenav ? "none" : xxl,
       marginBottom: transparentSidenav ? 0 : "inherit",
       left: "0",
@@ -67,7 +85,7 @@ export default styled(Drawer)(({ theme, ownerState }) => {
       duration: transitions.duration.shorter,
     }),
 
-    [breakpoints.up("xl")]: {
+    [breakpoints.up("lg")]: {
       boxShadow: transparentSidenav ? "none" : xxl,
       marginBottom: transparentSidenav ? 0 : "inherit",
       left: "0",

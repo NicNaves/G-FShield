@@ -4,6 +4,9 @@ const graspExecutionStoreService = require("../services/GraspExecutionStoreServi
 const datasetCatalogService = require("../services/DatasetCatalogService");
 const executionQueueService = require("../services/ExecutionQueueService");
 const environmentResetService = require("../services/EnvironmentResetService");
+const appCacheService = require("../services/AppCacheService");
+const graspDashboardAggregateService = require("../services/GraspDashboardAggregateService");
+const graspMonitorFeedService = require("../services/GraspMonitorFeedService");
 const { MONITOR_SCHEMA_VERSION, graspMonitorSummaryService } = require("../services/GraspMonitorSummaryService");
 
 class GraspController {
@@ -119,6 +122,50 @@ class GraspController {
       : storedRun;
   }
 
+  resolveCacheTtlMs(kind = "default") {
+    const specificTtls = {
+      runs: Number(process.env.GRASP_RUNS_CACHE_TTL_MS || 2500),
+      run: Number(process.env.GRASP_RUN_CACHE_TTL_MS || 4000),
+      events: Number(process.env.GRASP_EVENTS_CACHE_TTL_MS || 2500),
+      summary: Number(process.env.GRASP_SUMMARY_CACHE_TTL_MS || 4000),
+      launch: Number(process.env.GRASP_LAUNCH_CACHE_TTL_MS || 5000),
+      compare: Number(process.env.GRASP_COMPARE_CACHE_TTL_MS || 5000),
+      bootstrap: Number(process.env.GRASP_BOOTSTRAP_CACHE_TTL_MS || 2500),
+      projection: Number(process.env.GRASP_PROJECTION_CACHE_TTL_MS || 2500),
+      dashboard: Number(process.env.GRASP_DASHBOARD_CACHE_TTL_MS || 5000),
+      feed: Number(process.env.GRASP_FEED_CACHE_TTL_MS || 2500),
+    };
+
+    return Math.max(specificTtls[kind] || Number(process.env.API_CACHE_TTL_MS || 5000), 250);
+  }
+
+  async buildMonitorBootstrap({ runLimit = 100, eventLimit = 300, historyLimit = 30 } = {}) {
+    if (graspExecutionMonitorService.canServeWindow({ runLimit, eventLimit, historyLimit })) {
+      const projection = graspExecutionMonitorService.getProjection();
+      return {
+        runs: graspExecutionMonitorService.getRuns(runLimit),
+        events: graspExecutionMonitorService.getEvents(eventLimit),
+        summary: projection.summary,
+        projection,
+      };
+    }
+
+    const liveRuns = graspExecutionMonitorService.getRuns();
+    const storedRuns = await graspExecutionStoreService.listRuns(runLimit, historyLimit);
+    const liveEvents = graspExecutionMonitorService.getEvents(eventLimit);
+    const storedEvents = await graspExecutionStoreService.listEvents(eventLimit);
+    const runs = this.mergeRuns(storedRuns, liveRuns);
+    const events = this.mergeEvents(storedEvents, liveEvents, eventLimit);
+    const summary = graspMonitorSummaryService.summarize(runs, events);
+
+    return {
+      runs,
+      events,
+      summary,
+      projection: graspExecutionMonitorService.getProjection(),
+    };
+  }
+
   buildRunComparison(runs = []) {
     const validRuns = runs.filter(Boolean);
     const scores = validRuns
@@ -175,6 +222,7 @@ class GraspController {
       }
 
       const launch = await executionQueueService.enqueueExecution(payload, req.user);
+      await appCacheService.clear();
 
       res.status(202).json(this.buildEnvelope({
         message: "Execution queued successfully.",
@@ -196,11 +244,20 @@ class GraspController {
 
   async getExecutionLaunch(req, res, next) {
     try {
-      const launch = await executionQueueService.getLaunch(req.params.requestId, {
+      const options = {
         includeMonitor: String(req.query.includeMonitor || "false").toLowerCase() === "true",
         historyLimit: Number(req.query.historyLimit || process.env.GRASP_RUN_HISTORY_LIMIT || 2000),
         eventLimit: Number(req.query.eventLimit || process.env.GRASP_EVENT_EXPORT_LIMIT || 5000),
+      };
+      const cacheKey = appCacheService.buildKey("execution-launch", {
+        requestId: req.params.requestId,
+        ...options,
       });
+      const launch = await appCacheService.remember(
+        cacheKey,
+        () => executionQueueService.getLaunch(req.params.requestId, options),
+        this.resolveCacheTtlMs("launch")
+      );
       if (!launch) {
         return res.status(404).json({ error: "Execution launch not found." });
       }
@@ -214,6 +271,7 @@ class GraspController {
   async cancelExecution(req, res, next) {
     try {
       const launch = await executionQueueService.cancelExecution(req.params.requestId);
+      await appCacheService.clear();
       res.json(this.buildEnvelope({
         message: "Execution cancellation processed.",
         launch,
@@ -240,12 +298,28 @@ class GraspController {
 
   async getRuns(req, res, next) {
     try {
-      const liveRuns = graspExecutionMonitorService.getRuns();
-      const storedRuns = await graspExecutionStoreService.listRuns(
-        Number(req.query.limit || 100),
-        Number(req.query.historyLimit || process.env.GRASP_RUN_SUMMARY_HISTORY_LIMIT || 30)
+      const options = {
+        limit: Number(req.query.limit || 100),
+        historyLimit: Number(req.query.historyLimit || process.env.GRASP_RUN_SUMMARY_HISTORY_LIMIT || 30),
+      };
+      const cacheKey = appCacheService.buildKey("monitor-runs", options);
+      const runs = await appCacheService.remember(
+        cacheKey,
+        async () => {
+          if (graspExecutionMonitorService.canServeWindow({
+            runLimit: options.limit,
+            eventLimit: 0,
+            historyLimit: options.historyLimit,
+          })) {
+            return graspExecutionMonitorService.getRuns(options.limit);
+          }
+
+          const liveRuns = graspExecutionMonitorService.getRuns();
+          const storedRuns = await graspExecutionStoreService.listRuns(options.limit, options.historyLimit);
+          return this.mergeRuns(storedRuns, liveRuns);
+        },
+        this.resolveCacheTtlMs("runs")
       );
-      const runs = this.mergeRuns(storedRuns, liveRuns);
 
       res.json(this.buildEnvelope({ runs }));
     } catch (error) {
@@ -255,9 +329,15 @@ class GraspController {
 
   async getRun(req, res, next) {
     try {
-      const run = await this.loadMergedRun(
-        req.params.seedId,
-        Number(req.query.historyLimit || process.env.GRASP_RUN_HISTORY_LIMIT || 2000)
+      const historyLimit = Number(req.query.historyLimit || process.env.GRASP_RUN_HISTORY_LIMIT || 2000);
+      const cacheKey = appCacheService.buildKey("monitor-run", {
+        seedId: req.params.seedId,
+        historyLimit,
+      });
+      const run = await appCacheService.remember(
+        cacheKey,
+        () => this.loadMergedRun(req.params.seedId, historyLimit),
+        this.resolveCacheTtlMs("run")
       );
 
       if (!run) {
@@ -277,13 +357,20 @@ class GraspController {
         return res.status(400).json({ error: "Select at least two seedIds to compare." });
       }
 
-      const runs = (
-        await Promise.all(
-          seedIds.map((seedId) =>
-            this.loadMergedRun(seedId, Number(req.query.historyLimit || process.env.GRASP_RUN_SUMMARY_HISTORY_LIMIT || 50))
+      const historyLimit = Number(req.query.historyLimit || process.env.GRASP_RUN_SUMMARY_HISTORY_LIMIT || 50);
+      const cacheKey = appCacheService.buildKey("monitor-compare", {
+        seedIds,
+        historyLimit,
+      });
+      const runs = await appCacheService.remember(
+        cacheKey,
+        async () => (
+          await Promise.all(
+            seedIds.map((seedId) => this.loadMergedRun(seedId, historyLimit))
           )
-        )
-      ).filter(Boolean);
+        ).filter(Boolean),
+        this.resolveCacheTtlMs("compare")
+      );
 
       res.json(this.buildEnvelope({
         comparison: this.buildRunComparison(runs),
@@ -297,9 +384,24 @@ class GraspController {
   async getEvents(req, res, next) {
     try {
       const limit = Number(req.query.limit || 500);
-      const liveEvents = graspExecutionMonitorService.getEvents(limit);
-      const storedEvents = await graspExecutionStoreService.listEvents(limit);
-      const events = this.mergeEvents(storedEvents, liveEvents, limit);
+      const cacheKey = appCacheService.buildKey("monitor-events", { limit });
+      const events = await appCacheService.remember(
+        cacheKey,
+        async () => {
+          if (graspExecutionMonitorService.canServeWindow({
+            runLimit: 0,
+            eventLimit: limit,
+            historyLimit: 0,
+          })) {
+            return graspExecutionMonitorService.getEvents(limit);
+          }
+
+          const liveEvents = graspExecutionMonitorService.getEvents(limit);
+          const storedEvents = await graspExecutionStoreService.listEvents(limit);
+          return this.mergeEvents(storedEvents, liveEvents, limit);
+        },
+        this.resolveCacheTtlMs("events")
+      );
 
       res.json(this.buildEnvelope({ events }));
     } catch (error) {
@@ -309,18 +411,112 @@ class GraspController {
 
   async getSummary(req, res, next) {
     try {
-      const runLimit = Number(req.query.runLimit || 300);
-      const eventLimit = Number(req.query.eventLimit || 300);
-      const historyLimit = Number(req.query.historyLimit || process.env.GRASP_RUN_SUMMARY_HISTORY_LIMIT || 30);
-      const liveRuns = graspExecutionMonitorService.getRuns();
-      const storedRuns = await graspExecutionStoreService.listRuns(runLimit, historyLimit);
-      const liveEvents = graspExecutionMonitorService.getEvents(eventLimit);
-      const storedEvents = await graspExecutionStoreService.listEvents(eventLimit);
-      const runs = this.mergeRuns(storedRuns, liveRuns);
-      const events = this.mergeEvents(storedEvents, liveEvents, eventLimit);
-      const summary = graspMonitorSummaryService.summarize(runs, events);
+      const options = {
+        runLimit: Number(req.query.runLimit || 300),
+        eventLimit: Number(req.query.eventLimit || 300),
+        historyLimit: Number(req.query.historyLimit || process.env.GRASP_RUN_SUMMARY_HISTORY_LIMIT || 30),
+      };
+      const cacheKey = appCacheService.buildKey("monitor-summary", options);
+      const summary = await appCacheService.remember(
+        cacheKey,
+        async () => {
+          if (graspExecutionMonitorService.canServeWindow(options)) {
+            return graspExecutionMonitorService.getSummary();
+          }
+
+          const bootstrap = await this.buildMonitorBootstrap(options);
+          return bootstrap.summary;
+        },
+        this.resolveCacheTtlMs("summary")
+      );
 
       res.json(this.buildEnvelope({ summary }));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getBootstrap(req, res, next) {
+    try {
+      const options = {
+        runLimit: Number(req.query.limit || 100),
+        eventLimit: Number(req.query.eventLimit || 300),
+        historyLimit: Number(req.query.historyLimit || process.env.GRASP_RUN_SUMMARY_HISTORY_LIMIT || 30),
+      };
+      const cacheKey = appCacheService.buildKey("monitor-bootstrap", options);
+      const bootstrap = await appCacheService.remember(
+        cacheKey,
+        () => this.buildMonitorBootstrap(options),
+        this.resolveCacheTtlMs("bootstrap")
+      );
+
+      res.json(this.buildEnvelope(bootstrap));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getProjection(req, res, next) {
+    try {
+      const cacheKey = appCacheService.buildKey("monitor-projection", {
+        bucketLimit: Number(req.query.bucketLimit || 72),
+      });
+      const projection = await appCacheService.remember(
+        cacheKey,
+        () => graspExecutionMonitorService.getProjection({
+          bucketLimit: Number(req.query.bucketLimit || 72),
+        }),
+        this.resolveCacheTtlMs("projection")
+      );
+
+      res.json(this.buildEnvelope({ projection }));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getFeed(req, res, next) {
+    try {
+      const options = {
+        page: Number(req.query.page || 1),
+        pageSize: Number(req.query.pageSize || process.env.GRASP_FEED_PAGE_SIZE || 25),
+        topics: req.query.topics || "",
+        algorithm: req.query.algorithm || "",
+        datasetKey: req.query.datasetKey || "",
+        status: req.query.status || "",
+        searchLabel: req.query.searchLabel || "",
+        requestId: req.query.requestId || "",
+        seedId: req.query.seedId || "",
+        start: req.query.start || "",
+        end: req.query.end || "",
+        query: req.query.query || "",
+      };
+      const cacheKey = appCacheService.buildKey("monitor-feed", options);
+      const feed = await appCacheService.remember(
+        cacheKey,
+        () => graspMonitorFeedService.listFeed(options),
+        this.resolveCacheTtlMs("feed")
+      );
+
+      res.json(this.buildEnvelope({ feed }));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getDashboardAggregate(req, res, next) {
+    try {
+      const options = {
+        bucketLimit: Number(req.query.bucketLimit || process.env.GRASP_DASHBOARD_BUCKET_LIMIT || 72),
+      };
+      const cacheKey = appCacheService.buildKey("monitor-dashboard-v2", options);
+      const dashboard = await appCacheService.remember(
+        cacheKey,
+        () => graspDashboardAggregateService.getDashboardAggregate(options),
+        this.resolveCacheTtlMs("dashboard")
+      );
+
+      res.json(this.buildEnvelope({ dashboard }));
     } catch (error) {
       next(error);
     }
@@ -331,6 +527,7 @@ class GraspController {
       graspExecutionMonitorService.reset();
       await executionQueueService.reset();
       await graspExecutionStoreService.resetMonitorState();
+      await appCacheService.clear();
       res.json(this.buildEnvelope({
         message: "Monitor state reset successfully.",
         summary: graspMonitorSummaryService.summarize([], []),
@@ -343,6 +540,7 @@ class GraspController {
   async resetEnvironment(req, res, next) {
     try {
       const result = await environmentResetService.resetEnvironment();
+      await appCacheService.clear();
       res.json(this.buildEnvelope({
         message: "Distributed environment reset successfully.",
         reset: result,

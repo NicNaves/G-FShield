@@ -6,6 +6,8 @@ param(
   [switch]$SkipInstall,
   [int]$ApiPort = 4000,
   [int]$FrontendPort = 3000,
+  [ValidateSet("Dev", "Preview")]
+  [string]$FrontendMode = "Dev",
   [string]$PublicFrontOrigin = "",
   [string]$CorsOrigins = "",
   [string]$ApiHealthcheckUrl = "",
@@ -72,6 +74,7 @@ $apiCacheVolume = "$composeProjectName-api-cache-local"
 $frontCacheVolume = "$composeProjectName-front-cache-local"
 $composeNetworkName = "$composeProjectName`_default"
 $useDockerNode = -not [string]::IsNullOrWhiteSpace($DevNodeImage)
+$frontendModeNormalized = $FrontendMode.ToLowerInvariant()
 
 function Get-NpmCommand {
   $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
@@ -455,7 +458,7 @@ if ($useDockerNode) {
     Invoke-DockerNodeInstall -Image $DevNodeImage -WorkingDirectory $apiDir -NodeModulesVolume $apiNodeModulesVolume -HomeVolume $apiHomeVolume -CacheVolume $apiCacheVolume -RequiredBinary "node_modules/.bin/nodemon"
 
     Write-Host "Instalando dependencias de webservice/front em container..."
-    Invoke-DockerNodeInstall -Image $DevNodeImage -WorkingDirectory $frontDir -NodeModulesVolume $frontNodeModulesVolume -HomeVolume $frontHomeVolume -CacheVolume $frontCacheVolume -RequiredBinary "node_modules/.bin/react-scripts"
+    Invoke-DockerNodeInstall -Image $DevNodeImage -WorkingDirectory $frontDir -NodeModulesVolume $frontNodeModulesVolume -HomeVolume $frontHomeVolume -CacheVolume $frontCacheVolume -RequiredBinary "node_modules/.bin/vite"
   }
 
   $apiEnvironment = @{
@@ -485,10 +488,13 @@ if ($useDockerNode) {
     PORT = "$FrontendPort"
     HOST = "0.0.0.0"
     BROWSER = "none"
-    CHOKIDAR_USEPOLLING = "true"
-    WATCHPACK_POLLING = "true"
+    FRONTEND_MODE = $frontendModeNormalized
     REACT_APP_API_URL = "http://localhost:$ApiPort/api"
     REACT_APP_AUTH_DISABLED = $frontAuthDisabled
+  }
+  if ($FrontendMode -eq "Dev") {
+    $frontEnvironment.CHOKIDAR_USEPOLLING = "true"
+    $frontEnvironment.CHOKIDAR_INTERVAL = "1000"
   }
 
   $apiShellCommand = @"
@@ -508,7 +514,12 @@ npm run dev
 
   $frontShellCommand = @"
 set -e
-npm start
+if [ "`$FRONTEND_MODE" = "preview" ]; then
+  npm run build
+  npm run preview
+else
+  npm start
+fi
 "@
 
   Write-Host "Iniciando API local em container..."
@@ -544,9 +555,19 @@ Set-Location '$apiDir'
 Set-Location '$frontDir'
 `$env:BROWSER = 'none'
 `$env:PORT = '$FrontendPort'
+`$env:FRONTEND_MODE = '$frontendModeNormalized'
 `$env:REACT_APP_API_URL = 'http://localhost:$ApiPort/api'
 `$env:REACT_APP_AUTH_DISABLED = '$frontAuthDisabled'
-& '$npmCommand' start
+if ('$FrontendMode' -eq 'Preview') {
+  & '$npmCommand' run build
+  if (`$LASTEXITCODE -ne 0) { exit `$LASTEXITCODE }
+  & '$npmCommand' run preview
+}
+else {
+  `$env:CHOKIDAR_USEPOLLING = 'true'
+  `$env:CHOKIDAR_INTERVAL = '1000'
+  & '$npmCommand' start
+}
 "@
 
   Write-Host "Abrindo API em nova janela..."
@@ -589,8 +610,9 @@ Write-Host "Ambiente iniciado."
 Write-Host "Front: http://localhost:$FrontendPort"
 Write-Host "API: http://localhost:$ApiPort"
 Write-Host "Swagger: http://localhost:$ApiPort/api-docs"
-Write-Host "Conduktor: http://localhost:8080"
+Write-Host "Kafbat: http://localhost:8080"
 Write-Host "Modo de autenticacao: $AuthMode"
+Write-Host "Modo do front: $FrontendMode"
 if ($useDockerNode) {
   Write-Host "Node em Docker: $DevNodeImage"
 }

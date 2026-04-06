@@ -19,6 +19,7 @@
     "@mapbox/mapbox-gl-geocoder": "^5.0.3",
     "@mui/icons-material": "5.11.16",
     "@mui/material": "5.12.3",
+    "@tanstack/react-query": "^5.96.2",
     "axios": "^1.7.7",
     "chart.js": "4.3.0",
     "chroma-js": "2.4.2",
@@ -40,8 +41,10 @@
     "yup": "1.1.1"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "dev": "vite --host 0.0.0.0 --port 3000",
+    "start": "vite --host 0.0.0.0 --port 3000",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 3000",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "postinstall": "node scripts/ensure-stylis-rtl-sourcemap.js",
@@ -69,12 +72,14 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@vitejs/plugin-react": "^6.0.1",
     "ajv": "^7.2.4",
     "eslint": "8.39.0",
     "eslint-plugin-import": "2.27.5",
     "eslint-plugin-jsx-a11y": "6.7.1",
     "eslint-plugin-react": "7.32.2",
-    "eslint-plugin-react-hooks": "4.6.0"
+    "eslint-plugin-react-hooks": "4.6.0",
+    "vite": "^8.0.3"
   },
   "overrides": {
     "svgo": "3.0.2"

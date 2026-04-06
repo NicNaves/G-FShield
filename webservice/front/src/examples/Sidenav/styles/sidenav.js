@@ -28,7 +28,7 @@ export default function sidenavLogoLabel(theme, ownerState) {
       duration: transitions.duration.standard,
     }),
 
-    [breakpoints.up("xl")]: {
+    [breakpoints.up("lg")]: {
       opacity: miniSidenav ? 0 : 1,
     },
   };

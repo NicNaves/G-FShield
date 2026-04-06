@@ -38,22 +38,32 @@ function DashboardLayout({ children }) {
 
   return (
     <MDBox
-      sx={({ breakpoints, transitions, functions: { pxToRem } }) => ({
-        p: 3,
+      sx={({ breakpoints, transitions, functions: { pxToRem } }) => {
+        const desktopSidebarWidth = miniSidenav ? pxToRem(120) : pxToRem(274);
+
+        return ({
+        p: { xs: 1.5, sm: 2, md: 3 },
         position: "relative",
         minHeight: "100vh",
+        width: "100%",
+        maxWidth: "100%",
+        overflowX: "hidden",
         background: darkMode
           ? "radial-gradient(circle at top right, rgba(78, 161, 255, 0.08), transparent 26%), transparent"
           : "radial-gradient(circle at top right, rgba(61, 142, 245, 0.08), transparent 24%), transparent",
 
-        [breakpoints.up("xl")]: {
-          marginLeft: miniSidenav ? pxToRem(120) : pxToRem(274),
+        [breakpoints.up("lg")]: {
+          marginLeft: desktopSidebarWidth,
+          width: `calc(100% - ${desktopSidebarWidth})`,
+          maxWidth: `calc(100% - ${desktopSidebarWidth})`,
+          minWidth: 0,
           transition: transitions.create(["margin-left", "margin-right"], {
             easing: transitions.easing.easeInOut,
             duration: transitions.duration.standard,
           }),
         },
-      })}
+      });
+      }}
     >
       {children}
     </MDBox>

@@ -98,7 +98,7 @@ const navbarRow = ({ breakpoints }, { isMini }) => ({
     width: isMini ? "100%" : "max-content",
   },
 
-  [breakpoints.up("xl")]: {
+  [breakpoints.up("lg")]: {
     justifyContent: "stretch !important",
     width: "max-content !important",
   },
@@ -126,7 +126,7 @@ const navbarMobileMenu = ({ breakpoints }) => ({
   display: "inline-block",
   lineHeight: 0,
 
-  [breakpoints.up("xl")]: {
+  [breakpoints.up("lg")]: {
     display: "none",
   },
 });

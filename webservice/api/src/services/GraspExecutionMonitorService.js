@@ -1,6 +1,7 @@
 const { Kafka } = require("kafkajs");
 const { kafkaBrokers, monitorTopics } = require("../config/graspFsConfig");
 const graspExecutionStoreService = require("./GraspExecutionStoreService");
+const graspMonitorProjectionService = require("./GraspMonitorProjectionService");
 const { MONITOR_SCHEMA_VERSION, graspMonitorSummaryService } = require("./GraspMonitorSummaryService");
 const logger = require("../utils/jsonLogger");
 
@@ -202,6 +203,9 @@ class GraspExecutionMonitorService {
       this.runs = new Map(mergedRuns.map((run) => [run.seedId, run]));
       this.events = this.mergeEvents(storedEvents, this.getEvents(this.storeBootstrapEventLimit), this.storeBootstrapEventLimit);
       this.rehydratedAt = new Date().toISOString();
+      graspMonitorProjectionService.rehydrate(mergedRuns, this.events, {
+        hydratedAt: this.rehydratedAt,
+      });
 
       logger.info("Monitor reidratado a partir do store persistido", {
         runs: mergedRuns.length,
@@ -361,6 +365,7 @@ class GraspExecutionMonitorService {
         status: execution.status,
         })),
     });
+    graspMonitorProjectionService.applyEvent(event);
 
     graspExecutionStoreService.recordGatewayDispatch(dispatchResult).catch((error) => {
       logger.error("Falha ao persistir disparo do gateway", {
@@ -517,6 +522,7 @@ class GraspExecutionMonitorService {
     };
 
     this.runs.set(seedId, run);
+    graspMonitorProjectionService.applyRun(run);
     const { history, ...runWithoutHistory } = run;
 
     const event = {
@@ -537,7 +543,8 @@ class GraspExecutionMonitorService {
     };
 
     if (!this.isProgressTopic(topic) || this.exposeProgressEvents) {
-      this.pushEvent(event);
+      const broadcastEvent = this.pushEvent(event);
+      graspMonitorProjectionService.applyEvent(broadcastEvent);
     }
 
     if (eventType !== "kafka.progress" || this.persistProgressEvents) {
@@ -646,24 +653,58 @@ class GraspExecutionMonitorService {
   async sendSnapshotToClient(res) {
     const snapshotLimit = Number(process.env.GRASP_MONITOR_SNAPSHOT_LIMIT || 200);
     const eventLimit = Number(process.env.GRASP_MONITOR_SNAPSHOT_EVENT_LIMIT || 200);
-    const [storedRuns, storedEvents] = await Promise.all([
-      graspExecutionStoreService.listRuns(snapshotLimit),
-      graspExecutionStoreService.listEvents(eventLimit),
-    ]);
+    const canServeProjection = this.canServeWindow({
+      runLimit: snapshotLimit,
+      eventLimit,
+      historyLimit: this.storeBootstrapHistoryLimit,
+    });
+    const snapshot = canServeProjection
+      ? {
+          schemaVersion: MONITOR_SCHEMA_VERSION,
+          type: "snapshot",
+          runs: this.getRuns(snapshotLimit),
+          events: this.getEvents(eventLimit),
+          summary: graspMonitorProjectionService.getSummary(),
+          projection: graspMonitorProjectionService.getProjection(),
+        }
+      : (() => {
+          const fallback = {
+            schemaVersion: MONITOR_SCHEMA_VERSION,
+            type: "snapshot",
+            runs: [],
+            events: [],
+          };
 
-    const snapshot = {
-      schemaVersion: MONITOR_SCHEMA_VERSION,
-      type: "snapshot",
-      runs: this.mergeRuns(storedRuns, this.getRuns()),
-      events: this.mergeEvents(storedEvents, this.getEvents(eventLimit), eventLimit),
-    };
-    snapshot.summary = graspMonitorSummaryService.summarize(snapshot.runs, snapshot.events);
+          return Promise.all([
+            graspExecutionStoreService.listRuns(snapshotLimit),
+            graspExecutionStoreService.listEvents(eventLimit),
+          ]).then(([storedRuns, storedEvents]) => ({
+            ...fallback,
+            runs: this.mergeRuns(storedRuns, this.getRuns()),
+            events: this.mergeEvents(storedEvents, this.getEvents(eventLimit), eventLimit),
+          })).then((resolvedSnapshot) => ({
+            ...resolvedSnapshot,
+            summary: graspMonitorSummaryService.summarize(resolvedSnapshot.runs, resolvedSnapshot.events),
+          }));
+        })();
 
-    res.write(`data: ${JSON.stringify(snapshot)}\n\n`);
+    const resolvedSnapshot = await snapshot;
+    res.write(`data: ${JSON.stringify(resolvedSnapshot)}\n\n`);
   }
 
-  getRuns() {
-    return [...this.runs.values()].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  canServeWindow({ runLimit = 0, eventLimit = 0, historyLimit = 0 } = {}) {
+    if (!this.rehydratedAt) {
+      return false;
+    }
+
+    return runLimit <= this.storeBootstrapRunLimit
+      && eventLimit <= this.storeBootstrapEventLimit
+      && historyLimit <= this.storeBootstrapHistoryLimit;
+  }
+
+  getRuns(limit = null) {
+    const runs = [...this.runs.values()].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    return Number.isFinite(limit) ? runs.slice(0, Math.max(Number(limit) || 0, 0)) : runs;
   }
 
   getRun(seedId) {
@@ -674,9 +715,19 @@ class GraspExecutionMonitorService {
     return this.events.slice(0, limit);
   }
 
+  getProjection(options = {}) {
+    return graspMonitorProjectionService.getProjection(options);
+  }
+
+  getSummary() {
+    return graspMonitorProjectionService.getSummary();
+  }
+
   reset() {
     this.runs.clear();
     this.events = [];
+    this.rehydratedAt = null;
+    graspMonitorProjectionService.reset();
     this.broadcast({
       schemaVersion: MONITOR_SCHEMA_VERSION,
       type: "snapshot",

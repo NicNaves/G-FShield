@@ -125,13 +125,23 @@ O dashboard atual cobre monitoramento operacional e analise:
 
 Melhorias recentes refletidas no front:
 
+- migracao do front para `Vite`, com lazy loading por rota
+- `TanStack Query` para cache de detalhes de request e run
 - exportacao em CSV e JSON no dashboard e nas tabelas compartilhadas
 - exportacao por request inteira, run inteira e recorte visivel da timeline
 - filtros de tempo com calendario, busca por timestamp e janela padrao de `15m`
 - grafico de atividade por horario
 - `DLS Outcome Summary` mostrando atividade visivel de `BIT_FLIP`, `IWSS` e `IWSSR`, nao apenas a busca final vencedora
 - `Run Comparison Studio`
+- tabelas pesadas com virtualizacao de janela no feed analitico e no historico de run
 - modo escuro e tipografia refinados
+
+Melhorias recentes refletidas na API:
+
+- cache em memoria com `Redis` opcional
+- bootstrap agregado em `GET /api/grasp/monitor/bootstrap`
+- projecao incremental do monitor em `GET /api/grasp/monitor/projection`
+- resumo do monitor servido a partir da janela viva quando possivel, com fallback para o store persistido
 
 ### Autenticacao
 
@@ -275,13 +285,23 @@ The current dashboard covers both operational monitoring and analysis:
 
 Recent front-end improvements now documented in the project:
 
+- front-end migration to `Vite`, with route-level lazy loading
+- `TanStack Query` for request/run detail caching
 - CSV and JSON export in the dashboard and shared tables
 - export by full request, full run, and visible timeline slice
 - time filters with calendar inputs, timestamp search, and a default `15m` window
 - hourly activity chart
 - `DLS Outcome Summary` showing visible `BIT_FLIP`, `IWSS`, and `IWSSR` activity instead of only the winning final search
 - `Run Comparison Studio`
+- virtualized heavy tables for the analytics feed and run history
 - refined dark theme and typography
+
+Recent API improvements now documented in the project:
+
+- in-memory cache with optional `Redis`
+- aggregated bootstrap at `GET /api/grasp/monitor/bootstrap`
+- incremental monitor projection at `GET /api/grasp/monitor/projection`
+- live-window summaries served from memory when possible, with persisted-store fallback
 
 ### Authentication
 

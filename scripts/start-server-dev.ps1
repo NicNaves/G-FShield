@@ -5,6 +5,9 @@ param(
   [switch]$DispatchSampleRun,
   [int]$ApiPort = 4000,
   [int]$FrontendPort = 3000,
+  [string]$PublicFrontOrigin = "",
+  [string]$CorsOrigins = "",
+  [string]$ApiHealthcheckUrl = "",
   [int]$MaxGenerations = 2,
   [int]$RclCutoff = 30,
   [int]$SampleSize = 5,
@@ -18,9 +21,35 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
+function Get-NormalizedProjectName {
+  param(
+    [string]$Name
+  )
+
+  return (($Name.ToLowerInvariant() -replace "[^a-z0-9]+", "-") -replace "^-+", "") -replace "-+$", ""
+}
+
+function Resolve-RepoRootPath {
+  param(
+    [string]$Path
+  )
+
+  $item = Get-Item -LiteralPath $Path
+  if ($item.LinkType -and $item.Target) {
+    return [string]($item.Target | Select-Object -First 1)
+  }
+
+  return $item.FullName
+}
+
+$scriptRepoRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Resolve-RepoRootPath -Path $scriptRepoRoot
+$repoName = Split-Path -Leaf $repoRoot
+$composeProjectName = Get-NormalizedProjectName -Name $repoName
 $apiDir = Join-Path $repoRoot "webservice/api"
 $frontDir = Join-Path $repoRoot "webservice/front"
+$datasetsDir = Join-Path $repoRoot "datasets"
+$metricsDir = Join-Path $repoRoot "metrics"
 $rootComposeFile = Join-Path $repoRoot "docker-compose.yml"
 $rootPresetComposeFile = Join-Path $repoRoot "docker-compose.server.yml"
 $dbComposeFile = Join-Path $apiDir "docker-compose.db.yml"
@@ -46,11 +75,17 @@ function Get-NpmCommand {
 function Invoke-Compose {
   param(
     [string]$WorkingDirectory,
-    [string[]]$Arguments
+    [string[]]$Arguments,
+    [string]$ProjectName = ""
   )
 
   Push-Location $WorkingDirectory
   try {
+    if ($ProjectName) {
+      & docker compose -p $ProjectName @Arguments
+      return
+    }
+
     & docker compose @Arguments
   }
   finally {
@@ -173,6 +208,17 @@ $apiAuthDisabled = if ($useMockAuth) { "true" } else { "false" }
 $apiMockDataEnabled = if ($useMockAuth) { "true" } else { "false" }
 $frontAuthDisabled = if ($useMockAuth) { "true" } else { "false" }
 
+if ([string]::IsNullOrWhiteSpace($CorsOrigins)) {
+  $CorsOrigins = "http://localhost:$FrontendPort,http://127.0.0.1:$FrontendPort,http://localhost:$ApiPort"
+  if (-not [string]::IsNullOrWhiteSpace($PublicFrontOrigin)) {
+    $CorsOrigins = "$CorsOrigins,$PublicFrontOrigin"
+  }
+}
+
+if ([string]::IsNullOrWhiteSpace($ApiHealthcheckUrl)) {
+  $ApiHealthcheckUrl = "http://localhost:$ApiPort/api-docs"
+}
+
 if (-not (Test-Path $stateDir)) {
   New-Item -ItemType Directory -Path $stateDir | Out-Null
 }
@@ -185,7 +231,7 @@ if ($Rebuild) {
 }
 
 Write-Host "Subindo stack server do GF-Shield..."
-Invoke-Compose -WorkingDirectory $repoRoot -Arguments $rootComposeArgs
+Invoke-Compose -WorkingDirectory $repoRoot -Arguments $rootComposeArgs -ProjectName $composeProjectName
 
 Write-Host "Subindo banco server do webservice/api..."
 Invoke-Compose -WorkingDirectory $repoRoot -Arguments @("-f", $dbComposeFile, "-f", $dbPresetComposeFile, "up", "-d")
@@ -216,6 +262,12 @@ Set-Location '$apiDir'
 `$env:API_PORT = '$ApiPort'
 `$env:AUTH_DISABLED = '$apiAuthDisabled'
 `$env:MOCK_DATA_ENABLED = '$apiMockDataEnabled'
+`$env:CORS_ORIGINS = '$CorsOrigins'
+`$env:GRASP_DATASETS_DIR = '$datasetsDir'
+`$env:GF_SHIELD_PROJECT_ROOT = '$repoRoot'
+`$env:GF_SHIELD_METRICS_DIR = '$metricsDir'
+`$env:GF_SHIELD_COMPOSE_PROJECT_NAME = '$composeProjectName'
+`$env:GF_SHIELD_COMPOSE_FILES = 'docker-compose.yml,docker-compose.server.yml'
 & '$npmCommand' run dev
 "@
 
@@ -238,8 +290,8 @@ $state = [PSCustomObject]@{
 
 $state | ConvertTo-Json -Depth 4 | Set-Content -Path $stateFile
 
-Write-Host "Aguardando API responder em http://localhost:$ApiPort/api/grasp/services ..."
-Wait-ForHttp -Url "http://localhost:$ApiPort/api/grasp/services"
+Write-Host "Aguardando API responder em $ApiHealthcheckUrl ..."
+Wait-ForHttp -Url $ApiHealthcheckUrl
 
 Write-Host "Aguardando front responder em $frontHealthcheckUrl ..."
 Wait-ForHttp -Url $frontHealthcheckUrl
@@ -260,5 +312,5 @@ Write-Host "Ambiente server iniciado."
 Write-Host "Front: http://localhost:$FrontendPort"
 Write-Host "API: http://localhost:$ApiPort"
 Write-Host "Swagger: http://localhost:$ApiPort/api-docs"
-Write-Host "Conduktor: http://localhost:8080"
+Write-Host "Kafbat: http://localhost:8080"
 Write-Host "Modo de autenticacao: $AuthMode"

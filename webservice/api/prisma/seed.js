@@ -1,8 +1,8 @@
-const bcrypt = require("bcrypt");
+const passwordHasher = require("../src/utils/passwordHasher");
 const prisma = require("../src/lib/prisma");
 
 async function main() {
-  const hashedPassword = await bcrypt.hash("senhaSegura123", 10);
+  const hashedPassword = await passwordHasher.hash("senhaSegura123", 10);
 
   const adminUsers = [
     {

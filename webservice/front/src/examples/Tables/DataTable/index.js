@@ -13,11 +13,12 @@ Coded by www.creative-tim.com
 * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 
-import { isValidElement, useMemo, useEffect, useState } from "react";
+import { isValidElement, useMemo, useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
-import { useTable, usePagination, useGlobalFilter, useAsyncDebounce, useSortBy } from "react-table";
+import { useTable, usePagination, useGlobalFilter, useSortBy } from "react-table";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
 import TableContainer from "@mui/material/TableContainer";
 import TableRow from "@mui/material/TableRow";
 import Icon from "@mui/material/Icon";
@@ -133,14 +134,32 @@ function DataTable({
   pagination,
   isSorted,
   noEndBorder,
+  virtualization,
+  serverPagination,
 }) {
   const { t } = useI18n();
   const defaultValue = entriesPerPage.defaultValue ? entriesPerPage.defaultValue : 10;
   const entries = entriesPerPage.entries
     ? entriesPerPage.entries.map((entry) => entry.toString())
     : ["5", "10", "15", "20", "25"];
-  const columns = useMemo(() => table.columns, [table]);
-  const data = useMemo(() => table.rows, [table]);
+  const columns = useMemo(() => table.columns, [table.columns]);
+  const data = useMemo(() => table.rows, [table.rows]);
+  const tableContainerRef = useRef(null);
+  const tableHeadRef = useRef(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [tableHeadHeight, setTableHeadHeight] = useState(0);
+  const serverPaginationConfig =
+    serverPagination && typeof serverPagination === "object" ? serverPagination : null;
+  const manualPaginationEnabled = Boolean(serverPaginationConfig);
+  const virtualizationConfig = virtualization && typeof virtualization === "object" ? virtualization : {};
+  const virtualizationEnabled = virtualizationConfig.enabled !== false;
+  const virtualizationRowHeight = Math.max(Number(virtualizationConfig.rowHeight || 60) || 60, 44);
+  const virtualizationMaxHeight = Math.max(
+    Number(virtualizationConfig.maxHeight || 420) || 420,
+    virtualizationRowHeight * 4
+  );
+  const virtualizationThreshold = Math.max(Number(virtualizationConfig.threshold || 32) || 32, 1);
+  const virtualizationOverscan = Math.max(Number(virtualizationConfig.overscan || 6) || 6, 1);
 
   const tableInstance = useTable(
     { columns, data, initialState: { pageIndex: 0, pageSize: defaultValue || 10 } },
@@ -164,16 +183,29 @@ function DataTable({
     previousPage,
     setPageSize,
     setGlobalFilter,
-    state: { pageIndex, pageSize, globalFilter },
+    state: { pageIndex: internalPageIndex, pageSize: internalPageSize, globalFilter },
   } = tableInstance;
 
   useEffect(() => {
-    setPageSize(defaultValue || 10);
-  }, [defaultValue, setPageSize]);
+    if (manualPaginationEnabled) {
+      setPageSize(serverPaginationConfig.pageSize || defaultValue || 10);
+      return;
+    }
 
-  const setEntriesPerPage = (value) => setPageSize(value);
+    setPageSize(defaultValue || 10);
+  }, [defaultValue, manualPaginationEnabled, serverPaginationConfig?.pageSize, setPageSize]);
+
+  const setEntriesPerPage = (value) => {
+    if (manualPaginationEnabled) {
+      serverPaginationConfig.onPageSizeChange?.(value);
+      return;
+    }
+
+    setPageSize(value);
+  };
 
   const leafColumns = useMemo(() => headerGroups[headerGroups.length - 1]?.headers || [], [headerGroups]);
+  const bodyColumnCount = Math.max(leafColumns.length || columns.length || 1, 1);
 
   const exportColumns = useMemo(
     () =>
@@ -272,12 +304,60 @@ function DataTable({
     );
   };
 
-  const renderPagination = pageOptions.map((option) => (
+  const resolvedPageIndex = manualPaginationEnabled
+    ? Math.max(Number(serverPaginationConfig.pageIndex) || 0, 0)
+    : internalPageIndex;
+  const resolvedPageSize = manualPaginationEnabled
+    ? Math.max(Number(serverPaginationConfig.pageSize) || defaultValue || 10, 1)
+    : internalPageSize;
+  const resolvedPageOptions = manualPaginationEnabled
+    ? Array.from({
+      length: Math.max(
+        Number(serverPaginationConfig.pageCount)
+          || Math.ceil((Number(serverPaginationConfig.totalEntries) || 0) / resolvedPageSize)
+          || 1,
+        1
+      ),
+    }, (_, index) => index)
+    : pageOptions;
+  const resolvedCanPreviousPage = manualPaginationEnabled ? resolvedPageIndex > 0 : canPreviousPage;
+  const resolvedCanNextPage = manualPaginationEnabled
+    ? resolvedPageIndex + 1 < resolvedPageOptions.length
+    : canNextPage;
+
+  const goToResolvedPage = (nextPageIndex) => {
+    if (manualPaginationEnabled) {
+      serverPaginationConfig.onPageChange?.(nextPageIndex);
+      return;
+    }
+
+    gotoPage(nextPageIndex);
+  };
+
+  const goToNextResolvedPage = () => {
+    if (manualPaginationEnabled) {
+      serverPaginationConfig.onPageChange?.(resolvedPageIndex + 1);
+      return;
+    }
+
+    nextPage();
+  };
+
+  const goToPreviousResolvedPage = () => {
+    if (manualPaginationEnabled) {
+      serverPaginationConfig.onPageChange?.(resolvedPageIndex - 1);
+      return;
+    }
+
+    previousPage();
+  };
+
+  const renderPagination = resolvedPageOptions.map((option) => (
     <MDPagination
       item
       key={option}
-      onClick={() => gotoPage(Number(option))}
-      active={pageIndex === option}
+      onClick={() => goToResolvedPage(Number(option))}
+      active={resolvedPageIndex === option}
     >
       {option + 1}
     </MDPagination>
@@ -285,21 +365,71 @@ function DataTable({
 
   const handleInputPagination = ({ target: { value } }) => {
     const nextPageIndex = Number(value) - 1;
-    if (Number.isNaN(nextPageIndex) || nextPageIndex < 0 || nextPageIndex >= pageOptions.length) {
-      gotoPage(0);
+    if (Number.isNaN(nextPageIndex) || nextPageIndex < 0 || nextPageIndex >= resolvedPageOptions.length) {
+      goToResolvedPage(0);
       return;
     }
 
-    gotoPage(nextPageIndex);
+    goToResolvedPage(nextPageIndex);
   };
 
-  const customizedPageOptions = pageOptions.map((option) => option + 1);
+  const customizedPageOptions = resolvedPageOptions.map((option) => option + 1);
 
-  const [search, setSearch] = useState(globalFilter);
+  const [search, setSearch] = useState(
+    manualPaginationEnabled ? serverPaginationConfig.search || "" : globalFilter || ""
+  );
+  const latestSetGlobalFilterRef = useRef(setGlobalFilter);
+  const lastAppliedGlobalFilterRef = useRef(globalFilter || undefined);
 
-  const onSearchChange = useAsyncDebounce((value) => {
-    setGlobalFilter(value || undefined);
-  }, 100);
+  useEffect(() => {
+    latestSetGlobalFilterRef.current = setGlobalFilter;
+  }, [setGlobalFilter]);
+
+  useEffect(() => {
+    if (manualPaginationEnabled) {
+      const normalizedServerSearch = serverPaginationConfig.search || "";
+      lastAppliedGlobalFilterRef.current = normalizedServerSearch || undefined;
+
+      setSearch((currentValue) =>
+        currentValue === normalizedServerSearch ? currentValue : normalizedServerSearch
+      );
+      return;
+    }
+
+    const normalizedGlobalFilter = globalFilter || "";
+    lastAppliedGlobalFilterRef.current = globalFilter || undefined;
+
+    setSearch((currentValue) =>
+      currentValue === normalizedGlobalFilter ? currentValue : normalizedGlobalFilter
+    );
+  }, [globalFilter, manualPaginationEnabled, serverPaginationConfig?.search]);
+
+  useEffect(() => {
+    if (manualPaginationEnabled) {
+      const nextServerSearch = search || "";
+      if ((serverPaginationConfig.search || "") === nextServerSearch) {
+        return undefined;
+      }
+
+      const debounceHandle = window.setTimeout(() => {
+        serverPaginationConfig.onSearchChange?.(nextServerSearch);
+      }, 120);
+
+      return () => window.clearTimeout(debounceHandle);
+    }
+
+    const nextGlobalFilter = search || undefined;
+    if (lastAppliedGlobalFilterRef.current === nextGlobalFilter) {
+      return undefined;
+    }
+
+    const debounceHandle = window.setTimeout(() => {
+      lastAppliedGlobalFilterRef.current = nextGlobalFilter;
+      latestSetGlobalFilterRef.current(nextGlobalFilter);
+    }, 120);
+
+    return () => window.clearTimeout(debounceHandle);
+  }, [manualPaginationEnabled, search, serverPaginationConfig]);
 
   const setSortedValue = (column) => {
     if (!isSorted) {
@@ -313,14 +443,97 @@ function DataTable({
     return "none";
   };
 
-  const totalEntries = rows.length;
-  const entriesStart = totalEntries === 0 ? 0 : pageIndex * pageSize + 1;
-  const entriesEnd = totalEntries === 0 ? 0 : Math.min(totalEntries, pageSize * (pageIndex + 1));
+  const preparedPageRows = useMemo(
+    () =>
+      page.map((row) => {
+        prepareRow(row);
+        return row;
+      }),
+    [page, prepareRow]
+  );
+  const totalEntries = manualPaginationEnabled
+    ? Math.max(Number(serverPaginationConfig.totalEntries) || 0, 0)
+    : rows.length;
+  const entriesStart = totalEntries === 0 ? 0 : resolvedPageIndex * resolvedPageSize + 1;
+  const entriesEnd = totalEntries === 0
+    ? 0
+    : Math.min(totalEntries, resolvedPageIndex * resolvedPageSize + preparedPageRows.length);
   const totalLabel = totalEntries === 1 ? t("datatable.itemSingular") : t("datatable.itemPlural");
   const hasToolbar = entriesPerPage || canSearch || canExport;
+  const shouldVirtualize = virtualizationEnabled && preparedPageRows.length >= virtualizationThreshold;
+  const virtualWindow = useMemo(() => {
+    if (!shouldVirtualize) {
+      return {
+        start: 0,
+        end: preparedPageRows.length,
+        topSpacerHeight: 0,
+        bottomSpacerHeight: 0,
+      };
+    }
+
+    const effectiveScrollTop = Math.max(scrollTop - tableHeadHeight, 0);
+    const visibleRowCount = Math.max(Math.ceil(virtualizationMaxHeight / virtualizationRowHeight), 1);
+    const start = Math.max(Math.floor(effectiveScrollTop / virtualizationRowHeight) - virtualizationOverscan, 0);
+    const end = Math.min(
+      start + visibleRowCount + virtualizationOverscan * 2,
+      preparedPageRows.length
+    );
+
+    return {
+      start,
+      end,
+      topSpacerHeight: start * virtualizationRowHeight,
+      bottomSpacerHeight: Math.max((preparedPageRows.length - end) * virtualizationRowHeight, 0),
+    };
+  }, [
+    preparedPageRows.length,
+    scrollTop,
+    shouldVirtualize,
+    tableHeadHeight,
+    virtualizationMaxHeight,
+    virtualizationOverscan,
+    virtualizationRowHeight,
+  ]);
+  const renderedRows = useMemo(
+    () => preparedPageRows.slice(virtualWindow.start, virtualWindow.end),
+    [preparedPageRows, virtualWindow.end, virtualWindow.start]
+  );
+
+  useEffect(() => {
+    if (tableHeadRef.current) {
+      setTableHeadHeight(tableHeadRef.current.offsetHeight || 0);
+    }
+  }, [headerGroups, resolvedPageSize, shouldVirtualize]);
+
+  useEffect(() => {
+    setScrollTop(0);
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTop = 0;
+    }
+  }, [globalFilter, resolvedPageIndex, resolvedPageSize, search, shouldVirtualize]);
+
+  const handleTableScroll = (event) => {
+    if (!shouldVirtualize) {
+      return;
+    }
+
+    setScrollTop(event.currentTarget.scrollTop || 0);
+  };
 
   return (
-    <TableContainer sx={{ boxShadow: "none" }}>
+    <TableContainer
+      ref={tableContainerRef}
+      onScroll={handleTableScroll}
+      sx={{
+        boxShadow: "none",
+        ...(shouldVirtualize
+          ? {
+              maxHeight: `${virtualizationMaxHeight}px`,
+              overflowY: "auto",
+            }
+          : {}),
+      }}
+    >
       {hasToolbar ? (
         <MDBox
           display="flex"
@@ -334,7 +547,7 @@ function DataTable({
             {entriesPerPage && (
               <Autocomplete
                 disableClearable
-                value={pageSize.toString()}
+                value={resolvedPageSize.toString()}
                 options={entries}
                 onChange={(event, newValue) => {
                   setEntriesPerPage(parseInt(newValue, 10));
@@ -383,7 +596,6 @@ function DataTable({
                 fullWidth
                 onChange={({ currentTarget }) => {
                   setSearch(currentTarget.value);
-                  onSearchChange(currentTarget.value);
                 }}
               />
             </MDBox>
@@ -391,7 +603,7 @@ function DataTable({
         </MDBox>
       ) : null}
       <Table {...getTableProps()}>
-        <MDBox component="thead">
+        <MDBox component="thead" ref={tableHeadRef}>
           {headerGroups.map((headerGroup, key) => (
             <TableRow key={key} {...headerGroup.getHeaderGroupProps()}>
               {headerGroup.headers.map((column, idx) => (
@@ -409,23 +621,40 @@ function DataTable({
           ))}
         </MDBox>
         <TableBody {...getTableBodyProps()}>
-          {page.map((row, key) => {
-            prepareRow(row);
-            return (
-              <TableRow key={key} {...row.getRowProps()}>
-                {row.cells.map((cell, idx) => (
-                  <DataTableBodyCell
-                    key={idx}
-                    noBorder={noEndBorder && page.length - 1 === key}
-                    align={cell.column.align || "left"}
-                    {...cell.getCellProps()}
-                  >
-                    {cell.render("Cell")}
-                  </DataTableBodyCell>
-                ))}
-              </TableRow>
-            );
-          })}
+          {shouldVirtualize && virtualWindow.topSpacerHeight > 0 ? (
+            <TableRow>
+              <TableCell
+                colSpan={bodyColumnCount}
+                sx={{ borderBottom: "none", height: `${virtualWindow.topSpacerHeight}px`, p: 0 }}
+              />
+            </TableRow>
+          ) : null}
+          {renderedRows.map((row, key) => (
+            <TableRow
+              key={row.id || key}
+              {...row.getRowProps()}
+              sx={shouldVirtualize ? { height: `${virtualizationRowHeight}px` } : undefined}
+            >
+              {row.cells.map((cell, idx) => (
+                <DataTableBodyCell
+                  key={idx}
+                  noBorder={noEndBorder && renderedRows.length - 1 === key && virtualWindow.bottomSpacerHeight === 0}
+                  align={cell.column.align || "left"}
+                  {...cell.getCellProps()}
+                >
+                  {cell.render("Cell")}
+                </DataTableBodyCell>
+              ))}
+            </TableRow>
+          ))}
+          {shouldVirtualize && virtualWindow.bottomSpacerHeight > 0 ? (
+            <TableRow>
+              <TableCell
+                colSpan={bodyColumnCount}
+                sx={{ borderBottom: "none", height: `${virtualWindow.bottomSpacerHeight}px`, p: 0 }}
+              />
+            </TableRow>
+          ) : null}
         </TableBody>
       </Table>
 
@@ -434,7 +663,7 @@ function DataTable({
         flexDirection={{ xs: "column", sm: "row" }}
         justifyContent="space-between"
         alignItems={{ xs: "flex-start", sm: "center" }}
-        p={!showTotalEntries && pageOptions.length === 1 ? 0 : 3}
+        p={!showTotalEntries && resolvedPageOptions.length === 1 ? 0 : 3}
       >
         {showTotalEntries && (
           <MDBox mb={{ xs: 3, sm: 0 }}>
@@ -448,13 +677,13 @@ function DataTable({
             </MDTypography>
           </MDBox>
         )}
-        {pageOptions.length > 1 && (
+        {resolvedPageOptions.length > 1 && (
           <MDPagination
             variant={pagination.variant ? pagination.variant : "gradient"}
             color={pagination.color ? pagination.color : "info"}
           >
-            {canPreviousPage && (
-              <MDPagination item onClick={() => previousPage()}>
+            {resolvedCanPreviousPage && (
+              <MDPagination item onClick={goToPreviousResolvedPage}>
                 <Icon sx={{ fontWeight: "bold" }}>chevron_left</Icon>
               </MDPagination>
             )}
@@ -462,15 +691,15 @@ function DataTable({
               <MDBox width="5rem" mx={1}>
                 <MDInput
                   inputProps={{ type: "number", min: 1, max: customizedPageOptions.length }}
-                  value={customizedPageOptions[pageIndex]}
+                  value={customizedPageOptions[resolvedPageIndex]}
                   onChange={handleInputPagination}
                 />
               </MDBox>
             ) : (
               renderPagination
             )}
-            {canNextPage && (
-              <MDPagination item onClick={() => nextPage()}>
+            {resolvedCanNextPage && (
+              <MDPagination item onClick={goToNextResolvedPage}>
                 <Icon sx={{ fontWeight: "bold" }}>chevron_right</Icon>
               </MDPagination>
             )}
@@ -490,6 +719,8 @@ DataTable.defaultProps = {
   pagination: { variant: "gradient", color: "info" },
   isSorted: true,
   noEndBorder: false,
+  virtualization: false,
+  serverPagination: null,
 };
 
 DataTable.propTypes = {
@@ -520,6 +751,26 @@ DataTable.propTypes = {
   }),
   isSorted: PropTypes.bool,
   noEndBorder: PropTypes.bool,
+  virtualization: PropTypes.oneOfType([
+    PropTypes.bool,
+    PropTypes.shape({
+      enabled: PropTypes.bool,
+      maxHeight: PropTypes.number,
+      rowHeight: PropTypes.number,
+      threshold: PropTypes.number,
+      overscan: PropTypes.number,
+    }),
+  ]),
+  serverPagination: PropTypes.shape({
+    pageIndex: PropTypes.number.isRequired,
+    pageSize: PropTypes.number.isRequired,
+    totalEntries: PropTypes.number.isRequired,
+    pageCount: PropTypes.number,
+    search: PropTypes.string,
+    onPageChange: PropTypes.func,
+    onPageSizeChange: PropTypes.func,
+    onSearchChange: PropTypes.func,
+  }),
 };
 
 export default DataTable;

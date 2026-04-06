@@ -3,9 +3,7 @@ import { toast } from "react-toastify";
 
 import {
   createGraspMonitorStream,
-  getMonitorEvents,
-  getMonitorRuns,
-  getMonitorSummary,
+  getMonitorBootstrap,
 } from "api/grasp";
 import { DEFAULT_LOCALE, translate } from "i18n";
 import { pushGraspNotification } from "utils/graspNotifications";
@@ -122,6 +120,7 @@ const buildEventsFingerprint = (events = []) =>
     .join("||");
 
 const buildSummaryFingerprint = (summary) => JSON.stringify(summary || null);
+const buildProjectionFingerprint = (projection) => JSON.stringify(projection || null);
 
 const IMPROVEMENT_TOPICS = [
   "INITIAL_SOLUTION_TOPIC",
@@ -144,6 +143,7 @@ export default function useGraspMonitor(limit = 100, options = {}) {
   const [runs, setRuns] = useState([]);
   const [events, setEvents] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [projection, setProjection] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [connected, setConnected] = useState(false);
@@ -152,9 +152,11 @@ export default function useGraspMonitor(limit = 100, options = {}) {
   const runsRef = useRef([]);
   const eventsRef = useRef([]);
   const summaryRef = useRef(null);
+  const projectionRef = useRef(null);
   const runsFingerprintRef = useRef("");
   const eventsFingerprintRef = useRef("");
   const summaryFingerprintRef = useRef("");
+  const projectionFingerprintRef = useRef("");
   const streamBufferRef = useRef([]);
   const streamFlushTimerRef = useRef(null);
 
@@ -205,6 +207,17 @@ export default function useGraspMonitor(limit = 100, options = {}) {
     if (nextFingerprint !== summaryFingerprintRef.current) {
       summaryFingerprintRef.current = nextFingerprint;
       setSummary(nextSummary);
+    }
+  };
+
+  const commitProjection = (nextProjection) => {
+    const nextFingerprint = buildProjectionFingerprint(nextProjection);
+
+    projectionRef.current = nextProjection;
+
+    if (nextFingerprint !== projectionFingerprintRef.current) {
+      projectionFingerprintRef.current = nextFingerprint;
+      setProjection(nextProjection);
     }
   };
 
@@ -295,6 +308,7 @@ export default function useGraspMonitor(limit = 100, options = {}) {
 
       let nextRuns = runsRef.current;
       let nextSummary = summaryRef.current;
+      let nextProjection = projectionRef.current;
       const bufferedEvents = [];
 
       bufferedMessages.forEach((payload) => {
@@ -304,6 +318,10 @@ export default function useGraspMonitor(limit = 100, options = {}) {
 
           if (payload.summary) {
             nextSummary = payload.summary;
+          }
+
+          if (payload.projection) {
+            nextProjection = payload.projection;
           }
 
           return;
@@ -323,6 +341,7 @@ export default function useGraspMonitor(limit = 100, options = {}) {
       commitRuns(nextRuns);
       commitEvents(nextEvents);
       commitSummary(nextSummary);
+      commitProjection(nextProjection);
     };
 
     const scheduleBufferedFlush = () => {
@@ -358,19 +377,20 @@ export default function useGraspMonitor(limit = 100, options = {}) {
 
         const historyWindow = Math.min(configuredHistoryLimit, 120);
 
-        const [runsResponse, eventsResponse, summaryResponse] = await Promise.all([
-          getMonitorRuns(safeLimit, historyWindow),
-          getMonitorEvents(safeLimit),
-          getMonitorSummary(safeLimit, configuredSummaryEventLimit),
-        ]);
+        const bootstrap = await getMonitorBootstrap(
+          safeLimit,
+          historyWindow,
+          configuredSummaryEventLimit
+        );
 
         if (cancelled) {
           return;
         }
 
-        commitRuns(runsResponse);
-        commitEvents(mergeEvents([], eventsResponse, safeLimit));
-        commitSummary(summaryResponse);
+        commitRuns(bootstrap.runs);
+        commitEvents(mergeEvents([], bootstrap.events, safeLimit));
+        commitSummary(bootstrap.summary);
+        commitProjection(bootstrap.projection || null);
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError.message || "Unable to load monitor data.");
@@ -440,6 +460,7 @@ export default function useGraspMonitor(limit = 100, options = {}) {
     runs,
     events,
     summary,
+    projection,
     loading,
     error,
     connected,

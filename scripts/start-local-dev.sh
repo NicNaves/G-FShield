@@ -14,6 +14,7 @@ DISPATCH_SAMPLE_RUN="false"
 INSTALL_DEPENDENCIES="true"
 API_PORT=4000
 FRONTEND_PORT=3000
+FRONTEND_MODE="Dev"
 PUBLIC_FRONTEND_ORIGIN=""
 CORS_ORIGINS=""
 API_HEALTHCHECK_URL=""
@@ -50,6 +51,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --frontend-port)
       FRONTEND_PORT="$2"
+      shift 2
+      ;;
+    --frontend-mode)
+      FRONTEND_MODE="$2"
       shift 2
       ;;
     --public-front-origin)
@@ -108,6 +113,11 @@ if [[ "$AUTH_MODE" != "Real" && "$AUTH_MODE" != "Mock" ]]; then
   exit 1
 fi
 
+if [[ "$FRONTEND_MODE" != "Dev" && "$FRONTEND_MODE" != "Preview" ]]; then
+  echo "FrontendMode invalido: ${FRONTEND_MODE}. Use Dev ou Preview." >&2
+  exit 1
+fi
+
 if [[ "$NEIGHBORHOOD_STRATEGY" != "VND" && "$NEIGHBORHOOD_STRATEGY" != "RVND" ]]; then
   echo "NeighborhoodStrategy invalido: ${NEIGHBORHOOD_STRATEGY}. Use VND ou RVND." >&2
   exit 1
@@ -127,12 +137,15 @@ fi
 REPO_ROOT="${DEV_REPO_ROOT}"
 API_DIR="${REPO_ROOT}/webservice/api"
 FRONT_DIR="${REPO_ROOT}/webservice/front"
+DATASETS_DIR="${REPO_ROOT}/datasets"
+METRICS_DIR="${REPO_ROOT}/metrics"
 STATE_DIR="${REPO_ROOT}/.local-dev"
 STATE_FILE="${STATE_DIR}/processes.env"
 ROOT_COMPOSE_FILE="${REPO_ROOT}/docker-compose.yml"
 ROOT_PRESET_COMPOSE_FILE="${REPO_ROOT}/docker-compose.local.yml"
 DB_COMPOSE_FILE="${API_DIR}/docker-compose.db.yml"
 DB_PRESET_COMPOSE_FILE="${API_DIR}/docker-compose.db.local.yml"
+COMPOSE_PROJECT_NAME="$(basename "${REPO_ROOT}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
 NPM_COMMAND="$(get_npm_command)"
 
 API_AUTH_DISABLED="false"
@@ -169,10 +182,14 @@ FRONT_LOG="${STATE_DIR}/front.log"
 : >"$FRONT_LOG"
 
 echo "Iniciando API em background..."
-API_PID="$(start_managed_process "$API_DIR" "$API_LOG" env API_PORT="$API_PORT" AUTH_DISABLED="$API_AUTH_DISABLED" MOCK_DATA_ENABLED="$API_MOCK_DATA_ENABLED" CORS_ORIGINS="$CORS_ORIGINS" GF_SHIELD_COMPOSE_FILES="docker-compose.yml,docker-compose.local.yml" "$NPM_COMMAND" run dev)"
+API_PID="$(start_managed_process "$API_DIR" "$API_LOG" env API_PORT="$API_PORT" AUTH_DISABLED="$API_AUTH_DISABLED" MOCK_DATA_ENABLED="$API_MOCK_DATA_ENABLED" CORS_ORIGINS="$CORS_ORIGINS" GRASP_DATASETS_DIR="$DATASETS_DIR" GF_SHIELD_PROJECT_ROOT="$REPO_ROOT" GF_SHIELD_METRICS_DIR="$METRICS_DIR" GF_SHIELD_COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" GF_SHIELD_COMPOSE_FILES="docker-compose.yml,docker-compose.local.yml" "$NPM_COMMAND" run dev)"
 
 echo "Iniciando front em background..."
-FRONT_PID="$(start_managed_process "$FRONT_DIR" "$FRONT_LOG" env BROWSER=none PORT="$FRONTEND_PORT" REACT_APP_API_URL="http://localhost:${API_PORT}/api" REACT_APP_AUTH_DISABLED="$FRONT_AUTH_DISABLED" "$NPM_COMMAND" start)"
+if [[ "$FRONTEND_MODE" == "Preview" ]]; then
+  FRONT_PID="$(start_managed_process "$FRONT_DIR" "$FRONT_LOG" env BROWSER=none PORT="$FRONTEND_PORT" FRONTEND_MODE=preview REACT_APP_API_URL="http://localhost:${API_PORT}/api" REACT_APP_AUTH_DISABLED="$FRONT_AUTH_DISABLED" bash -lc "\"$NPM_COMMAND\" run build && \"$NPM_COMMAND\" run preview")"
+else
+  FRONT_PID="$(start_managed_process "$FRONT_DIR" "$FRONT_LOG" env BROWSER=none PORT="$FRONTEND_PORT" FRONTEND_MODE=dev CHOKIDAR_USEPOLLING=true CHOKIDAR_INTERVAL=1000 REACT_APP_API_URL="http://localhost:${API_PORT}/api" REACT_APP_AUTH_DISABLED="$FRONT_AUTH_DISABLED" "$NPM_COMMAND" start)"
+fi
 
 write_state_file "$STATE_FILE" "$(date -Iseconds)" "$AUTH_MODE" "$API_PID" "$FRONT_PID" "$API_LOG" "$FRONT_LOG"
 
@@ -208,7 +225,8 @@ echo "Ambiente local iniciado."
 echo "Front: http://localhost:${FRONTEND_PORT}"
 echo "API: http://localhost:${API_PORT}"
 echo "Swagger: http://localhost:${API_PORT}/api-docs"
-echo "Conduktor: http://localhost:8080"
+echo "Kafbat: http://localhost:8080"
 echo "Modo de autenticacao: ${AUTH_MODE}"
+echo "Modo do front: ${FRONTEND_MODE}"
 echo "Logs API: ${API_LOG}"
 echo "Logs front: ${FRONT_LOG}"

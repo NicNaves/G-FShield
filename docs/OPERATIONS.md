@@ -19,8 +19,9 @@ Por isso, os containers mais recentes tendem a aparecer como:
 - `g-fshield-zookeeper-1`
 - `g-fshield-kafka-1`
 - `g-fshield-grasp-fs-dls-vnd-1`
-- `g-fshield-api-dev`
-- `g-fshield-front-dev`
+- `g-fshield-postgres`
+- `g-fshield-redis`
+- `g-fshield-api-dev-local` e `g-fshield-front-dev-local` quando o modo local usa Node em Docker
 
 Se voce ainda tiver uma stack antiga `gf-shield-*`, derrube-a antes de misturar os ambientes.
 
@@ -34,6 +35,10 @@ docker compose -p g-fshield ps
 docker compose -p g-fshield logs --tail=100
 ```
 
+```powershell
+docker compose -f .\webservice\api\docker-compose.db.yml ps
+```
+
 ### Logs uteis
 
 Stack principal:
@@ -45,11 +50,18 @@ docker logs -f g-fshield-grasp-fs-dls-vnd-1
 docker logs -f g-fshield-grasp-fs-dls-iwr-1
 ```
 
-API e front em containers standalone:
+Banco e cache da API:
 
 ```powershell
-docker logs -f g-fshield-api-dev
-docker logs -f g-fshield-front-dev
+docker logs -f g-fshield-postgres
+docker logs -f g-fshield-redis
+```
+
+API e front no modo local com Node em Docker:
+
+```powershell
+docker logs -f g-fshield-api-dev-local
+docker logs -f g-fshield-front-dev-local
 ```
 
 Logs gravados pelos scripts:
@@ -110,6 +122,19 @@ npm.cmd run migrate
 npm.cmd run seed
 ```
 
+Validacao rapida do cache opcional:
+
+```powershell
+docker exec g-fshield-redis redis-cli ping
+```
+
+Para usar o cache Redis na API, habilite em [`webservice/api/.env`](../webservice/api/.env):
+
+```env
+REDIS_ENABLED=true
+REDIS_URL=redis://localhost:6379
+```
+
 ### Reset do monitor e reset completo
 
 No dashboard:
@@ -151,6 +176,14 @@ KAFKA_MONITOR_GROUP_ID=grasp-fs-monitor-group-replay
 
 Depois reinicie a API. Para um replay novo no futuro, troque o `KAFKA_MONITOR_GROUP_ID`.
 
+### Endpoints operacionais do monitor
+
+Os endpoints abaixo ajudam a distinguir payload bruto de agregado:
+
+- `GET /api/grasp/monitor/bootstrap`
+- `GET /api/grasp/monitor/projection`
+- `GET /api/grasp/monitor/summary`
+
 ### Rebuild seletivo
 
 DRG:
@@ -191,8 +224,9 @@ Isso remove:
 
 ### Dicas de diagnostico
 
-- se o dashboard parecer pesado, verifique se o browser esta com build antigo em cache
+- se o dashboard parecer pesado, verifique se o browser esta com build antigo em cache e consulte `monitor/bootstrap` e `monitor/projection`
 - se o `DLS Outcome Summary` mostrar menos algoritmos do que o esperado, cheque os logs de `VND` e `IWSSR` para confirmar se houve atividade real
+- se o cache nao estiver surtindo efeito, confirme `REDIS_ENABLED=true` e `docker exec g-fshield-redis redis-cli ping`
 - se o login falhar em acesso remoto, revise `CORS_ORIGINS` e a porta publica do front
 
 ## EN-US
@@ -214,8 +248,9 @@ Because of that, the latest containers usually look like:
 - `g-fshield-zookeeper-1`
 - `g-fshield-kafka-1`
 - `g-fshield-grasp-fs-dls-vnd-1`
-- `g-fshield-api-dev`
-- `g-fshield-front-dev`
+- `g-fshield-postgres`
+- `g-fshield-redis`
+- `g-fshield-api-dev-local` and `g-fshield-front-dev-local` when local mode uses Docker Node
 
 If you still have an older `gf-shield-*` stack, stop it before mixing environments.
 
@@ -229,6 +264,10 @@ docker compose -p g-fshield ps
 docker compose -p g-fshield logs --tail=100
 ```
 
+```powershell
+docker compose -f .\webservice\api\docker-compose.db.yml ps
+```
+
 ### Useful logs
 
 Main stack:
@@ -240,11 +279,18 @@ docker logs -f g-fshield-grasp-fs-dls-vnd-1
 docker logs -f g-fshield-grasp-fs-dls-iwr-1
 ```
 
-API and front-end standalone containers:
+API database and cache:
 
 ```powershell
-docker logs -f g-fshield-api-dev
-docker logs -f g-fshield-front-dev
+docker logs -f g-fshield-postgres
+docker logs -f g-fshield-redis
+```
+
+API and front-end in local Docker-Node mode:
+
+```powershell
+docker logs -f g-fshield-api-dev-local
+docker logs -f g-fshield-front-dev-local
 ```
 
 Script-managed logs:
@@ -305,6 +351,19 @@ npm.cmd run migrate
 npm.cmd run seed
 ```
 
+Quick optional-cache validation:
+
+```powershell
+docker exec g-fshield-redis redis-cli ping
+```
+
+To enable Redis-backed API caching, set the following in [`webservice/api/.env`](../webservice/api/.env):
+
+```env
+REDIS_ENABLED=true
+REDIS_URL=redis://localhost:6379
+```
+
 ### Monitor reset and full reset
 
 From the dashboard:
@@ -346,6 +405,14 @@ KAFKA_MONITOR_GROUP_ID=grasp-fs-monitor-group-replay
 
 Then restart the API. For another replay later, change `KAFKA_MONITOR_GROUP_ID`.
 
+### Monitor operational endpoints
+
+These endpoints help distinguish raw payloads from aggregated data:
+
+- `GET /api/grasp/monitor/bootstrap`
+- `GET /api/grasp/monitor/projection`
+- `GET /api/grasp/monitor/summary`
+
 ### Selective rebuild
 
 DRG:
@@ -386,6 +453,7 @@ This removes:
 
 ### Diagnostic hints
 
-- if the dashboard feels heavy, check whether the browser is still serving an older cached build
+- if the dashboard feels heavy, check whether the browser is still serving an older cached build and inspect `monitor/bootstrap` and `monitor/projection`
 - if `DLS Outcome Summary` shows fewer algorithms than expected, inspect the `VND` and `IWSSR` logs to confirm actual activity
+- if caching does not seem effective, confirm `REDIS_ENABLED=true` and `docker exec g-fshield-redis redis-cli ping`
 - if remote login fails, review `CORS_ORIGINS` and the public front-end port

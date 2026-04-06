@@ -9,6 +9,8 @@ import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Icon from "@mui/material/Icon";
 import Badge from "@mui/material/Badge";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useTheme } from "@mui/material/styles";
 import MDBox from "components/MDBox";
 import MDButton from "components/MDButton";
 import MDTypography from "components/MDTypography";
@@ -32,6 +34,8 @@ function DashboardNavbar({ absolute, light, isMini }) {
   const [openMenu, setOpenMenu] = useState(null); 
   const [notificationsAnchor, setNotificationsAnchor] = useState(null);
   const [notifications, setNotifications] = useState([]);
+  const theme = useTheme();
+  const isMobileNavbar = useMediaQuery(theme.breakpoints.down("lg"));
   const route = useLocation().pathname.split("/").slice(1);
   const navigate = useNavigate();
   const { t } = useI18n();
@@ -252,7 +256,7 @@ function DashboardNavbar({ absolute, light, isMini }) {
                 onClick={handleMiniSidenav}
               >
                 <Icon sx={iconsStyle} fontSize="medium">
-                  {miniSidenav ? "menu_open" : "menu"}
+                  {isMobileNavbar ? (miniSidenav ? "menu" : "close") : (miniSidenav ? "menu" : "menu_open")}
                 </Icon>
               </IconButton>
               {/* <IconButton

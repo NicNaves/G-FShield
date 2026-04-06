@@ -128,6 +128,11 @@ router.post("/executions/:requestId/cancel", authMiddleware, roleMiddleware("ADM
  */
 router.get("/monitor/runs", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.getRuns(req, res, next));
 
+router.get("/monitor/bootstrap", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.getBootstrap(req, res, next));
+router.get("/monitor/projection", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.getProjection(req, res, next));
+router.get("/monitor/feed", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.getFeed(req, res, next));
+router.get("/monitor/dashboard", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.getDashboardAggregate(req, res, next));
+
 /**
  * @swagger
  * /grasp/monitor/runs/{seedId}:

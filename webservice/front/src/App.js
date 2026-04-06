@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { Suspense, lazy, useState, useEffect, useMemo } from "react";
 import { Routes, Route, Navigate, useLocation, matchPath } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
@@ -11,8 +11,6 @@ import themeDark from "assets/theme-dark";
 import routes from "routes";
 import { useMaterialUIController, setMiniSidenav, setOpenConfigurator, setLogin } from "context";
 import logoShield from "assets/images/logoshield.png";
-import Login from "./layouts/authentication/sign-in";
-import SignUp from "./layouts/authentication/sign-up";
 import PropTypes from "prop-types";
 import { ALLOW_PUBLIC_REGISTRATION, AUTH_DISABLED, DEV_ROLE, DEV_TOKEN, DEV_USER_ID } from "./config/runtime";
 import useI18n from "hooks/useI18n";
@@ -20,6 +18,19 @@ import authApi from "./api/auth";
 
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+
+const Login = lazy(() => import("./layouts/authentication/sign-in"));
+const SignUp = lazy(() => import("./layouts/authentication/sign-up"));
+
+const routeFallback = (
+  <MDBox
+    display="flex"
+    alignItems="center"
+    justifyContent="center"
+    minHeight="40vh"
+    px={3}
+  />
+);
 
 const PrivateRoute = ({ element, roles, authReady }) => {
   const [controller] = useMaterialUIController();
@@ -138,6 +149,19 @@ export default function App() {
   }, [pathname]);
 
   useEffect(() => {
+    const previousBodyOverflowX = document.body.style.overflowX;
+    const previousDocumentOverflowX = document.documentElement.style.overflowX;
+
+    document.body.style.overflowX = "hidden";
+    document.documentElement.style.overflowX = "hidden";
+
+    return () => {
+      document.body.style.overflowX = previousBodyOverflowX;
+      document.documentElement.style.overflowX = previousDocumentOverflowX;
+    };
+  }, []);
+
+  useEffect(() => {
     const authTitles = {
       "/authentication/sign-in": t("auth.signIn"),
       "/authentication/sign-up": t("auth.createAccount"),
@@ -182,13 +206,13 @@ export default function App() {
       display="flex"
       justifyContent="center"
       alignItems="center"
-      width="3.25rem"
-      height="3.25rem"
+      width={{ xs: "2.85rem", sm: "3.25rem" }}
+      height={{ xs: "2.85rem", sm: "3.25rem" }}
       shadow="sm"
       borderRadius="50%"
       position="fixed"
-      right="2rem"
-      bottom="2rem"
+      right={{ xs: "1rem", sm: "2rem" }}
+      bottom={{ xs: "1rem", sm: "2rem" }}
       zIndex={99}
       color={darkMode ? "white" : "dark"}
       sx={{
@@ -228,22 +252,24 @@ export default function App() {
           {configsButton}
         </>
       )}
-      <Routes>
-        <Route
-          path="/"
-          element={canResolveAuth ? <Navigate to={AUTH_DISABLED || auth.token ? "/dashboard" : "/authentication/sign-in"} replace /> : null}
-        />
-        <Route
-          path="/authentication/sign-in"
-          element={canResolveAuth ? (AUTH_DISABLED || auth.token ? <Navigate to="/dashboard" replace /> : <Login />) : null}
-        />
-        <Route
-          path="/authentication/sign-up"
-          element={ALLOW_PUBLIC_REGISTRATION ? <SignUp /> : <Navigate to="/authentication/sign-in" replace />}
-        />
-        {canResolveAuth ? getRoutes(routes) : null}
-        <Route path="*" element={<Navigate to={AUTH_DISABLED || auth.token ? "/dashboard" : "/authentication/sign-in"} replace />} />
-      </Routes>
+      <Suspense fallback={routeFallback}>
+        <Routes>
+          <Route
+            path="/"
+            element={canResolveAuth ? <Navigate to={AUTH_DISABLED || auth.token ? "/dashboard" : "/authentication/sign-in"} replace /> : null}
+          />
+          <Route
+            path="/authentication/sign-in"
+            element={canResolveAuth ? (AUTH_DISABLED || auth.token ? <Navigate to="/dashboard" replace /> : <Login />) : null}
+          />
+          <Route
+            path="/authentication/sign-up"
+            element={ALLOW_PUBLIC_REGISTRATION ? <SignUp /> : <Navigate to="/authentication/sign-in" replace />}
+          />
+          {canResolveAuth ? getRoutes(routes) : null}
+          <Route path="*" element={<Navigate to={AUTH_DISABLED || auth.token ? "/dashboard" : "/authentication/sign-in"} replace />} />
+        </Routes>
+      </Suspense>
     </ThemeProvider>
   );
 }

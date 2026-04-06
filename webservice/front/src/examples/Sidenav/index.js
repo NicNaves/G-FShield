@@ -13,6 +13,8 @@ import List from "@mui/material/List";
 import Divider from "@mui/material/Divider";
 import Link from "@mui/material/Link";
 import Icon from "@mui/material/Icon";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useTheme } from "@mui/material/styles";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
@@ -39,6 +41,8 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
   const [controller, dispatch] = useMaterialUIController();
   const { t } = useI18n();
   const { miniSidenav, transparentSidenav, whiteSidenav, darkMode, sidenavColor } = controller;
+  const theme = useTheme();
+  const isMobileSidenav = useMediaQuery(theme.breakpoints.down("lg"));
   const location = useLocation();
   const collapseName = location.pathname.replace("/", "");
 
@@ -53,24 +57,16 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
   const closeSidenav = () => setMiniSidenav(dispatch, true);
 
   useEffect(() => {
-    // A function that sets the mini state of the sidenav.
-    function handleMiniSidenav() {
-      setMiniSidenav(dispatch, window.innerWidth < 1200);
-      setTransparentSidenav(dispatch, window.innerWidth < 1200 ? false : transparentSidenav);
-      setWhiteSidenav(dispatch, window.innerWidth < 1200 ? false : whiteSidenav);
+    setMiniSidenav(dispatch, isMobileSidenav);
+    setTransparentSidenav(dispatch, isMobileSidenav ? false : transparentSidenav);
+    setWhiteSidenav(dispatch, isMobileSidenav ? false : whiteSidenav);
+  }, [dispatch, isMobileSidenav, transparentSidenav, whiteSidenav]);
+
+  useEffect(() => {
+    if (isMobileSidenav) {
+      closeSidenav();
     }
-
-    /** 
-     The event listener that's calling the handleMiniSidenav function when resizing the window.
-    */
-    window.addEventListener("resize", handleMiniSidenav);
-
-    // Call the handleMiniSidenav function to set the state with the initial value.
-    handleMiniSidenav();
-
-    // Remove event listener on cleanup
-    return () => window.removeEventListener("resize", handleMiniSidenav);
-  }, [dispatch, transparentSidenav, whiteSidenav]);
+  }, [isMobileSidenav, location.pathname]);
 
   // Render all the routes from the routes.js (All the visible items on the Sidenav)
   const renderRoutes = routes
@@ -87,6 +83,7 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
           target="_blank"
           rel="noreferrer"
           sx={{ textDecoration: "none" }}
+          onClick={isMobileSidenav ? closeSidenav : undefined}
         >
           <SidenavCollapse
             name={resolvedName}
@@ -96,7 +93,7 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
           />
         </Link>
       ) : (
-        <NavLink key={key} to={route}>
+        <NavLink key={key} to={route} onClick={isMobileSidenav ? closeSidenav : undefined}>
           <SidenavCollapse name={resolvedName} icon={icon} active={key === collapseName} />
         </NavLink>
       );
@@ -136,12 +133,17 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
   return (
     <SidenavRoot
       {...rest}
-      variant="permanent"
-      ownerState={{ transparentSidenav, whiteSidenav, miniSidenav, darkMode }}
+      variant={isMobileSidenav ? "temporary" : "permanent"}
+      open={isMobileSidenav ? !miniSidenav : true}
+      onClose={closeSidenav}
+      ModalProps={{
+        keepMounted: true,
+      }}
+      ownerState={{ transparentSidenav, whiteSidenav, miniSidenav, darkMode, isMobileSidenav }}
     >
       <MDBox pt={3} pb={1} px={4} textAlign="center">
         <MDBox
-          display={{ xs: "block", xl: "none" }}
+          display={{ xs: "block", lg: "none" }}
           position="absolute"
           top={0}
           right={0}

@@ -11,7 +11,7 @@ const mockRoutes = require("./routes/mockRoutes");
 const app = express();
 
 const allowedOrigins = String(
-  process.env.CORS_ORIGINS || "http://localhost:3000,http://127.0.0.1:3000,http://localhost:4000"
+  process.env.CORS_ORIGINS || "http://localhost:3000,http://127.0.0.1:3000,http://localhost:4000,http://localhost:4173,http://127.0.0.1:4173"
 )
   .split(",")
   .map((origin) => origin.trim())

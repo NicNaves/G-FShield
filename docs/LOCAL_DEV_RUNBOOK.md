@@ -34,11 +34,24 @@ Windows:
 .\scripts\start-local-dev.ps1 -DevNodeImage node:24
 ```
 
+Para analisar a interface com carregamento mais rapido e sem watcher agressivo do Vite em Docker:
+
+```powershell
+.\scripts\start-local-dev.ps1 -DevNodeImage node:24 -FrontendMode Preview
+```
+
 Ubuntu:
 
 ```bash
 export DEV_NODE_IMAGE=node:24
 bash scripts/start-local-dev.sh
+```
+
+Para revisar o front em modo estatico:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-local-dev.sh --frontend-mode Preview
 ```
 
 #### 2. Modo alternativo: Node no host
@@ -78,11 +91,13 @@ bash scripts/start-server-dev.sh --api-port 4001 --frontend-port 3001 --public-f
 Os scripts de start:
 
 - sobem a stack principal (`docker-compose.yml` + preset)
-- sobem o PostgreSQL da API
+- sobem o PostgreSQL e o Redis opcional da API
 - podem instalar dependencias automaticamente
-- iniciam API e front
+- iniciam API e front (`Vite` no front e build estatico no fluxo server)
 - esperam a API responder no healthcheck
+- injetam `GRASP_DATASETS_DIR`, `GF_SHIELD_PROJECT_ROOT`, `GF_SHIELD_METRICS_DIR`, `GF_SHIELD_COMPOSE_PROJECT_NAME` e `GF_SHIELD_COMPOSE_FILES`
 - no modo Docker, montam datasets, repo root e configuracao de reset
+- aceitam `FrontendMode/--frontend-mode` com `Dev` ou `Preview`
 
 Os scripts de stop:
 
@@ -132,6 +147,11 @@ Local padrao:
 - Swagger: `http://localhost:4000/api-docs`
 - Kafbat: `http://localhost:8080`
 
+Servicos auxiliares:
+
+- PostgreSQL: `localhost:5432`
+- Redis: `localhost:6379`
+
 Servidor, exemplo com front em `3001`:
 
 - Front: `http://SEU_IP:3001`
@@ -164,6 +184,11 @@ Modo real com seed:
 
 O front atual inclui:
 
+- bootstrap agregado do monitor em `GET /api/grasp/monitor/bootstrap`
+- projecao incremental em `GET /api/grasp/monitor/projection`
+- cache remoto com `TanStack Query`
+- tabelas virtualizadas para listas densas
+- decimation nos graficos de serie temporal e limite de seeds visiveis na timeline
 - exportacao em CSV/JSON nas tabelas compartilhadas
 - exportacao por request, run inteira ou recorte de timeline
 - filtro temporal com calendario e busca por timestamp
@@ -186,7 +211,14 @@ Use o modo Docker dos scripts. Ele monta a pasta `datasets` e ajusta `GRASP_DATA
 
 #### O dashboard ficou pesado
 
-As versoes mais recentes do front ja reduzem o volume inicial de historico carregado e usam um limite mais leve para o monitor. Mesmo assim, um `Ctrl+F5` apos deploy ajuda a limpar cache antigo.
+As versoes mais recentes do front ja reduzem o volume inicial de historico carregado, usam cache de consulta, projecao incremental e virtualizacao de tabelas. Mesmo assim, um `Ctrl+F5` apos deploy ajuda a limpar cache antigo.
+
+Se ainda ficar lento, valide:
+
+- `GET /api/grasp/monitor/bootstrap` para o carregamento inicial
+- `GET /api/grasp/monitor/projection` para os agregados vivos
+- se `REDIS_ENABLED=true`, confirme se o container `g-fshield-redis` esta ativo
+- se estiver rodando local com Node em Docker no Windows, prefira `-FrontendMode Preview` para evitar o custo do watcher com polling do Vite
 
 #### Botao `Restart and clean environment` retorna erro
 
@@ -270,10 +302,11 @@ bash scripts/start-server-dev.sh --api-port 4001 --frontend-port 3001 --public-f
 The start scripts:
 
 - start the main stack (`docker-compose.yml` + preset)
-- start the API PostgreSQL database
+- start the API PostgreSQL database and optional Redis cache
 - can install dependencies automatically
-- start the API and front-end
+- start the API and front-end (`Vite` on the front-end and static build in server mode)
 - wait for the API healthcheck
+- inject `GRASP_DATASETS_DIR`, `GF_SHIELD_PROJECT_ROOT`, `GF_SHIELD_METRICS_DIR`, `GF_SHIELD_COMPOSE_PROJECT_NAME`, and `GF_SHIELD_COMPOSE_FILES`
 - in Docker mode, mount datasets, repo root, and reset-related runtime settings
 
 The stop scripts:
@@ -324,6 +357,11 @@ Default local:
 - Swagger: `http://localhost:4000/api-docs`
 - Kafbat: `http://localhost:8080`
 
+Supporting services:
+
+- PostgreSQL: `localhost:5432`
+- Redis: `localhost:6379`
+
 Server example with front on `3001`:
 
 - Front: `http://YOUR_IP:3001`
@@ -356,6 +394,11 @@ Real mode with seed:
 
 The current front-end includes:
 
+- aggregated monitor bootstrap at `GET /api/grasp/monitor/bootstrap`
+- incremental projection at `GET /api/grasp/monitor/projection`
+- remote caching with `TanStack Query`
+- virtualized tables for dense lists
+- time-series decimation and visible-seed limits in the timeline
 - CSV/JSON export in shared tables
 - export by full request, full run, or timeline slice
 - time filters with calendar inputs and timestamp search
@@ -378,7 +421,13 @@ Use the Docker mode from the scripts. It mounts the `datasets` folder and adjust
 
 #### The dashboard feels heavy
 
-Recent front-end changes already reduced the initial history volume and use a lighter monitor limit. Even so, a `Ctrl+F5` after deploy helps clear stale cache.
+Recent front-end changes already reduce the initial history volume and combine query caching, incremental projection, and table virtualization. Even so, a `Ctrl+F5` after deploy helps clear stale cache.
+
+If it still feels slow, validate:
+
+- `GET /api/grasp/monitor/bootstrap` for the initial payload
+- `GET /api/grasp/monitor/projection` for the live aggregates
+- when `REDIS_ENABLED=true`, confirm the `g-fshield-redis` container is running
 
 #### `Restart and clean environment` returns an error
 

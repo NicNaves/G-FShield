@@ -9,6 +9,7 @@ Esta API concentra autenticacao, usuarios, fila de execucoes GRASP-FS, persisten
 - Express
 - Prisma
 - PostgreSQL
+- Redis opcional
 - KafkaJS
 - Swagger UI
 
@@ -32,6 +33,8 @@ GRASP:
 - `GET /api/grasp/executions/:requestId`
 - `POST /api/grasp/executions/:requestId/cancel`
 - `GET /api/grasp/monitor/runs`
+- `GET /api/grasp/monitor/bootstrap`
+- `GET /api/grasp/monitor/projection`
 - `GET /api/grasp/monitor/runs/:seedId`
 - `GET /api/grasp/monitor/compare`
 - `GET /api/grasp/monitor/summary`
@@ -64,6 +67,10 @@ As tabelas principais sao:
 
 ### Endpoints importantes para o front atual
 
+- `GET /api/grasp/monitor/bootstrap`
+  retorna `runs + events + summary + projection` para reduzir o bootstrap inicial do dashboard
+- `GET /api/grasp/monitor/projection`
+  retorna agregados incrementais do monitor, como buckets de atividade e volume por topico
 - `GET /api/grasp/executions/:requestId?includeMonitor=true`
   retorna o bundle completo da request, usado pela exportacao do dashboard
 - `POST /api/grasp/environment/reset`
@@ -96,6 +103,19 @@ GF_SHIELD_PROJECT_ROOT=/workspace-repo
 GF_SHIELD_COMPOSE_PROJECT_NAME=g-fshield
 GF_SHIELD_COMPOSE_FILES=docker-compose.yml,docker-compose.server.yml
 GF_SHIELD_DOCKER_BIN=docker
+REDIS_ENABLED=false
+REDIS_URL="redis://localhost:6379"
+API_CACHE_TTL_MS=5000
+GRASP_BOOTSTRAP_CACHE_TTL_MS=2500
+GRASP_RUNS_CACHE_TTL_MS=2500
+GRASP_RUN_CACHE_TTL_MS=4000
+GRASP_EVENTS_CACHE_TTL_MS=2500
+GRASP_SUMMARY_CACHE_TTL_MS=4000
+GRASP_LAUNCH_CACHE_TTL_MS=5000
+GRASP_COMPARE_CACHE_TTL_MS=5000
+GRASP_PROJECTION_CACHE_TTL_MS=2500
+GRASP_PROJECTION_BUCKET_MS=60000
+GRASP_PROJECTION_EVENT_LIMIT=300
 ```
 
 ### Reset completo do ambiente
@@ -143,6 +163,8 @@ O monitor assina:
 A API expoe:
 
 - runs consolidadas por `seedId`
+- bootstrap agregado do monitor
+- projecao incremental em memoria
 - eventos visiveis do monitor
 - resumo estatistico
 - bundles por request
@@ -157,6 +179,7 @@ This API handles authentication, users, GRASP-FS execution queueing, persisted m
 - Express
 - Prisma
 - PostgreSQL
+- Optional Redis
 - KafkaJS
 - Swagger UI
 
@@ -180,6 +203,8 @@ GRASP:
 - `GET /api/grasp/executions/:requestId`
 - `POST /api/grasp/executions/:requestId/cancel`
 - `GET /api/grasp/monitor/runs`
+- `GET /api/grasp/monitor/bootstrap`
+- `GET /api/grasp/monitor/projection`
 - `GET /api/grasp/monitor/runs/:seedId`
 - `GET /api/grasp/monitor/compare`
 - `GET /api/grasp/monitor/summary`
@@ -212,6 +237,10 @@ Main tables:
 
 ### Important endpoints for the current front-end
 
+- `GET /api/grasp/monitor/bootstrap`
+  returns `runs + events + summary + projection` to reduce the dashboard bootstrap cost
+- `GET /api/grasp/monitor/projection`
+  returns incremental monitor aggregates such as activity buckets and topic volume
 - `GET /api/grasp/executions/:requestId?includeMonitor=true`
   returns the full request bundle used by dashboard export
 - `POST /api/grasp/environment/reset`
@@ -244,6 +273,19 @@ GF_SHIELD_PROJECT_ROOT=/workspace-repo
 GF_SHIELD_COMPOSE_PROJECT_NAME=g-fshield
 GF_SHIELD_COMPOSE_FILES=docker-compose.yml,docker-compose.server.yml
 GF_SHIELD_DOCKER_BIN=docker
+REDIS_ENABLED=false
+REDIS_URL="redis://localhost:6379"
+API_CACHE_TTL_MS=5000
+GRASP_BOOTSTRAP_CACHE_TTL_MS=2500
+GRASP_RUNS_CACHE_TTL_MS=2500
+GRASP_RUN_CACHE_TTL_MS=4000
+GRASP_EVENTS_CACHE_TTL_MS=2500
+GRASP_SUMMARY_CACHE_TTL_MS=4000
+GRASP_LAUNCH_CACHE_TTL_MS=5000
+GRASP_COMPARE_CACHE_TTL_MS=5000
+GRASP_PROJECTION_CACHE_TTL_MS=2500
+GRASP_PROJECTION_BUCKET_MS=60000
+GRASP_PROJECTION_EVENT_LIMIT=300
 ```
 
 ### Full environment reset
@@ -291,6 +333,8 @@ The monitor subscribes to:
 The API exposes:
 
 - consolidated runs by `seedId`
+- aggregated monitor bootstrap
+- in-memory incremental projection
 - visible monitor events
 - statistical summaries
 - request bundles

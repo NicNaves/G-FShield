@@ -7,8 +7,10 @@ Este front-end e o dashboard operacional do GF-Shield.
 ### Stack
 
 - React 18
+- Vite
 - Material UI 5
 - Chart.js
+- TanStack Query
 - React Router
 - React Toastify
 
@@ -25,6 +27,7 @@ Este front-end e o dashboard operacional do GF-Shield.
 ### Recursos atuais do dashboard
 
 - monitor em tempo real via SSE
+- bootstrap agregado e projecao incremental do monitor no carregamento inicial
 - `Run Details` por `seedId`
 - exportacao em CSV/JSON nas tabelas compartilhadas
 - exportacao por request inteira, run inteira e recorte visivel da timeline
@@ -33,11 +36,12 @@ Este front-end e o dashboard operacional do GF-Shield.
 - grafico de atividade por horario
 - `DLS Outcome Summary`
 - `Run Comparison Studio`
+- virtualizacao nas tabelas mais pesadas do feed analitico e do historico de run
 - tema escuro refinado e tipografia ajustada
 
 ### Performance
 
-As ultimas mudancas do front reduziram o volume inicial de historico carregado no dashboard e usam um limite mais leve para o monitor, o que melhora o comportamento com muitos dados sem perder os detalhes por request e por run.
+As ultimas mudancas do front reduziram o volume inicial de historico carregado no dashboard, usam cache remoto com `TanStack Query`, carregamento lazy por rota em `Vite`, decimation nos graficos de serie temporal e virtualizacao nas tabelas mais densas. Isso melhora o comportamento com muitos dados sem perder os detalhes por request e por run.
 
 ### Inicializacao
 
@@ -70,8 +74,10 @@ This front-end is the GF-Shield operational dashboard.
 ### Stack
 
 - React 18
+- Vite
 - Material UI 5
 - Chart.js
+- TanStack Query
 - React Router
 - React Toastify
 
@@ -88,6 +94,7 @@ This front-end is the GF-Shield operational dashboard.
 ### Current dashboard capabilities
 
 - real-time monitor through SSE
+- aggregated bootstrap and incremental monitor projection on initial load
 - `Run Details` by `seedId`
 - CSV/JSON export in shared tables
 - export by full request, full run, and visible timeline slice
@@ -96,11 +103,12 @@ This front-end is the GF-Shield operational dashboard.
 - hourly activity chart
 - `DLS Outcome Summary`
 - `Run Comparison Studio`
+- virtualization for the heaviest analytics-feed and run-history tables
 - refined dark theme and typography
 
 ### Performance
 
-Recent front-end changes reduced the initial history volume loaded by the dashboard and use a lighter monitor limit, improving behavior with larger datasets while keeping request-level and run-level detail views available.
+Recent front-end changes reduced the initial history volume loaded by the dashboard and now combine `TanStack Query`, route-level lazy loading in `Vite`, time-series decimation, and table virtualization. This improves behavior with larger datasets while keeping request-level and run-level detail views available.
 
 ### Startup
 

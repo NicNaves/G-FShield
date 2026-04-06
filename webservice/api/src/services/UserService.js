@@ -1,6 +1,6 @@
 const User = require("../model/User");
 const prisma = require("../lib/prisma");
-const bcrypt = require("bcrypt");
+const passwordHasher = require("../utils/passwordHasher");
 
 class UserService {
   constructor() {
@@ -53,7 +53,7 @@ class UserService {
     }
 
     
-    const hashedPassword = await bcrypt.hash(normalizedUserData.password, this.passwordHashRounds);
+    const hashedPassword = await passwordHasher.hash(normalizedUserData.password, this.passwordHashRounds);
 
     
     const prismaUser = await prisma.user.create({
@@ -95,7 +95,7 @@ class UserService {
     if (!password || typeof password !== "string") {
       throw new Error("Senha inválida.");
     }
-    return bcrypt.compare(password, hashedPassword);
+    return passwordHasher.compare(password, hashedPassword);
   }
 
   /**
@@ -145,7 +145,7 @@ class UserService {
 
       
       if (dataToUpdate.password) {
-        dataToUpdate.password = await bcrypt.hash(dataToUpdate.password, this.passwordHashRounds);
+        dataToUpdate.password = await passwordHasher.hash(dataToUpdate.password, this.passwordHashRounds);
       }
 
       const updatedUser = await prisma.user.update({

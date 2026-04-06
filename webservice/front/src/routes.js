@@ -1,11 +1,12 @@
+import { lazy } from "react";
 import Icon from "@mui/material/Icon";
 
-import Dashboard from "./layouts/dashboard";
-import RunDetails from "./layouts/dashboard/run-details";
-import Settings from "./layouts/settings";
-import Datasets from "./layouts/datasets";
-import Users from "./layouts/users";
-import UserEdit from "./layouts/users/edit";
+const Dashboard = lazy(() => import("./layouts/dashboard"));
+const RunDetails = lazy(() => import("./layouts/dashboard/run-details"));
+const Settings = lazy(() => import("./layouts/settings"));
+const Datasets = lazy(() => import("./layouts/datasets"));
+const Users = lazy(() => import("./layouts/users"));
+const UserEdit = lazy(() => import("./layouts/users/edit"));
 
 const routes = [
   {

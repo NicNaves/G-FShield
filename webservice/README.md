@@ -37,18 +37,24 @@ API:
 
 - launch por request com persistencia
 - reconciliacao real de `status` da pipeline
+- cache curto em memoria com `Redis` opcional
 - reset do monitor
 - reset completo do ambiente quando a API roda com acesso ao Docker/Compose do host
 - endpoint de bundle por request para exportacao
+- endpoint agregado `monitor/bootstrap`
+- endpoint de projecao incremental `monitor/projection`
 
 Front:
 
+- `Vite` com carregamento lazy por rota
+- `TanStack Query` para cache de dados remotos
 - exportacao em CSV/JSON
 - filtros de tempo com calendario
 - busca por timestamp na timeline
 - `Run Comparison Studio`
 - `DLS Outcome Summary`
 - `Run Details` por `seedId`
+- virtualizacao das tabelas mais pesadas
 
 ### Semantica importante
 
@@ -99,18 +105,24 @@ API:
 
 - persisted request launches
 - true pipeline status reconciliation
+- short-lived in-memory cache with optional `Redis`
 - monitor reset
 - full environment reset when the API runs with access to the host Docker/Compose runtime
 - request bundle endpoint for export
+- aggregated `monitor/bootstrap` endpoint
+- incremental `monitor/projection` endpoint
 
 Front-end:
 
+- `Vite` with route-level lazy loading
+- `TanStack Query` for remote data caching
 - CSV/JSON export
 - time filters with calendar inputs
 - timeline timestamp search
 - `Run Comparison Studio`
 - `DLS Outcome Summary`
 - `Run Details` by `seedId`
+- virtualization for the heaviest tables
 
 ### Important semantics
 

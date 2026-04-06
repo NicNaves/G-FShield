@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import Grid from "@mui/material/Grid";
@@ -32,8 +32,8 @@ import Footer from "examples/Footer";
 import ComplexStatisticsCard from "examples/Cards/StatisticsCards/ComplexStatisticsCard";
 import DataTable from "examples/Tables/DataTable";
 
-import { getMonitorRun } from "api/grasp";
 import useI18n from "hooks/useI18n";
+import useMonitorRunQuery from "hooks/queries/useMonitorRunQuery";
 import {
   formatCompactPercent,
   formatDateTime,
@@ -47,41 +47,23 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
 
+const virtualizedHistoryTableConfig = {
+  enabled: true,
+  maxHeight: 480,
+  rowHeight: 58,
+  threshold: 20,
+  overscan: 6,
+};
+
 function RunDetails() {
   const { seedId } = useParams();
   const { t } = useI18n();
-  const [run, setRun] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError("");
-        const response = await getMonitorRun(seedId);
-        if (!cancelled) {
-          setRun(response);
-        }
-      } catch (requestError) {
-        if (!cancelled) {
-          setError(requestError.message || t("runDetails.notFound"));
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [seedId, t]);
+  const runQuery = useMonitorRunQuery(seedId, {
+    historyLimit: 2000,
+  });
+  const run = runQuery.data || null;
+  const loading = runQuery.isLoading || runQuery.isFetching;
+  const error = runQuery.error?.message || "";
 
   const history = useMemo(() => (Array.isArray(run?.history) ? [...run.history] : []), [run?.history]);
 
@@ -403,10 +385,11 @@ function RunDetails() {
                 </MDBox>
                 <DataTable
                   table={historyTable}
-                  entriesPerPage={{ defaultValue: 8, entries: [8, 12, 20] }}
+                  entriesPerPage={{ defaultValue: 25, entries: [25, 50, 100] }}
                   canSearch
                   showTotalEntries
                   noEndBorder
+                  virtualization={virtualizedHistoryTableConfig}
                 />
               </Card>
             </MDBox>

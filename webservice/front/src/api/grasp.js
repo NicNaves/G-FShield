@@ -18,8 +18,43 @@ export const getMonitorRuns = async (limit = 100, historyLimit = 30) => {
   return data.runs || [];
 };
 
-export const getMonitorRun = async (seedId) => {
-  const { data } = await api.get(`/grasp/monitor/runs/${seedId}`);
+export const getMonitorBootstrap = async (limit = 100, historyLimit = 30, eventLimit = 300) => {
+  const { data } = await api.get("/grasp/monitor/bootstrap", {
+    params: { limit, historyLimit, eventLimit },
+  });
+
+  return {
+    runs: data.runs || [],
+    events: data.events || [],
+    summary: data.summary || null,
+    projection: data.projection || null,
+  };
+};
+
+export const getMonitorDashboardAggregate = async (bucketLimit = 72) => {
+  const { data } = await api.get("/grasp/monitor/dashboard", {
+    params: { bucketLimit },
+  });
+
+  return data.dashboard || null;
+};
+
+export const getMonitorEventFeed = async (options = {}) => {
+  const params = {
+    ...options,
+    topics: Array.isArray(options.topics) ? options.topics.join(",") : options.topics,
+  };
+  const { data } = await api.get("/grasp/monitor/feed", {
+    params,
+  });
+
+  return data.feed || null;
+};
+
+export const getMonitorRun = async (seedId, options = {}) => {
+  const { data } = await api.get(`/grasp/monitor/runs/${seedId}`, {
+    params: options,
+  });
   return data;
 };
 
