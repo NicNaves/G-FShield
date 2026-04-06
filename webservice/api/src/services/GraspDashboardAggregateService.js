@@ -482,6 +482,14 @@ class GraspDashboardAggregateService {
     };
   }
 
+  isMissingReadModelTableError(error) {
+    const message = String(error?.message || "");
+    const errorCode = String(error?.code || "");
+    return errorCode === "P2021"
+      || (errorCode === "P2010" && message.includes("42P01"))
+      || message.includes('relation "GraspDashboardReadModel" does not exist');
+  }
+
   mapTimelineOverviewBuckets(rows = [], bucketLimit = this.timelineBucketLimit) {
     return [...rows]
       .map((row) => ({
@@ -959,17 +967,25 @@ class GraspDashboardAggregateService {
   }
 
   async clearReadModel() {
-    if (prisma?.graspDashboardReadModel && typeof prisma.graspDashboardReadModel.deleteMany === "function") {
-      await prisma.graspDashboardReadModel.deleteMany({
-        where: { key: this.readModelKey },
-      });
-      return;
-    }
+    try {
+      if (prisma?.graspDashboardReadModel && typeof prisma.graspDashboardReadModel.deleteMany === "function") {
+        await prisma.graspDashboardReadModel.deleteMany({
+          where: { key: this.readModelKey },
+        });
+        return;
+      }
 
-    await prisma.$executeRawUnsafe(
-      'DELETE FROM "GraspDashboardReadModel" WHERE "key" = $1',
-      this.readModelKey
-    );
+      await prisma.$executeRawUnsafe(
+        'DELETE FROM "GraspDashboardReadModel" WHERE "key" = $1',
+        this.readModelKey
+      );
+    } catch (error) {
+      if (this.isMissingReadModelTableError(error)) {
+        return;
+      }
+
+      throw error;
+    }
   }
 
   async buildDashboardAggregate(options = {}) {
