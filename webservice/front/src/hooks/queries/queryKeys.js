@@ -25,6 +25,7 @@ const queryKeys = {
   monitorDashboardAggregate: (options = {}) => [
     "monitor-dashboard-aggregate",
     options.bucketLimit || "default",
+    options.timelineBucketLimit || "default",
   ],
 };
 

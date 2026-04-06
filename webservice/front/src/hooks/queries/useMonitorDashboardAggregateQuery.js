@@ -4,11 +4,11 @@ import { getMonitorDashboardAggregate } from "api/grasp";
 import queryKeys from "./queryKeys";
 
 export default function useMonitorDashboardAggregateQuery(options = {}) {
-  const { bucketLimit, enabled = true, ...queryOptions } = options;
+  const { bucketLimit, timelineBucketLimit, enabled = true, ...queryOptions } = options;
 
   return useQuery({
-    queryKey: queryKeys.monitorDashboardAggregate({ bucketLimit }),
-    queryFn: () => getMonitorDashboardAggregate(bucketLimit),
+    queryKey: queryKeys.monitorDashboardAggregate({ bucketLimit, timelineBucketLimit }),
+    queryFn: () => getMonitorDashboardAggregate({ bucketLimit, timelineBucketLimit }),
     enabled,
     ...queryOptions,
   });

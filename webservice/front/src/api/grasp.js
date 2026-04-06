@@ -31,9 +31,13 @@ export const getMonitorBootstrap = async (limit = 100, historyLimit = 30, eventL
   };
 };
 
-export const getMonitorDashboardAggregate = async (bucketLimit = 72) => {
+export const getMonitorDashboardAggregate = async (options = {}) => {
+  const params = {
+    bucketLimit: options.bucketLimit ?? 72,
+    timelineBucketLimit: options.timelineBucketLimit ?? 1440,
+  };
   const { data } = await api.get("/grasp/monitor/dashboard", {
-    params: { bucketLimit },
+    params,
   });
 
   return data.dashboard || null;

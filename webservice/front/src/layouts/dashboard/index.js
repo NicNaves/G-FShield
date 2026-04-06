@@ -1586,6 +1586,171 @@ const buildRunTimelinePoints = (run = {}, options = {}) => {
   return buildTimelineDownsampledPoints(timelinePoints, maxPoints);
 };
 
+const buildRunTimelinePointsFromAggregate = (series = {}, options = {}) => {
+  const {
+    fallbackEvent = null,
+    run = {},
+    range = {},
+    query = "",
+    maxPoints = 900,
+  } = options;
+  const startTimestamp = resolveRunStartTimestamp(run, fallbackEvent) || series?.points?.[0]?.timestamp || null;
+  const startMs = parseDateTimeValue(startTimestamp);
+
+  if (startMs === null) {
+    return [];
+  }
+
+  const timelinePoints = (series?.points || [])
+    .filter(
+      (point) =>
+        isTimestampWithinRange(point?.timestamp, range)
+        && matchesTimelineTimestampQuery(point, query)
+    )
+    .map((point, index) => {
+      const timestampMs = parseDateTimeValue(point?.timestamp);
+      const score = getFiniteMetric(point?.latestScore ?? point?.averageScore ?? point?.bestScore);
+
+      if (timestampMs === null || score === null) {
+        return null;
+      }
+
+      return {
+        x: timestampMs,
+        y: score,
+        timestamp: point.timestamp,
+        elapsedMs: Math.max(timestampMs - startMs, 0),
+        order: index + 1,
+        stage: point.stage || run?.stage || fallbackEvent?.stage || null,
+        sampleCount: point.sampleCount ?? 0,
+        runCount: point.runCount ?? 1,
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.x - right.x);
+
+  return buildTimelineDownsampledPoints(timelinePoints, maxPoints);
+};
+
+const buildAggregatedResourceSeriesFromSeedSeries = (timelineSeries = [], options = {}) => {
+  const {
+    range = {},
+    query = "",
+  } = options;
+
+  const rawPoints = timelineSeries
+    .flatMap((series) =>
+      (series?.points || [])
+        .filter(
+          (point) =>
+            isTimestampWithinRange(point?.timestamp, range)
+            && matchesTimelineTimestampQuery(point, query)
+        )
+        .map((point) => {
+          const timestampMs = parseDateTimeValue(point?.timestamp);
+          const cpuUsage = getFiniteMetric(point?.avgCpuUsage);
+          const memoryUsagePercent = getFiniteMetric(point?.avgMemoryUsagePercent);
+
+          if (timestampMs === null || (cpuUsage === null && memoryUsagePercent === null)) {
+            return null;
+          }
+
+          return {
+            seedId: series?.seedId || null,
+            timestampMs,
+            cpuUsage,
+            memoryUsagePercent,
+            sampleCount: Number(point?.sampleCount || 0),
+          };
+        })
+        .filter(Boolean)
+    )
+    .sort((left, right) => left.timestampMs - right.timestampMs);
+
+  if (!rawPoints.length) {
+    return {
+      cpuPoints: [],
+      memoryPoints: [],
+      snapshotCount: 0,
+      bucketCount: 0,
+      runCount: 0,
+      minTimestampMs: null,
+      maxTimestampMs: null,
+    };
+  }
+
+  const bucketSizeMs = resolveResourceBucketSizeMs(
+    rawPoints[0]?.timestampMs,
+    rawPoints[rawPoints.length - 1]?.timestampMs,
+    rawPoints.length
+  );
+  const buckets = new Map();
+  const runIds = new Set();
+
+  rawPoints.forEach((point) => {
+    const bucketTimestampMs = Math.floor(point.timestampMs / bucketSizeMs) * bucketSizeMs;
+    const bucket = buckets.get(bucketTimestampMs) || {
+      timestampMs: bucketTimestampMs,
+      cpuValues: [],
+      memoryValues: [],
+      sampleCount: 0,
+      runIds: new Set(),
+    };
+
+    if (point.cpuUsage !== null) {
+      bucket.cpuValues.push(point.cpuUsage);
+    }
+
+    if (point.memoryUsagePercent !== null) {
+      bucket.memoryValues.push(point.memoryUsagePercent);
+    }
+
+    bucket.sampleCount += Number(point.sampleCount || 0);
+    if (point.seedId) {
+      bucket.runIds.add(point.seedId);
+      runIds.add(point.seedId);
+    }
+
+    buckets.set(bucketTimestampMs, bucket);
+  });
+
+  const orderedBuckets = [...buckets.values()].sort((left, right) => left.timestampMs - right.timestampMs);
+
+  return {
+    cpuPoints: orderedBuckets
+      .map((bucket) => {
+        const value = averageMetric(bucket.cpuValues);
+        return value === null
+          ? null
+          : {
+              x: bucket.timestampMs,
+              y: value,
+              sampleCount: bucket.sampleCount,
+              runCount: bucket.runIds.size,
+            };
+      })
+      .filter(Boolean),
+    memoryPoints: orderedBuckets
+      .map((bucket) => {
+        const value = averageMetric(bucket.memoryValues);
+        return value === null
+          ? null
+          : {
+              x: bucket.timestampMs,
+              y: value,
+              sampleCount: bucket.sampleCount,
+              runCount: bucket.runIds.size,
+            };
+      })
+      .filter(Boolean),
+    snapshotCount: rawPoints.reduce((sum, point) => sum + Number(point.sampleCount || 0), 0),
+    bucketCount: orderedBuckets.length,
+    runCount: runIds.size,
+    minTimestampMs: orderedBuckets[0]?.timestampMs ?? null,
+    maxTimestampMs: orderedBuckets[orderedBuckets.length - 1]?.timestampMs ?? null,
+  };
+};
+
 function Dashboard() {
   const { t } = useI18n();
   const [controller] = useMaterialUIController();
@@ -1654,17 +1819,17 @@ function Dashboard() {
     });
   }, []);
   const shouldFetchDashboardAggregate =
-    (isPerformanceTabActive || isAlgorithmsTabActive || isAnalyticsTabActive)
+    (activeTab === "overview" || isPerformanceTabActive || isAlgorithmsTabActive || isAnalyticsTabActive)
     && selectedAlgorithm === "all"
     && selectedDataset === "all"
     && selectedStageLens === "all"
     && selectedRunStatus === "all"
     && selectedSearch === "all"
     && selectedRequestFilterId === "all"
-    && !hasActiveTimeFilter(selectedTimeWindow, customRangeStart, customRangeEnd)
-    && !selectedSeedId;
+    && !hasActiveTimeFilter(selectedTimeWindow, customRangeStart, customRangeEnd);
   const dashboardAggregateQuery = useMonitorDashboardAggregateQuery({
     bucketLimit: 72,
+    timelineBucketLimit: 1440,
     enabled: shouldFetchDashboardAggregate,
     staleTime: 15_000,
   });
@@ -1900,7 +2065,6 @@ function Dashboard() {
         selectedSearch !== "all",
         selectedRequestFilterId !== "all",
         hasActiveTimeFilter(selectedTimeWindow, customRangeStart, customRangeEnd),
-        Boolean(selectedSeedId),
       ].filter(Boolean).length,
     [
       selectedAlgorithm,
@@ -1912,11 +2076,23 @@ function Dashboard() {
       selectedTimeWindow,
       customRangeStart,
       customRangeEnd,
-      selectedSeedId,
     ]
   );
   const canUsePersistentDashboardAggregate = activeFilterCount === 0;
   const dashboardAggregate = dashboardAggregateQuery.data || null;
+  const canUsePersistentTimelineAggregate =
+    canUsePersistentDashboardAggregate
+    && Array.isArray(dashboardAggregate?.timelineSeedSeries)
+    && dashboardAggregate.timelineSeedSeries.length > 0;
+  const persistentTimelineSeedSeriesBySeed = useMemo(
+    () =>
+      new Map(
+        (dashboardAggregate?.timelineSeedSeries || [])
+          .filter((series) => series?.seedId)
+          .map((series) => [series.seedId, series])
+      ),
+    [dashboardAggregate?.timelineSeedSeries]
+  );
   const workspaceFeedFilters = useMemo(
     () => ({
       algorithm: selectedAlgorithm !== "all" ? selectedAlgorithm : undefined,
@@ -1924,7 +2100,6 @@ function Dashboard() {
       status: selectedRunStatus !== "all" ? selectedRunStatus : undefined,
       searchLabel: selectedSearch !== "all" ? selectedSearch : undefined,
       requestId: selectedRequestFilterId !== "all" ? selectedRequestFilterId : undefined,
-      seedId: selectedSeedId || undefined,
       start: timeRangeBounds.from !== null ? new Date(timeRangeBounds.from).toISOString() : undefined,
       end: timeRangeBounds.to !== null ? new Date(timeRangeBounds.to).toISOString() : undefined,
     }),
@@ -1934,7 +2109,6 @@ function Dashboard() {
       selectedRequestFilterId,
       selectedRunStatus,
       selectedSearch,
-      selectedSeedId,
       timeRangeBounds.from,
       timeRangeBounds.to,
     ]
@@ -3019,12 +3193,24 @@ function Dashboard() {
 
     const datasets = timelineDisplayRuns
       .map((run, index) => {
-        const points = buildRunTimelinePoints(run, {
-          fallbackEvent: initialEventBySeed.get(run.seedId),
-          range: timelineRangeBounds,
-          query: timelineTimestampQuery,
-          maxPoints: 720,
-        });
+        const fallbackEvent = initialEventBySeed.get(run.seedId);
+        const persistentSeries = canUsePersistentTimelineAggregate
+          ? persistentTimelineSeedSeriesBySeed.get(run.seedId)
+          : null;
+        const points = persistentSeries
+          ? buildRunTimelinePointsFromAggregate(persistentSeries, {
+            fallbackEvent,
+            run,
+            range: timelineRangeBounds,
+            query: timelineTimestampQuery,
+            maxPoints: 720,
+          })
+          : buildRunTimelinePoints(run, {
+            fallbackEvent,
+            range: timelineRangeBounds,
+            query: timelineTimestampQuery,
+            maxPoints: 720,
+          });
 
         if (!points.length) {
           return null;
@@ -3070,7 +3256,15 @@ function Dashboard() {
           ? Math.max(maxTimestampMs - minTimestampMs, 0)
           : 0,
     };
-  }, [featuredRun?.seedId, initialEventBySeed, timelineDisplayRuns, timelineRangeBounds, timelineTimestampQuery]);
+  }, [
+    canUsePersistentTimelineAggregate,
+    featuredRun?.seedId,
+    initialEventBySeed,
+    persistentTimelineSeedSeriesBySeed,
+    timelineDisplayRuns,
+    timelineRangeBounds,
+    timelineTimestampQuery,
+  ]);
 
   const fullTimelineChartData = useMemo(() => {
     if (!fullTimelineComparison.datasets.length) {
@@ -3217,13 +3411,34 @@ function Dashboard() {
   );
 
   const aggregatedResourceSeries = useMemo(
-    () =>
-      buildAggregatedResourceSeries(timelineComparisonRuns, {
+    () => {
+      if (canUsePersistentTimelineAggregate) {
+        const persistentSeries = timelineComparisonRuns
+          .map((run) => persistentTimelineSeedSeriesBySeed.get(run.seedId))
+          .filter(Boolean);
+
+        if (persistentSeries.length) {
+          return buildAggregatedResourceSeriesFromSeedSeries(persistentSeries, {
+            range: timelineRangeBounds,
+            query: timelineTimestampQuery,
+          });
+        }
+      }
+
+      return buildAggregatedResourceSeries(timelineComparisonRuns, {
         initialEventBySeed,
         range: timelineRangeBounds,
         query: timelineTimestampQuery,
-      }),
-    [initialEventBySeed, timelineComparisonRuns, timelineRangeBounds, timelineTimestampQuery]
+      });
+    },
+    [
+      canUsePersistentTimelineAggregate,
+      initialEventBySeed,
+      persistentTimelineSeedSeriesBySeed,
+      timelineComparisonRuns,
+      timelineRangeBounds,
+      timelineTimestampQuery,
+    ]
   );
 
   const resourceChartData = useMemo(() => {

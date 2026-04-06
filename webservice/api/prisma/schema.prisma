@@ -136,6 +136,7 @@ model GraspDashboardReadModel {
   activityBuckets  GraspDashboardActivityBucket[]
   resourceMetrics  GraspDashboardResourceMetric[]
   algorithmMetrics GraspDashboardAlgorithmMetric[]
+  timelineBuckets  GraspDashboardTimelineBucket[]
 
   @@index([generatedAt])
 }
@@ -224,4 +225,33 @@ model GraspDashboardAlgorithmMetric {
 
   @@index([readModelId, summaryType, position])
   @@index([readModelId, summaryType, algorithm])
+}
+
+model GraspDashboardTimelineBucket {
+  id                    Int      @id @default(autoincrement())
+  readModelId           Int
+  scope                 String
+  label                 String
+  seedId                String?
+  requestId             String?
+  algorithm             String?
+  position              Int
+  timestamp             DateTime
+  sampleCount           Int      @default(0)
+  runCount              Int      @default(0)
+  latestScore           Float?
+  averageScore          Float?
+  bestScore             Float?
+  avgCpuUsage           Float?
+  avgMemoryUsagePercent Float?
+  stage                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  readModel GraspDashboardReadModel @relation(fields: [readModelId], references: [id], onDelete: Cascade)
+
+  @@index([readModelId, scope, position])
+  @@index([readModelId, scope, label])
+  @@index([readModelId, seedId, timestamp])
+  @@index([readModelId, algorithm, timestamp])
 }

@@ -73,6 +73,20 @@ const TESTING_FILE_SQL = `COALESCE(
   NULLIF(COALESCE("payload"#>>'{payload,testingFileName}', "payload"#>>'{testingFileName}'), ''),
   '--'
 )`;
+const REQUEST_ID_SQL = `COALESCE("requestId", "payload"#>>'{payload,requestId}', "payload"#>>'{requestId}')`;
+const STAGE_SQL = `COALESCE(
+  NULLIF(
+    COALESCE(
+      "stage",
+      "payload"#>>'{payload,historyEntry,stage}',
+      "payload"#>>'{payload,stage}',
+      "payload"#>>'{historyEntry,stage}',
+      "payload"#>>'{stage}'
+    ),
+    ''
+  ),
+  'Unknown'
+)`;
 const SOLUTION_FEATURES_JSON_SQL = `COALESCE(
   "payload"#>'{payload,historyEntry,solutionFeatures}',
   "payload"#>'{payload,solutionFeatures}',
@@ -83,11 +97,19 @@ const SOLUTION_FEATURES_JSON_SQL = `COALESCE(
 class GraspDashboardAggregateService {
   constructor() {
     this.bucketIntervalMs = 60 * 60 * 1000;
+    this.timelineBucketIntervalMs = Math.max(
+      Number(process.env.GRASP_DASHBOARD_TIMELINE_BUCKET_MS || 60_000) || 60_000,
+      10_000
+    );
     this.defaultBucketLimit = Math.max(Number(process.env.GRASP_DASHBOARD_BUCKET_LIMIT || 72) || 72, 1);
     this.readModelKey = process.env.GRASP_DASHBOARD_READ_MODEL_KEY || "monitor-dashboard-default";
     this.readModelBucketLimit = Math.max(
       Number(process.env.GRASP_DASHBOARD_READ_MODEL_BUCKET_LIMIT || 336) || 336,
       this.defaultBucketLimit
+    );
+    this.timelineBucketLimit = Math.max(
+      Number(process.env.GRASP_DASHBOARD_TIMELINE_BUCKET_LIMIT || 1440) || 1440,
+      120
     );
     this.readModelMaxAgeMs = Math.max(
       Number(process.env.GRASP_DASHBOARD_READ_MODEL_MAX_AGE_MS || 10 * 60 * 1000) || (10 * 60 * 1000),
@@ -340,16 +362,175 @@ class GraspDashboardAggregateService {
       : fallback;
   }
 
+  normalizeTimelineBucketLimit(value, fallback = this.timelineBucketLimit) {
+    const requestedBucketLimit = Number(value);
+    return Number.isFinite(requestedBucketLimit) && requestedBucketLimit > 0
+      ? Math.max(Math.floor(requestedBucketLimit), 1)
+      : fallback;
+  }
+
+  buildTimelinePoint(row = {}) {
+    const timestamp = this.serializeDate(row.timestamp);
+    const timestampMs = timestamp ? new Date(timestamp).getTime() : null;
+
+    return {
+      timestamp,
+      timestampMs: Number.isFinite(timestampMs) ? timestampMs : null,
+      latestScore: this.normalizeMetric(row.latestScore),
+      averageScore: this.normalizeMetric(row.averageScore),
+      bestScore: this.normalizeMetric(row.bestScore),
+      avgCpuUsage: this.normalizeMetric(row.avgCpuUsage),
+      avgMemoryUsagePercent: this.normalizeMetric(row.avgMemoryUsagePercent),
+      sampleCount: this.normalizeCount(row.sampleCount),
+      runCount: this.normalizeCount(row.runCount),
+      stage: row.stage || null,
+    };
+  }
+
+  buildTimelineSeedSeries(rows = [], bucketLimit = this.timelineBucketLimit) {
+    const groups = new Map();
+
+    rows.forEach((row) => {
+      const seedId = row.seedId || row.label || null;
+      if (!seedId) {
+        return;
+      }
+
+      const current = groups.get(seedId) || {
+        seedId,
+        algorithm: row.algorithm || "Unknown",
+        requestId: row.requestId || null,
+        points: [],
+      };
+
+      current.algorithm = row.algorithm || current.algorithm || "Unknown";
+      current.requestId = row.requestId || current.requestId || null;
+      current.points.push(this.buildTimelinePoint(row));
+      groups.set(seedId, current);
+    });
+
+    return [...groups.values()]
+      .map((entry) => ({
+        ...entry,
+        points: entry.points
+          .filter((point) => point.timestampMs !== null)
+          .sort((left, right) => left.timestampMs - right.timestampMs)
+          .slice(-this.normalizeTimelineBucketLimit(bucketLimit)),
+      }))
+      .filter((entry) => entry.points.length > 0)
+      .sort(
+        (left, right) =>
+          (right.points[right.points.length - 1]?.timestampMs || 0)
+          - (left.points[left.points.length - 1]?.timestampMs || 0)
+      );
+  }
+
+  buildTimelineAlgorithmSeries(rows = [], bucketLimit = this.timelineBucketLimit) {
+    const groups = new Map();
+
+    rows.forEach((row) => {
+      const algorithm = row.algorithm || row.label || "Unknown";
+      const current = groups.get(algorithm) || {
+        algorithm,
+        points: [],
+      };
+
+      current.points.push(this.buildTimelinePoint(row));
+      groups.set(algorithm, current);
+    });
+
+    return [...groups.values()]
+      .map((entry) => ({
+        algorithm: entry.algorithm,
+        points: entry.points
+          .filter((point) => point.timestampMs !== null)
+          .sort((left, right) => left.timestampMs - right.timestampMs)
+          .slice(-this.normalizeTimelineBucketLimit(bucketLimit)),
+      }))
+      .filter((entry) => entry.points.length > 0)
+      .sort((left, right) => left.algorithm.localeCompare(right.algorithm));
+  }
+
+  buildResourceTimeline(rows = []) {
+    const orderedRows = [...rows]
+      .map((row) => this.buildTimelinePoint(row))
+      .filter((point) => point.timestampMs !== null)
+      .sort((left, right) => left.timestampMs - right.timestampMs);
+
+    return {
+      cpuPoints: orderedRows
+        .filter((point) => point.avgCpuUsage !== null)
+        .map((point) => ({
+          x: point.timestampMs,
+          y: point.avgCpuUsage,
+          sampleCount: point.sampleCount,
+          runCount: point.runCount,
+        })),
+      memoryPoints: orderedRows
+        .filter((point) => point.avgMemoryUsagePercent !== null)
+        .map((point) => ({
+          x: point.timestampMs,
+          y: point.avgMemoryUsagePercent,
+          sampleCount: point.sampleCount,
+          runCount: point.runCount,
+        })),
+      snapshotCount: orderedRows.reduce((sum, point) => sum + this.normalizeCount(point.sampleCount), 0),
+      bucketCount: orderedRows.length,
+      runCount: orderedRows.reduce((maxValue, point) => Math.max(maxValue, this.normalizeCount(point.runCount)), 0),
+      minTimestampMs: orderedRows[0]?.timestampMs ?? null,
+      maxTimestampMs: orderedRows[orderedRows.length - 1]?.timestampMs ?? null,
+    };
+  }
+
+  mapTimelineOverviewBuckets(rows = [], bucketLimit = this.timelineBucketLimit) {
+    return [...rows]
+      .map((row) => ({
+        timestamp: this.serializeDate(row.timestamp),
+        averageScore: this.normalizeMetric(row.averageScore),
+        bestScore: this.normalizeMetric(row.bestScore),
+        avgCpuUsage: this.normalizeMetric(row.avgCpuUsage),
+        avgMemoryUsagePercent: this.normalizeMetric(row.avgMemoryUsagePercent),
+        sampleCount: this.normalizeCount(row.sampleCount),
+        runCount: this.normalizeCount(row.runCount),
+      }))
+      .filter((row) => row.timestamp)
+      .sort((left, right) => new Date(left.timestamp) - new Date(right.timestamp))
+      .slice(-this.normalizeTimelineBucketLimit(bucketLimit));
+  }
+
   sliceDashboardAggregate(aggregate, bucketLimit) {
     const normalizedBucketLimit = this.normalizeBucketLimit(bucketLimit);
     const activityBuckets = Array.isArray(aggregate?.activityBuckets)
       ? aggregate.activityBuckets.slice(-normalizedBucketLimit)
       : [];
+    const timelineBucketLimit = this.normalizeTimelineBucketLimit(aggregate?.timelineBucketLimit);
+    const timelineSeedSeries = Array.isArray(aggregate?.timelineSeedSeries)
+      ? aggregate.timelineSeedSeries.map((series) => ({
+        ...series,
+        points: Array.isArray(series.points) ? series.points.slice(-timelineBucketLimit) : [],
+      }))
+      : [];
+    const timelineAlgorithmSeries = Array.isArray(aggregate?.timelineAlgorithmSeries)
+      ? aggregate.timelineAlgorithmSeries.map((series) => ({
+        ...series,
+        points: Array.isArray(series.points) ? series.points.slice(-timelineBucketLimit) : [],
+      }))
+      : [];
+    const timelineOverviewBuckets = Array.isArray(aggregate?.timelineOverviewBuckets)
+      ? aggregate.timelineOverviewBuckets.slice(-timelineBucketLimit)
+      : [];
+    const resourceTimeline = this.buildResourceTimeline(timelineOverviewBuckets);
 
     return {
       ...(aggregate || {}),
       bucketIntervalMs: Number(aggregate?.bucketIntervalMs || this.bucketIntervalMs),
+      timelineBucketIntervalMs: Number(aggregate?.timelineBucketIntervalMs || this.timelineBucketIntervalMs),
+      timelineBucketLimit,
       activityBuckets,
+      timelineSeedSeries,
+      timelineAlgorithmSeries,
+      timelineOverviewBuckets,
+      resourceTimeline,
     };
   }
 
@@ -370,10 +551,13 @@ class GraspDashboardAggregateService {
     };
   }
 
-  buildMaterializedAggregate(readModel, bucketLimit = this.defaultBucketLimit) {
+  buildMaterializedAggregate(readModel, options = {}) {
     if (!readModel) {
       return null;
     }
+
+    const bucketLimit = this.normalizeBucketLimit(options.bucketLimit);
+    const timelineBucketLimit = this.normalizeTimelineBucketLimit(options.timelineBucketLimit);
 
     const payload = typeof readModel.payload === "object" && readModel.payload ? readModel.payload : {};
     const overview = payload.overview || {};
@@ -454,11 +638,28 @@ class GraspDashboardAggregateService {
         datasets: Array.isArray(row.datasets) ? row.datasets : [],
       }));
 
+    const timelineBuckets = (readModel.timelineBuckets || []).sort((left, right) => left.position - right.position);
+    const timelineSeedSeries = this.buildTimelineSeedSeries(
+      timelineBuckets.filter((row) => row.scope === "seed"),
+      timelineBucketLimit
+    );
+    const timelineAlgorithmSeries = this.buildTimelineAlgorithmSeries(
+      timelineBuckets.filter((row) => row.scope === "algorithm"),
+      timelineBucketLimit
+    );
+    const timelineOverviewBuckets = this.mapTimelineOverviewBuckets(
+      timelineBuckets.filter((row) => row.scope === "overview"),
+      timelineBucketLimit
+    );
+    const resourceTimeline = this.buildResourceTimeline(timelineOverviewBuckets);
+
     return {
       schemaVersion: MONITOR_SCHEMA_VERSION,
       generatedAt: this.serializeDate(readModel.generatedAt) || new Date().toISOString(),
       source: "database-read-model",
       bucketIntervalMs: Number(readModel.bucketIntervalMs || this.bucketIntervalMs),
+      timelineBucketIntervalMs: Number(payload.timelineBucketIntervalMs || this.timelineBucketIntervalMs),
+      timelineBucketLimit,
       overview: {
         rawEvents: this.normalizeCount(overview.rawEvents),
         rawSnapshots: this.normalizeCount(overview.rawSnapshots),
@@ -473,6 +674,10 @@ class GraspDashboardAggregateService {
       finalRunsByAlgorithm,
       finalRunsByRclAlgorithm,
       dlsOutcomeSummary,
+      timelineSeedSeries,
+      timelineAlgorithmSeries,
+      timelineOverviewBuckets,
+      resourceTimeline,
     };
   }
 
@@ -570,11 +775,71 @@ class GraspDashboardAggregateService {
       rclAlgorithms: Array.isArray(row.rclAlgorithms) ? row.rclAlgorithms : [],
     }));
 
+    const timelineSeedBuckets = (payload.timelineSeedSeries || []).flatMap((series, seriesIndex) =>
+      (series?.points || []).map((point, pointIndex) => ({
+        readModelId: recordId,
+        scope: "seed",
+        label: series.seedId || `seed-${seriesIndex}`,
+        seedId: series.seedId || null,
+        requestId: series.requestId || null,
+        algorithm: series.algorithm || "Unknown",
+        position: (seriesIndex * 10000) + pointIndex,
+        timestamp: point.timestamp ? new Date(point.timestamp) : new Date(0),
+        sampleCount: this.normalizeCount(point.sampleCount),
+        runCount: this.normalizeCount(point.runCount || 1),
+        latestScore: this.normalizeMetric(point.latestScore),
+        averageScore: this.normalizeMetric(point.averageScore),
+        bestScore: this.normalizeMetric(point.bestScore),
+        avgCpuUsage: this.normalizeMetric(point.avgCpuUsage),
+        avgMemoryUsagePercent: this.normalizeMetric(point.avgMemoryUsagePercent),
+        stage: point.stage || null,
+      }))
+    );
+    const timelineAlgorithmBuckets = (payload.timelineAlgorithmSeries || []).flatMap((series, seriesIndex) =>
+      (series?.points || []).map((point, pointIndex) => ({
+        readModelId: recordId,
+        scope: "algorithm",
+        label: series.algorithm || `algorithm-${seriesIndex}`,
+        seedId: null,
+        requestId: null,
+        algorithm: series.algorithm || "Unknown",
+        position: (seriesIndex * 10000) + pointIndex,
+        timestamp: point.timestamp ? new Date(point.timestamp) : new Date(0),
+        sampleCount: this.normalizeCount(point.sampleCount),
+        runCount: this.normalizeCount(point.runCount),
+        latestScore: this.normalizeMetric(point.latestScore),
+        averageScore: this.normalizeMetric(point.averageScore),
+        bestScore: this.normalizeMetric(point.bestScore),
+        avgCpuUsage: this.normalizeMetric(point.avgCpuUsage),
+        avgMemoryUsagePercent: this.normalizeMetric(point.avgMemoryUsagePercent),
+        stage: point.stage || null,
+      }))
+    );
+    const timelineOverviewBuckets = (payload.timelineOverviewBuckets || []).map((point, index) => ({
+      readModelId: recordId,
+      scope: "overview",
+      label: "ALL",
+      seedId: null,
+      requestId: null,
+      algorithm: null,
+      position: index,
+      timestamp: point.timestamp ? new Date(point.timestamp) : new Date(0),
+      sampleCount: this.normalizeCount(point.sampleCount),
+      runCount: this.normalizeCount(point.runCount),
+      latestScore: null,
+      averageScore: this.normalizeMetric(point.averageScore),
+      bestScore: this.normalizeMetric(point.bestScore),
+      avgCpuUsage: this.normalizeMetric(point.avgCpuUsage),
+      avgMemoryUsagePercent: this.normalizeMetric(point.avgMemoryUsagePercent),
+      stage: null,
+    }));
+
     return {
       topicMetrics,
       activityBuckets,
       resourceMetrics: [...resourceAveragesByAlgorithm, ...resourceAveragesByLocalSearch],
       algorithmMetrics: [...finalRunsByAlgorithm, ...finalRunsByRclAlgorithm, ...dlsOutcomeSummary],
+      timelineBuckets: [...timelineSeedBuckets, ...timelineAlgorithmBuckets, ...timelineOverviewBuckets],
     };
   }
 
@@ -604,6 +869,7 @@ class GraspDashboardAggregateService {
       && Array.isArray(readModel?.activityBuckets) && readModel.activityBuckets.length > 0
       && Array.isArray(readModel?.resourceMetrics) && readModel.resourceMetrics.length > 0
       && Array.isArray(readModel?.algorithmMetrics) && readModel.algorithmMetrics.length > 0
+      && Array.isArray(readModel?.timelineBuckets) && readModel.timelineBuckets.length > 0
     );
   }
 
@@ -665,6 +931,7 @@ class GraspDashboardAggregateService {
       await tx.graspDashboardActivityBucket.deleteMany({ where: { readModelId: persistedReadModel.id } });
       await tx.graspDashboardResourceMetric.deleteMany({ where: { readModelId: persistedReadModel.id } });
       await tx.graspDashboardAlgorithmMetric.deleteMany({ where: { readModelId: persistedReadModel.id } });
+      await tx.graspDashboardTimelineBucket.deleteMany({ where: { readModelId: persistedReadModel.id } });
 
       if (rows.topicMetrics.length) {
         await tx.graspDashboardTopicMetric.createMany({ data: rows.topicMetrics });
@@ -677,6 +944,9 @@ class GraspDashboardAggregateService {
       }
       if (rows.algorithmMetrics.length) {
         await tx.graspDashboardAlgorithmMetric.createMany({ data: rows.algorithmMetrics });
+      }
+      if (rows.timelineBuckets.length) {
+        await tx.graspDashboardTimelineBucket.createMany({ data: rows.timelineBuckets });
       }
 
       return persistedReadModel;
@@ -699,6 +969,8 @@ class GraspDashboardAggregateService {
     const bucketLimit = Number.isFinite(requestedBucketLimit) && requestedBucketLimit > 0
       ? Math.max(Math.floor(requestedBucketLimit), 1)
       : this.defaultBucketLimit;
+    const timelineBucketLimit = this.normalizeTimelineBucketLimit(options.timelineBucketLimit);
+    const timelineBucketIntervalMs = this.timelineBucketIntervalMs;
 
     const [
       overviewRows,
@@ -709,6 +981,9 @@ class GraspDashboardAggregateService {
       initialSeedCountRows,
       finalRunRows,
       dlsOutcomeRows,
+      timelineSeedBucketRows,
+      timelineAlgorithmBucketRows,
+      timelineOverviewBucketRows,
     ] = await Promise.all([
       prisma.$queryRawUnsafe(`
         WITH base AS (
@@ -924,6 +1199,104 @@ class GraspDashboardAggregateService {
         WHERE dls.ranking = 1
           AND dls.algorithm <> 'Unknown'
       `),
+      prisma.$queryRawUnsafe(`
+        WITH base AS (
+          SELECT
+            ${SEED_ID_SQL} AS seed_id,
+            ${REQUEST_ID_SQL} AS request_id,
+            ${RCL_ALGORITHM_SQL} AS algorithm,
+            ${STAGE_SQL} AS stage,
+            to_timestamp(
+              floor(extract(epoch from "createdAt") * 1000 / ${timelineBucketIntervalMs}) * ${timelineBucketIntervalMs} / 1000.0
+            ) AS bucket_timestamp,
+            ${SCORE_SQL} AS score,
+            ${CPU_USAGE_SQL} AS cpu_usage,
+            ${MEMORY_USAGE_PERCENT_SQL} AS memory_usage_percent,
+            "createdAt" AS created_at
+          FROM "GraspExecutionEvent"
+          WHERE ${SNAPSHOT_EVENT_FILTER}
+            AND ${SEED_ID_SQL} IS NOT NULL
+        ),
+        ranked AS (
+          SELECT
+            *,
+            ROW_NUMBER() OVER (
+              PARTITION BY seed_id, bucket_timestamp
+              ORDER BY created_at DESC
+            ) AS ranking
+          FROM base
+        )
+        SELECT
+          seed_id AS "seedId",
+          MAX(request_id) AS "requestId",
+          MAX(algorithm) AS algorithm,
+          bucket_timestamp AS timestamp,
+          COUNT(*) AS "sampleCount",
+          COUNT(DISTINCT seed_id) AS "runCount",
+          MAX(CASE WHEN ranking = 1 THEN score ELSE NULL END)::double precision AS "latestScore",
+          AVG(score)::double precision AS "averageScore",
+          MAX(score)::double precision AS "bestScore",
+          AVG(cpu_usage)::double precision AS "avgCpuUsage",
+          AVG(memory_usage_percent)::double precision AS "avgMemoryUsagePercent",
+          MAX(CASE WHEN ranking = 1 THEN stage ELSE NULL END) AS stage
+        FROM ranked
+        GROUP BY seed_id, bucket_timestamp
+        ORDER BY bucket_timestamp ASC, seed_id ASC
+      `),
+      prisma.$queryRawUnsafe(`
+        WITH base AS (
+          SELECT
+            ${SEED_ID_SQL} AS seed_id,
+            ${RCL_ALGORITHM_SQL} AS algorithm,
+            to_timestamp(
+              floor(extract(epoch from "createdAt") * 1000 / ${timelineBucketIntervalMs}) * ${timelineBucketIntervalMs} / 1000.0
+            ) AS bucket_timestamp,
+            ${SCORE_SQL} AS score,
+            ${CPU_USAGE_SQL} AS cpu_usage,
+            ${MEMORY_USAGE_PERCENT_SQL} AS memory_usage_percent
+          FROM "GraspExecutionEvent"
+          WHERE ${SNAPSHOT_EVENT_FILTER}
+            AND ${SEED_ID_SQL} IS NOT NULL
+        )
+        SELECT
+          algorithm,
+          bucket_timestamp AS timestamp,
+          COUNT(*) AS "sampleCount",
+          COUNT(DISTINCT seed_id) AS "runCount",
+          AVG(score)::double precision AS "averageScore",
+          MAX(score)::double precision AS "bestScore",
+          AVG(cpu_usage)::double precision AS "avgCpuUsage",
+          AVG(memory_usage_percent)::double precision AS "avgMemoryUsagePercent"
+        FROM base
+        GROUP BY algorithm, bucket_timestamp
+        ORDER BY bucket_timestamp ASC, algorithm ASC
+      `),
+      prisma.$queryRawUnsafe(`
+        WITH base AS (
+          SELECT
+            ${SEED_ID_SQL} AS seed_id,
+            to_timestamp(
+              floor(extract(epoch from "createdAt") * 1000 / ${timelineBucketIntervalMs}) * ${timelineBucketIntervalMs} / 1000.0
+            ) AS bucket_timestamp,
+            ${SCORE_SQL} AS score,
+            ${CPU_USAGE_SQL} AS cpu_usage,
+            ${MEMORY_USAGE_PERCENT_SQL} AS memory_usage_percent
+          FROM "GraspExecutionEvent"
+          WHERE ${SNAPSHOT_EVENT_FILTER}
+            AND ${SEED_ID_SQL} IS NOT NULL
+        )
+        SELECT
+          bucket_timestamp AS timestamp,
+          COUNT(*) AS "sampleCount",
+          COUNT(DISTINCT seed_id) AS "runCount",
+          AVG(score)::double precision AS "averageScore",
+          MAX(score)::double precision AS "bestScore",
+          AVG(cpu_usage)::double precision AS "avgCpuUsage",
+          AVG(memory_usage_percent)::double precision AS "avgMemoryUsagePercent"
+        FROM base
+        GROUP BY bucket_timestamp
+        ORDER BY bucket_timestamp ASC
+      `),
     ]);
 
     const overviewRow = overviewRows?.[0] || {};
@@ -932,12 +1305,24 @@ class GraspDashboardAggregateService {
       finalRunsByRclAlgorithm,
     } = this.buildFinalRunSummaries(finalRunRows, initialSeedCountRows);
     const dlsOutcomeSummary = this.buildDlsOutcomeSummaries(dlsOutcomeRows);
+    const timelineSeedSeries = this.buildTimelineSeedSeries(timelineSeedBucketRows, timelineBucketLimit);
+    const timelineAlgorithmSeries = this.buildTimelineAlgorithmSeries(
+      timelineAlgorithmBucketRows,
+      timelineBucketLimit
+    );
+    const timelineOverviewBuckets = this.mapTimelineOverviewBuckets(
+      timelineOverviewBucketRows,
+      timelineBucketLimit
+    );
+    const resourceTimeline = this.buildResourceTimeline(timelineOverviewBuckets);
 
     return {
       schemaVersion: MONITOR_SCHEMA_VERSION,
       generatedAt: new Date().toISOString(),
       source: "persistent-store-build",
       bucketIntervalMs: this.bucketIntervalMs,
+      timelineBucketIntervalMs,
+      timelineBucketLimit,
       overview: {
         rawEvents: this.normalizeCount(overviewRow.rawEvents),
         rawSnapshots: this.normalizeCount(overviewRow.rawSnapshots),
@@ -952,11 +1337,16 @@ class GraspDashboardAggregateService {
       finalRunsByAlgorithm,
       finalRunsByRclAlgorithm,
       dlsOutcomeSummary,
+      timelineSeedSeries,
+      timelineAlgorithmSeries,
+      timelineOverviewBuckets,
+      resourceTimeline,
     };
   }
 
   async getDashboardAggregate(options = {}) {
     const bucketLimit = this.normalizeBucketLimit(options.bucketLimit);
+    const timelineBucketLimit = this.normalizeTimelineBucketLimit(options.timelineBucketLimit);
     const sourceWatermark = await this.getSourceWatermark();
     const storedReadModel = await prisma.graspDashboardReadModel.findUnique({
       where: { key: this.readModelKey },
@@ -965,20 +1355,28 @@ class GraspDashboardAggregateService {
         activityBuckets: true,
         resourceMetrics: true,
         algorithmMetrics: true,
+        timelineBuckets: true,
       },
     });
 
     if (this.isReadModelFresh(storedReadModel, sourceWatermark)) {
-      return this.buildMaterializedAggregate(storedReadModel, bucketLimit);
+      return this.buildMaterializedAggregate(storedReadModel, {
+        bucketLimit,
+        timelineBucketLimit,
+      });
     }
 
     const aggregate = await this.buildDashboardAggregate({
       ...options,
       bucketLimit: Math.max(bucketLimit, this.readModelBucketLimit),
+      timelineBucketLimit: Math.max(timelineBucketLimit, this.timelineBucketLimit),
     });
     const storedPayload = await this.persistReadModel(aggregate, sourceWatermark);
 
-    return this.sliceDashboardAggregate(storedPayload, bucketLimit);
+    return this.sliceDashboardAggregate({
+      ...storedPayload,
+      timelineBucketLimit,
+    }, bucketLimit);
   }
 }
 

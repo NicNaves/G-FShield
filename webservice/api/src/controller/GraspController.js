@@ -508,8 +508,11 @@ class GraspController {
     try {
       const options = {
         bucketLimit: Number(req.query.bucketLimit || process.env.GRASP_DASHBOARD_BUCKET_LIMIT || 72),
+        timelineBucketLimit: Number(
+          req.query.timelineBucketLimit || process.env.GRASP_DASHBOARD_TIMELINE_BUCKET_LIMIT || 1440
+        ),
       };
-      const cacheKey = appCacheService.buildKey("monitor-dashboard-v3", options);
+      const cacheKey = appCacheService.buildKey("monitor-dashboard-v4", options);
       const dashboard = await appCacheService.remember(
         cacheKey,
         () => graspDashboardAggregateService.getDashboardAggregate(options),
