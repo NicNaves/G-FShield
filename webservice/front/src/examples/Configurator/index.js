@@ -132,31 +132,38 @@ function Configurator() {
       <MDBox
         display="flex"
         justifyContent="space-between"
-        alignItems="baseline"
-        pt={4}
-        pb={0.5}
-        px={3}
+        alignItems="flex-start"
+        gap={1.5}
+        pt={3.5}
+        pb={1}
       >
-        <MDBox>
+        <MDBox minWidth={0} pr={1}>
           <MDTypography variant="h5">{t("configurator.title")}</MDTypography>
-          <MDTypography variant="body2" color="text">
+          <MDTypography variant="body2" color="text" sx={{ wordBreak: "break-word" }}>
             {t("configurator.subtitle")}
           </MDTypography>
         </MDBox>
 
-        <Icon
-          sx={({ typography: { size }, palette: { dark, white } }) => ({
-            fontSize: `${size.lg} !important`,
-            color: darkMode ? white.main : dark.main,
-            stroke: "currentColor",
-            strokeWidth: "2px",
-            cursor: "pointer",
-            transform: "translateY(5px)",
-          })}
+        <IconButton
           onClick={handleCloseConfigurator}
+          sx={({ palette: { dark, white } }) => ({
+            flexShrink: 0,
+            alignSelf: "flex-start",
+            mt: -0.5,
+            mr: -0.5,
+            color: darkMode ? white.main : dark.main,
+          })}
         >
-          close
-        </Icon>
+          <Icon
+            sx={({ typography: { size } }) => ({
+              fontSize: `${size.lg} !important`,
+              stroke: "currentColor",
+              strokeWidth: "2px",
+            })}
+          >
+            close
+          </Icon>
+        </IconButton>
       </MDBox>
 
       <Divider />

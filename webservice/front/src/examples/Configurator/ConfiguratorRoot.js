@@ -21,7 +21,7 @@ export default styled(Drawer)(({ theme, ownerState }) => {
   const { boxShadows, functions, transitions } = theme;
   const { openConfigurator } = ownerState;
 
-  const configuratorWidth = "min(360px, 100vw)";
+  const configuratorWidth = "min(400px, calc(100vw - 0.75rem))";
   const { lg } = boxShadows;
   const { pxToRem } = functions;
 
@@ -49,7 +49,7 @@ export default styled(Drawer)(({ theme, ownerState }) => {
       maxWidth: "100vw",
       height: "100vh",
       margin: 0,
-      padding: `0 ${pxToRem(10)}`,
+      padding: `0 ${pxToRem(16)}`,
       borderRadius: 0,
       boxShadow: lg,
       overflowY: "auto",
