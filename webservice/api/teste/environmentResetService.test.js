@@ -54,6 +54,21 @@ const createSpawnMock = (outcomes = []) => {
   });
 };
 
+const createSpawnErrorMock = (error) => {
+  return jest.fn(() => {
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = jest.fn();
+
+    process.nextTick(() => {
+      child.emit("error", error);
+    });
+
+    return child;
+  });
+};
+
 describe("EnvironmentResetService", () => {
   beforeEach(() => {
     jest.resetModules();
@@ -137,5 +152,31 @@ describe("EnvironmentResetService", () => {
 
     expect(graspExecutionMonitorService.start).toHaveBeenCalledTimes(1);
     expect(executionQueueService.start).toHaveBeenCalledTimes(1);
+  });
+
+  test("falls back to docker socket restart when the docker binary is unavailable", async () => {
+    process.env.GF_SHIELD_PROJECT_ROOT = "/tmp/g-fshield";
+    process.env.GF_SHIELD_DOCKER_BIN = "/usr/local/bin/docker";
+    process.env.GF_SHIELD_COMPOSE_PROJECT_NAME = "g-fshield";
+    process.env.GF_SHIELD_COMPOSE_FILES = "docker-compose.yml,docker-compose.server.yml";
+
+    mockDependencies();
+    const spawnError = new Error("spawn /usr/local/bin/docker ENOENT");
+    spawnError.code = "ENOENT";
+    jest.doMock("child_process", () => ({ spawn: createSpawnErrorMock(spawnError) }));
+
+    const service = require("../src/services/EnvironmentResetService");
+    const restartSpy = jest
+      .spyOn(service, "restartComposeContainersViaSocket")
+      .mockResolvedValue({
+        strategy: "docker-api-restart",
+        restartedCount: 3,
+        restartedServices: ["zookeeper", "kafka", "grasp-fs-dls-bf"],
+      });
+
+    const result = await service.resetEnvironment();
+
+    expect(result.status).toBe("completed");
+    expect(restartSpy).toHaveBeenCalledTimes(1);
   });
 });

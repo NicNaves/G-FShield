@@ -58,6 +58,16 @@ const RUN_STAGE_SQL = `COALESCE(
 )`;
 
 class GraspExecutionStoreService {
+  hasDelegate(name) {
+    return Boolean(prisma?.[name] && typeof prisma[name].deleteMany === "function");
+  }
+
+  async truncateTables(tableNames = []) {
+    for (const tableName of tableNames) {
+      await prisma.$executeRawUnsafe(`TRUNCATE TABLE "${tableName}" RESTART IDENTITY CASCADE`);
+    }
+  }
+
   isProgressTopic(topic) {
     return topic === "LOCAL_SEARCH_PROGRESS_TOPIC";
   }
@@ -651,10 +661,23 @@ class GraspExecutionStoreService {
   }
 
   async resetMonitorState() {
-    await prisma.$transaction([
-      prisma.graspExecutionEvent.deleteMany({}),
-      prisma.graspExecutionRun.deleteMany({}),
-      prisma.graspExecutionLaunch.deleteMany({}),
+    if (
+      this.hasDelegate("graspExecutionEvent")
+      && this.hasDelegate("graspExecutionRun")
+      && this.hasDelegate("graspExecutionLaunch")
+    ) {
+      await prisma.$transaction([
+        prisma.graspExecutionEvent.deleteMany({}),
+        prisma.graspExecutionRun.deleteMany({}),
+        prisma.graspExecutionLaunch.deleteMany({}),
+      ]);
+      return;
+    }
+
+    await this.truncateTables([
+      "GraspExecutionEvent",
+      "GraspExecutionRun",
+      "GraspExecutionLaunch",
     ]);
   }
 

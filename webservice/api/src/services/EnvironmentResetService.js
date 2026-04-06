@@ -1,4 +1,5 @@
 const fs = require("fs/promises");
+const http = require("http");
 const path = require("path");
 const { spawn } = require("child_process");
 
@@ -31,6 +32,12 @@ class EnvironmentResetService {
       .split(/[,\r\n;]+/)
       .map((entry) => entry.trim())
       .filter(Boolean);
+  }
+
+  getComposeFileBaseNames() {
+    return this.composeFiles
+      .map((composeFile) => path.posix.basename(String(composeFile).replace(/\\/g, "/")))
+      .sort();
   }
 
   buildComposeArgs(...commandArgs) {
@@ -87,12 +94,7 @@ class EnvironmentResetService {
       });
       runtimeInterrupted = true;
 
-      await this.runStep(steps, "docker.compose.down", async () =>
-        this.runCommand(this.dockerCommand, this.buildComposeArgs("down", "--remove-orphans"), {
-          cwd: this.projectRoot,
-          timeoutMs: 10 * 60 * 1000,
-        })
-      );
+      const composeDownState = await this.tryComposeDown(steps);
 
       const metricsCleanup = await this.runStep(steps, "metrics.cleanup", async () => {
         const removedFiles = await this.clearMetricsFiles();
@@ -107,12 +109,18 @@ class EnvironmentResetService {
         return { cleared: true };
       });
 
-      await this.runStep(steps, "docker.compose.up", async () =>
-        this.runCommand(this.dockerCommand, this.buildComposeArgs("up", "-d", "--force-recreate", "--remove-orphans"), {
-          cwd: this.projectRoot,
-          timeoutMs: 10 * 60 * 1000,
-        })
-      );
+      if (composeDownState.strategy === "compose") {
+        await this.runStep(steps, "docker.compose.up", async () =>
+          this.runCommand(this.dockerCommand, this.buildComposeArgs("up", "-d", "--force-recreate", "--remove-orphans"), {
+            cwd: this.projectRoot,
+            timeoutMs: 10 * 60 * 1000,
+          })
+        );
+      } else {
+        await this.runStep(steps, "docker.api.restart", async () =>
+          this.restartComposeContainersViaSocket()
+        );
+      }
 
       await this.runStep(steps, "monitor.consumer.restart", async () => {
         await this.retry(async () => {
@@ -193,6 +201,186 @@ class EnvironmentResetService {
         error: error.message,
       });
     }
+  }
+
+  async tryComposeDown(steps) {
+    try {
+      const result = await this.runStep(steps, "docker.compose.down", async () =>
+        this.runCommand(this.dockerCommand, this.buildComposeArgs("down", "--remove-orphans"), {
+          cwd: this.projectRoot,
+          timeoutMs: 10 * 60 * 1000,
+        })
+      );
+
+      return {
+        strategy: "compose",
+        result,
+      };
+    } catch (error) {
+      if (!this.shouldUseDockerApiFallback(error)) {
+        throw error;
+      }
+
+      const latestStep = steps[steps.length - 1];
+      if (latestStep?.name === "docker.compose.down" && latestStep?.status === "failed") {
+        latestStep.status = "skipped";
+        latestStep.details = {
+          strategy: "docker-api-restart",
+          reason: error.message,
+        };
+        delete latestStep.error;
+      }
+
+      logger.warn("Docker CLI unavailable for environment reset; falling back to Docker socket restart", {
+        error: error.message,
+        dockerCommand: this.dockerCommand,
+      });
+
+      return {
+        strategy: "docker-api-restart",
+        error,
+      };
+    }
+  }
+
+  shouldUseDockerApiFallback(error) {
+    const message = String(error?.message || "");
+    const errorCode = String(error?.code || "");
+    return errorCode === "ENOENT"
+      || message.includes("ENOENT")
+      || message.includes("spawn /usr/local/bin/docker")
+      || message.includes("spawn docker");
+  }
+
+  async restartComposeContainersViaSocket() {
+    const containers = await this.listComposeContainersViaSocket();
+    if (!containers.length) {
+      throw new Error("No compose containers matched the configured project for reset.");
+    }
+
+    const restartedServices = [];
+    for (const container of containers) {
+      await this.requestDockerApi("POST", `/containers/${container.Id}/restart?t=30`);
+      restartedServices.push(container.Labels?.["com.docker.compose.service"] || container.Names?.[0] || container.Id);
+    }
+
+    return {
+      strategy: "docker-api-restart",
+      restartedCount: restartedServices.length,
+      restartedServices,
+    };
+  }
+
+  async listComposeContainersViaSocket() {
+    const containers = await this.requestDockerApi("GET", "/containers/json?all=1");
+    const configuredFileBaseNames = this.getComposeFileBaseNames();
+
+    const matched = (Array.isArray(containers) ? containers : [])
+      .filter((container) => {
+        const labels = container?.Labels || {};
+        const composeProject = labels["com.docker.compose.project"] || "";
+        if (composeProject !== this.composeProjectName) {
+          return false;
+        }
+
+        const configFiles = String(labels["com.docker.compose.project.config_files"] || "")
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+          .map((entry) => path.posix.basename(entry.replace(/\\/g, "/")))
+          .sort();
+
+        if (!configuredFileBaseNames.length) {
+          return true;
+        }
+
+        return configuredFileBaseNames.join(",") === configFiles.join(",");
+      })
+      .sort((left, right) => this.compareComposeContainers(left, right));
+
+    return matched;
+  }
+
+  compareComposeContainers(left, right) {
+    const priority = new Map([
+      ["zookeeper", 0],
+      ["kafka", 1],
+      ["grasp-fs.dls.verify", 2],
+      ["grasp-fs-dls-bf", 3],
+      ["grasp-fs-dls-iw", 4],
+      ["grasp-fs-dls-iwr", 5],
+      ["grasp-fs-dls-rvnd", 6],
+      ["grasp-fs-dls-vnd", 7],
+      ["grasp-fs-rcl-gr", 8],
+      ["grasp-fs-rcl-ig", 9],
+      ["grasp-fs-rcl-rf", 10],
+      ["grasp-fs-rcl-su", 11],
+      ["kafbat-ui", 12],
+    ]);
+
+    const leftService = left?.Labels?.["com.docker.compose.service"] || "";
+    const rightService = right?.Labels?.["com.docker.compose.service"] || "";
+    const leftPriority = priority.has(leftService) ? priority.get(leftService) : 100;
+    const rightPriority = priority.has(rightService) ? priority.get(rightService) : 100;
+
+    if (leftPriority !== rightPriority) {
+      return leftPriority - rightPriority;
+    }
+
+    return leftService.localeCompare(rightService);
+  }
+
+  requestDockerApi(method, requestPath, payload = null) {
+    return new Promise((resolve, reject) => {
+      const socketPath = process.env.DOCKER_SOCK || "/var/run/docker.sock";
+      const body = payload ? JSON.stringify(payload) : null;
+      const request = http.request(
+        {
+          socketPath,
+          path: requestPath,
+          method,
+          headers: body
+            ? {
+                "Content-Type": "application/json",
+                "Content-Length": Buffer.byteLength(body),
+              }
+            : undefined,
+        },
+        (response) => {
+          let rawData = "";
+
+          response.setEncoding("utf8");
+          response.on("data", (chunk) => {
+            rawData += chunk;
+          });
+          response.on("end", () => {
+            if (response.statusCode >= 400) {
+              reject(new Error(`Docker API ${method} ${requestPath} failed with status ${response.statusCode}: ${rawData}`));
+              return;
+            }
+
+            if (!rawData.trim()) {
+              resolve(null);
+              return;
+            }
+
+            try {
+              resolve(JSON.parse(rawData));
+            } catch (error) {
+              resolve(rawData);
+            }
+          });
+        }
+      );
+
+      request.on("error", reject);
+
+      if (body) {
+        request.write(body);
+      }
+
+      request.end();
+    });
   }
 
   async runStep(steps, name, action) {

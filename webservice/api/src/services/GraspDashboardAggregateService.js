@@ -959,9 +959,17 @@ class GraspDashboardAggregateService {
   }
 
   async clearReadModel() {
-    await prisma.graspDashboardReadModel.deleteMany({
-      where: { key: this.readModelKey },
-    });
+    if (prisma?.graspDashboardReadModel && typeof prisma.graspDashboardReadModel.deleteMany === "function") {
+      await prisma.graspDashboardReadModel.deleteMany({
+        where: { key: this.readModelKey },
+      });
+      return;
+    }
+
+    await prisma.$executeRawUnsafe(
+      'DELETE FROM "GraspDashboardReadModel" WHERE "key" = $1',
+      this.readModelKey
+    );
   }
 
   async buildDashboardAggregate(options = {}) {
