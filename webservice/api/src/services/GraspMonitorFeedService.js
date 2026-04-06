@@ -29,6 +29,38 @@ const TESTING_FILE_SQL = `COALESCE(
   NULLIF(COALESCE("payload"#>>'{payload,testingFileName}', "payload"#>>'{testingFileName}'), ''),
   '--'
 )`;
+const NUMERIC_REGEX = "^-?[0-9]+(?:\\.[0-9]+)?$";
+const F1_SCORE_SQL = `
+  CASE
+    WHEN NULLIF(
+      COALESCE(
+        "payload"#>>'{payload,historyEntry,f1Score}',
+        "payload"#>>'{payload,bestF1Score}',
+        "payload"#>>'{payload,currentF1Score}',
+        "payload"#>>'{payload,f1Score}',
+        "payload"#>>'{historyEntry,f1Score}',
+        "payload"#>>'{bestF1Score}',
+        "payload"#>>'{currentF1Score}',
+        "payload"#>>'{f1Score}'
+      ),
+      ''
+    ) ~ '${NUMERIC_REGEX}'
+      THEN NULLIF(
+        COALESCE(
+          "payload"#>>'{payload,historyEntry,f1Score}',
+          "payload"#>>'{payload,bestF1Score}',
+          "payload"#>>'{payload,currentF1Score}',
+          "payload"#>>'{payload,f1Score}',
+          "payload"#>>'{historyEntry,f1Score}',
+          "payload"#>>'{bestF1Score}',
+          "payload"#>>'{currentF1Score}',
+          "payload"#>>'{f1Score}'
+        ),
+        ''
+      )::double precision
+    ELSE NULL
+  END
+`;
 
 class GraspMonitorFeedService {
   constructor() {
@@ -84,6 +116,15 @@ class GraspMonitorFeedService {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
+  normalizeNumericFilter(value) {
+    if (value === undefined || value === null || value === "") {
+      return null;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
   parseDatasetKey(datasetKey) {
     const normalized = String(datasetKey || "").trim();
     if (!normalized || normalized === "all") {
@@ -118,6 +159,8 @@ class GraspMonitorFeedService {
     const requestId = String(options.requestId || "").trim();
     const seedId = String(options.seedId || "").trim();
     const searchLabel = String(options.searchLabel || "").trim().toUpperCase();
+    const minF1Score = this.normalizeNumericFilter(options.minF1Score);
+    const maxF1Score = this.normalizeNumericFilter(options.maxF1Score);
 
     if (topics.length) {
       const placeholders = topics.map((topic) => this.addParam(params, topic));
@@ -175,6 +218,14 @@ class GraspMonitorFeedService {
       )`);
     }
 
+    if (minF1Score !== null) {
+      clauses.push(`${F1_SCORE_SQL} >= ${this.addParam(params, minF1Score)}`);
+    }
+
+    if (maxF1Score !== null) {
+      clauses.push(`${F1_SCORE_SQL} <= ${this.addParam(params, maxF1Score)}`);
+    }
+
     return {
       params,
       whereClause: clauses.length ? `WHERE ${clauses.join(" AND ")}` : "",
@@ -202,7 +253,7 @@ class GraspMonitorFeedService {
     };
   }
 
-  async listFeed(options = {}) {
+  async queryFeedRows(options = {}) {
     const page = this.normalizePage(options.page);
     const pageSize = this.normalizePageSize(options.pageSize);
     const offset = (page - 1) * pageSize;
@@ -242,7 +293,46 @@ class GraspMonitorFeedService {
       offset
     );
 
-    const total = Number(countRows?.[0]?.total || 0);
+    return {
+      page,
+      pageSize,
+      total: Number(countRows?.[0]?.total || 0),
+      eventRows,
+    };
+  }
+
+  async listAllFeed(options = {}) {
+    const exportLimit = Math.max(Number(process.env.GRASP_FEED_EXPORT_LIMIT || 50_000) || 50_000, 1_000);
+    const { whereClause, params } = this.buildFilterState(options);
+
+    const eventRows = await prisma.$queryRawUnsafe(
+      `
+        SELECT
+          "fingerprint",
+          "eventType",
+          "topic",
+          "stage",
+          "status",
+          "seedId",
+          "requestId",
+          "sourcePartition",
+          "sourceOffset",
+          "payload",
+          "createdAt"
+        FROM "GraspExecutionEvent"
+        ${whereClause}
+        ORDER BY "createdAt" DESC
+        LIMIT $${params.length + 1}
+      `,
+      ...params,
+      exportLimit
+    );
+
+    return eventRows.map((eventRecord) => this.mapEvent(eventRecord));
+  }
+
+  async listFeed(options = {}) {
+    const { page, pageSize, total, eventRows } = await this.queryFeedRows(options);
     const totalPages = total > 0 ? Math.ceil(total / pageSize) : 1;
 
     return {

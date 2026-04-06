@@ -581,6 +581,8 @@ class GraspController {
         pageSize: Number(req.query.pageSize || process.env.GRASP_FEED_PAGE_SIZE || 25),
         topics: req.query.topics || "",
         algorithm: req.query.algorithm || "",
+        minF1Score: req.query.minF1Score || "",
+        maxF1Score: req.query.maxF1Score || "",
         datasetKey: req.query.datasetKey || "",
         status: req.query.status || "",
         searchLabel: req.query.searchLabel || "",

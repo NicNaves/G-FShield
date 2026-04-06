@@ -24,6 +24,8 @@ const queryKeys = {
     options.pageSize || "default",
     options.query || "",
     options.algorithm || "all",
+    options.minF1Score || "none",
+    options.maxF1Score || "none",
     options.datasetKey || "all",
     options.status || "all",
     options.searchLabel || "all",

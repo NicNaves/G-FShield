@@ -11,6 +11,7 @@ import MDBox from "components/MDBox";
 import MDTypography from "components/MDTypography";
 import ComplexStatisticsCard from "examples/Cards/StatisticsCards/ComplexStatisticsCard";
 import DataTable from "examples/Tables/DataTable";
+import FeedTableToolbarFilters from "./FeedTableToolbarFilters";
 
 const virtualizedFeedTableConfig = {
   enabled: true,
@@ -35,6 +36,12 @@ function DashboardAnalyticsTab({
   monitorFeedTotal,
   rawSolutionFeedTableData,
   rawSolutionFeedServerPagination,
+  algorithmOptions,
+  analyticsTableFilters,
+  onAnalyticsTableFiltersChange,
+  onExportAnalyticsCsv,
+  onExportAnalyticsJson,
+  exportBusy,
 }) {
   return (
     <MDBox mt={4}>
@@ -165,6 +172,17 @@ function DashboardAnalyticsTab({
                 noEndBorder
                 virtualization={virtualizedFeedTableConfig}
                 serverPagination={rawSolutionFeedServerPagination}
+                onExportCsv={onExportAnalyticsCsv}
+                onExportJson={onExportAnalyticsJson}
+                exportDisabled={exportBusy}
+                toolbarContent={(
+                  <FeedTableToolbarFilters
+                    idPrefix="analytics-feed"
+                    algorithmOptions={algorithmOptions}
+                    filters={analyticsTableFilters}
+                    onChange={onAnalyticsTableFiltersChange}
+                  />
+                )}
               />
             </MDBox>
           </Card>
@@ -189,6 +207,12 @@ DashboardAnalyticsTab.propTypes = {
   monitorFeedTotal: PropTypes.number.isRequired,
   rawSolutionFeedTableData: PropTypes.object.isRequired,
   rawSolutionFeedServerPagination: PropTypes.object.isRequired,
+  algorithmOptions: PropTypes.array.isRequired,
+  analyticsTableFilters: PropTypes.object.isRequired,
+  onAnalyticsTableFiltersChange: PropTypes.func.isRequired,
+  onExportAnalyticsCsv: PropTypes.func.isRequired,
+  onExportAnalyticsJson: PropTypes.func.isRequired,
+  exportBusy: PropTypes.bool.isRequired,
 };
 
 export default memo(DashboardAnalyticsTab);

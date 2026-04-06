@@ -331,6 +331,12 @@ const createEmptyPaginatedFeed = (pageSize = 25) => ({
   },
 });
 
+const createDefaultFeedTableFilters = () => ({
+  algorithm: "all",
+  minF1Score: "",
+  maxF1Score: "",
+});
+
 const limitDashboardRows = (rows = [], limit = DASHBOARD_TABLE_ROW_LIMIT) =>
   rows.length > limit ? rows.slice(0, limit) : rows;
 
@@ -1798,6 +1804,13 @@ function Dashboard() {
     format: "",
     jobId: "",
   });
+  const [tableFeedFilters, setTableFeedFilters] = useState({
+    analytics: createDefaultFeedTableFilters(),
+    executionInitial: createDefaultFeedTableFilters(),
+    executionOutcome: createDefaultFeedTableFilters(),
+    executionProgress: createDefaultFeedTableFilters(),
+    executionBestMoments: createDefaultFeedTableFilters(),
+  });
   const [feedControls, setFeedControls] = useState({
     analytics: { pageIndex: 0, pageSize: 25, search: "" },
     executionInitial: { pageIndex: 0, pageSize: 6, search: "" },
@@ -1829,6 +1842,22 @@ function Dashboard() {
         [key]: nextSlice,
       };
     });
+  }, []);
+  const updateTableFeedFilters = useCallback((key, patch) => {
+    setTableFeedFilters((current) => ({
+      ...current,
+      [key]: {
+        ...(current[key] || createDefaultFeedTableFilters()),
+        ...patch,
+      },
+    }));
+    setFeedControls((current) => ({
+      ...current,
+      [key]: {
+        ...(current[key] || {}),
+        pageIndex: 0,
+      },
+    }));
   }, []);
   const shouldFetchDashboardAggregate =
     (activeTab === "overview" || isPerformanceTabActive || isAlgorithmsTabActive || isAnalyticsTabActive)
@@ -2132,6 +2161,26 @@ function Dashboard() {
     }),
     [selectedStageLens, workspaceFeedFilters]
   );
+  const resolveFeedQueryOptions = useCallback(
+    (feedKey, topics, controlSlice = {}) => {
+      const tableFilters = tableFeedFilters[feedKey] || createDefaultFeedTableFilters();
+
+      return {
+        ...workspaceFeedFilters,
+        page: Number(controlSlice.pageIndex || 0) + 1,
+        pageSize: controlSlice.pageSize || 25,
+        query: controlSlice.search || "",
+        topics,
+        algorithm:
+          tableFilters.algorithm && tableFilters.algorithm !== "all"
+            ? tableFilters.algorithm
+            : workspaceFeedFilters.algorithm,
+        minF1Score: tableFilters.minF1Score || undefined,
+        maxF1Score: tableFilters.maxF1Score || undefined,
+      };
+    },
+    [tableFeedFilters, workspaceFeedFilters]
+  );
 
   useEffect(() => {
     setFeedControls((current) => ({
@@ -2165,47 +2214,27 @@ function Dashboard() {
   );
 
   const analyticsFeedQuery = useMonitorEventFeedQuery({
-    ...workspaceFeedFilters,
-    page: feedControls.analytics.pageIndex + 1,
-    pageSize: feedControls.analytics.pageSize,
-    query: feedControls.analytics.search,
-    topics: analyticsFeedTopics,
+    ...resolveFeedQueryOptions("analytics", analyticsFeedTopics, feedControls.analytics),
     enabled: isAnalyticsTabActive,
     staleTime: 10_000,
   });
   const executionInitialFeedQuery = useMonitorEventFeedQuery({
-    ...workspaceFeedFilters,
-    page: feedControls.executionInitial.pageIndex + 1,
-    pageSize: feedControls.executionInitial.pageSize,
-    query: feedControls.executionInitial.search,
-    topics: executionInitialFeedTopics,
+    ...resolveFeedQueryOptions("executionInitial", executionInitialFeedTopics, feedControls.executionInitial),
     enabled: isExecutionsTabActive && (selectedStageLens === "all" || executionInitialFeedTopics.length > 0),
     staleTime: 10_000,
   });
   const executionOutcomeFeedQuery = useMonitorEventFeedQuery({
-    ...workspaceFeedFilters,
-    page: feedControls.executionOutcome.pageIndex + 1,
-    pageSize: feedControls.executionOutcome.pageSize,
-    query: feedControls.executionOutcome.search,
-    topics: executionOutcomeFeedTopics,
+    ...resolveFeedQueryOptions("executionOutcome", executionOutcomeFeedTopics, feedControls.executionOutcome),
     enabled: isExecutionsTabActive && (selectedStageLens === "all" || executionOutcomeFeedTopics.length > 0),
     staleTime: 10_000,
   });
   const executionProgressFeedQuery = useMonitorEventFeedQuery({
-    ...workspaceFeedFilters,
-    page: feedControls.executionProgress.pageIndex + 1,
-    pageSize: feedControls.executionProgress.pageSize,
-    query: feedControls.executionProgress.search,
-    topics: executionProgressFeedTopics,
+    ...resolveFeedQueryOptions("executionProgress", executionProgressFeedTopics, feedControls.executionProgress),
     enabled: isExecutionsTabActive && (selectedStageLens === "all" || executionProgressFeedTopics.length > 0),
     staleTime: 10_000,
   });
   const executionBestMomentsFeedQuery = useMonitorEventFeedQuery({
-    ...workspaceFeedFilters,
-    page: feedControls.executionBestMoments.pageIndex + 1,
-    pageSize: feedControls.executionBestMoments.pageSize,
-    query: feedControls.executionBestMoments.search,
-    topics: executionBestMomentsFeedTopics,
+    ...resolveFeedQueryOptions("executionBestMoments", executionBestMomentsFeedTopics, feedControls.executionBestMoments),
     enabled: isExecutionsTabActive && (selectedStageLens === "all" || executionBestMomentsFeedTopics.length > 0),
     staleTime: 10_000,
   });
@@ -2823,6 +2852,13 @@ function Dashboard() {
     setSelectedExportScope("visible");
     setSelectedSeedId("");
     setSelectedRequestId("");
+    setTableFeedFilters({
+      analytics: createDefaultFeedTableFilters(),
+      executionInitial: createDefaultFeedTableFilters(),
+      executionOutcome: createDefaultFeedTableFilters(),
+      executionProgress: createDefaultFeedTableFilters(),
+      executionBestMoments: createDefaultFeedTableFilters(),
+    });
   };
 
   const featuredRun = useMemo(() => {
@@ -3180,6 +3216,93 @@ function Dashboard() {
     timelineTimestampQuery,
   ]);
 
+  const runFeedTableExportJob = useCallback(
+    async (format, config = {}) => {
+      const requestedFormat = String(format || "json").toLowerCase() === "csv" ? "csv" : "json";
+      const toastId = `table-export-${config.feedKey || config.prefix || "feed"}-${requestedFormat}`;
+      const queryOptions = resolveFeedQueryOptions(
+        config.feedKey,
+        config.topics || [],
+        feedControls[config.feedKey] || {}
+      );
+
+      try {
+        setExportJobState({
+          loading: true,
+          format: requestedFormat,
+          jobId: "",
+        });
+        toast.info("Preparando exportacao completa da tabela...", { toastId });
+
+        const job = await createMonitorExportJob({
+          format: requestedFormat,
+          scope: "feed",
+          prefix: config.prefix || "table-feed",
+          topics: config.topics || [],
+          algorithm: queryOptions.algorithm || null,
+          datasetKey: queryOptions.datasetKey || null,
+          status: queryOptions.status || null,
+          searchLabel: queryOptions.searchLabel || null,
+          requestId: queryOptions.requestId || null,
+          seedId: queryOptions.seedId || null,
+          start: queryOptions.start || null,
+          end: queryOptions.end || null,
+          query: queryOptions.query || null,
+          minF1Score: queryOptions.minF1Score || null,
+          maxF1Score: queryOptions.maxF1Score || null,
+          filters: {
+            exportScope: "feed",
+            algorithm: queryOptions.algorithm || "all",
+            dataset: queryOptions.datasetKey || "all",
+            requestId: queryOptions.requestId || null,
+            seedId: queryOptions.seedId || null,
+            timeWindow: selectedTimeWindow,
+            search: queryOptions.query || "",
+            minF1Score: queryOptions.minF1Score || null,
+            maxF1Score: queryOptions.maxF1Score || null,
+          },
+        });
+
+        let attempts = 0;
+        let currentJob = job;
+
+        while (attempts < 60) {
+          if (currentJob?.status === "completed") {
+            break;
+          }
+
+          if (currentJob?.status === "failed") {
+            throw new Error(currentJob.error || "Nao foi possivel exportar a tabela.");
+          }
+
+          await new Promise((resolve) => {
+            window.setTimeout(resolve, 1500);
+          });
+
+          currentJob = await getMonitorExportJob(job.jobId);
+          attempts += 1;
+        }
+
+        if (currentJob?.status !== "completed") {
+          throw new Error("A exportacao completa da tabela demorou mais do que o esperado.");
+        }
+
+        const download = await downloadMonitorExportJob(currentJob.jobId);
+        downloadBlobFile(download.filename, download.blob);
+        toast.success("Exportacao da tabela concluida.", { toastId });
+      } catch (requestError) {
+        toast.error(requestError.message || "Nao foi possivel exportar a tabela.", { toastId });
+      } finally {
+        setExportJobState({
+          loading: false,
+          format: "",
+          jobId: "",
+        });
+      }
+    },
+    [feedControls, resolveFeedQueryOptions, selectedTimeWindow]
+  );
+
   const runAsyncExportJob = useCallback(
     async (format) => {
       const requestedFormat = String(format || "json").toLowerCase() === "csv" ? "csv" : "json";
@@ -3259,6 +3382,24 @@ function Dashboard() {
     ]
   );
 
+  const handleAnalyticsTableFiltersChange = useCallback(
+    (patch) => updateTableFeedFilters("analytics", patch),
+    [updateTableFeedFilters]
+  );
+
+  const handleExecutionTableFiltersChange = useCallback(
+    (feedKey, patch) => {
+      const normalizedFeedKey = {
+        initial: "executionInitial",
+        outcome: "executionOutcome",
+        progress: "executionProgress",
+        best: "executionBestMoments",
+      }[feedKey] || feedKey;
+      updateTableFeedFilters(normalizedFeedKey, patch);
+    },
+    [updateTableFeedFilters]
+  );
+
   const handleExportCsv = useCallback(() => {
     if (selectedExportScope === "visible") {
       const fileName = `${buildDashboardExportFileName(exportSelection.prefix, exportSelection.filters)}.csv`;
@@ -3299,6 +3440,96 @@ function Dashboard() {
     runAsyncExportJob,
     selectedExportScope,
   ]);
+
+  const handleExportAnalyticsCsv = useCallback(
+    () => runFeedTableExportJob("csv", {
+      feedKey: "analytics",
+      topics: analyticsFeedTopics,
+      prefix: "analytics-feed",
+    }),
+    [analyticsFeedTopics, runFeedTableExportJob]
+  );
+
+  const handleExportAnalyticsJson = useCallback(
+    () => runFeedTableExportJob("json", {
+      feedKey: "analytics",
+      topics: analyticsFeedTopics,
+      prefix: "analytics-feed",
+    }),
+    [analyticsFeedTopics, runFeedTableExportJob]
+  );
+
+  const handleExportInitialSolutionsCsv = useCallback(
+    () => runFeedTableExportJob("csv", {
+      feedKey: "executionInitial",
+      topics: executionInitialFeedTopics,
+      prefix: "initial-solutions",
+    }),
+    [executionInitialFeedTopics, runFeedTableExportJob]
+  );
+
+  const handleExportInitialSolutionsJson = useCallback(
+    () => runFeedTableExportJob("json", {
+      feedKey: "executionInitial",
+      topics: executionInitialFeedTopics,
+      prefix: "initial-solutions",
+    }),
+    [executionInitialFeedTopics, runFeedTableExportJob]
+  );
+
+  const handleExportLocalSearchOutcomesCsv = useCallback(
+    () => runFeedTableExportJob("csv", {
+      feedKey: "executionOutcome",
+      topics: executionOutcomeFeedTopics,
+      prefix: "local-search-outcomes",
+    }),
+    [executionOutcomeFeedTopics, runFeedTableExportJob]
+  );
+
+  const handleExportLocalSearchOutcomesJson = useCallback(
+    () => runFeedTableExportJob("json", {
+      feedKey: "executionOutcome",
+      topics: executionOutcomeFeedTopics,
+      prefix: "local-search-outcomes",
+    }),
+    [executionOutcomeFeedTopics, runFeedTableExportJob]
+  );
+
+  const handleExportLocalSearchProgressCsv = useCallback(
+    () => runFeedTableExportJob("csv", {
+      feedKey: "executionProgress",
+      topics: executionProgressFeedTopics,
+      prefix: "local-search-progress",
+    }),
+    [executionProgressFeedTopics, runFeedTableExportJob]
+  );
+
+  const handleExportLocalSearchProgressJson = useCallback(
+    () => runFeedTableExportJob("json", {
+      feedKey: "executionProgress",
+      topics: executionProgressFeedTopics,
+      prefix: "local-search-progress",
+    }),
+    [executionProgressFeedTopics, runFeedTableExportJob]
+  );
+
+  const handleExportBestSolutionMomentsCsv = useCallback(
+    () => runFeedTableExportJob("csv", {
+      feedKey: "executionBestMoments",
+      topics: executionBestMomentsFeedTopics,
+      prefix: "best-solution-moments",
+    }),
+    [executionBestMomentsFeedTopics, runFeedTableExportJob]
+  );
+
+  const handleExportBestSolutionMomentsJson = useCallback(
+    () => runFeedTableExportJob("json", {
+      feedKey: "executionBestMoments",
+      topics: executionBestMomentsFeedTopics,
+      prefix: "best-solution-moments",
+    }),
+    [executionBestMomentsFeedTopics, runFeedTableExportJob]
+  );
 
   const fullTimelineComparison = useMemo(() => {
     let snapshotCount = 0;
@@ -5977,6 +6208,12 @@ function Dashboard() {
             monitorFeedTotal={analyticsFeed.pagination?.total || 0}
             rawSolutionFeedTableData={rawSolutionFeedTableData}
             rawSolutionFeedServerPagination={analyticsFeedServerPagination}
+            algorithmOptions={algorithmOptions}
+            analyticsTableFilters={tableFeedFilters.analytics}
+            onAnalyticsTableFiltersChange={handleAnalyticsTableFiltersChange}
+            onExportAnalyticsCsv={handleExportAnalyticsCsv}
+            onExportAnalyticsJson={handleExportAnalyticsJson}
+            exportBusy={exportJobState.loading}
           />
           </Suspense>
         ) : null}
@@ -6000,6 +6237,23 @@ function Dashboard() {
               localSearchOutcomesServerPagination={executionOutcomeServerPagination}
               localSearchProgressServerPagination={executionProgressServerPagination}
               bestSolutionMomentsServerPagination={executionBestMomentsServerPagination}
+              algorithmOptions={algorithmOptions}
+              executionTableFilters={{
+                initial: tableFeedFilters.executionInitial,
+                outcome: tableFeedFilters.executionOutcome,
+                progress: tableFeedFilters.executionProgress,
+                best: tableFeedFilters.executionBestMoments,
+              }}
+              onExecutionTableFiltersChange={handleExecutionTableFiltersChange}
+              onExportInitialSolutionsCsv={handleExportInitialSolutionsCsv}
+              onExportInitialSolutionsJson={handleExportInitialSolutionsJson}
+              onExportLocalSearchOutcomesCsv={handleExportLocalSearchOutcomesCsv}
+              onExportLocalSearchOutcomesJson={handleExportLocalSearchOutcomesJson}
+              onExportLocalSearchProgressCsv={handleExportLocalSearchProgressCsv}
+              onExportLocalSearchProgressJson={handleExportLocalSearchProgressJson}
+              onExportBestSolutionMomentsCsv={handleExportBestSolutionMomentsCsv}
+              onExportBestSolutionMomentsJson={handleExportBestSolutionMomentsJson}
+              exportBusy={exportJobState.loading}
             />
           </Suspense>
         ) : null}

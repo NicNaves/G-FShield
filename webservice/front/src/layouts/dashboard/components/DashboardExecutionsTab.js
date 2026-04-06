@@ -10,6 +10,7 @@ import MDTypography from "components/MDTypography";
 import DataTable from "examples/Tables/DataTable";
 
 import ExecutionComparison from "../execution-comparison";
+import FeedTableToolbarFilters from "./FeedTableToolbarFilters";
 
 const virtualizedFeedTableConfig = {
   enabled: true,
@@ -36,6 +37,18 @@ function DashboardExecutionsTab({
   localSearchOutcomesServerPagination,
   localSearchProgressServerPagination,
   bestSolutionMomentsServerPagination,
+  algorithmOptions,
+  executionTableFilters,
+  onExecutionTableFiltersChange,
+  onExportInitialSolutionsCsv,
+  onExportInitialSolutionsJson,
+  onExportLocalSearchOutcomesCsv,
+  onExportLocalSearchOutcomesJson,
+  onExportLocalSearchProgressCsv,
+  onExportLocalSearchProgressJson,
+  onExportBestSolutionMomentsCsv,
+  onExportBestSolutionMomentsJson,
+  exportBusy,
 }) {
   return (
     <MDBox mt={4}>
@@ -72,6 +85,17 @@ function DashboardExecutionsTab({
                 showTotalEntries
                 noEndBorder
                 serverPagination={initialSolutionsServerPagination}
+                onExportCsv={onExportInitialSolutionsCsv}
+                onExportJson={onExportInitialSolutionsJson}
+                exportDisabled={exportBusy}
+                toolbarContent={(
+                  <FeedTableToolbarFilters
+                    idPrefix="execution-initial"
+                    algorithmOptions={algorithmOptions}
+                    filters={executionTableFilters.initial}
+                    onChange={(patch) => onExecutionTableFiltersChange("initial", patch)}
+                  />
+                )}
               />
             </MDBox>
           </Card>
@@ -105,6 +129,17 @@ function DashboardExecutionsTab({
                 showTotalEntries
                 noEndBorder
                 serverPagination={localSearchOutcomesServerPagination}
+                onExportCsv={onExportLocalSearchOutcomesCsv}
+                onExportJson={onExportLocalSearchOutcomesJson}
+                exportDisabled={exportBusy}
+                toolbarContent={(
+                  <FeedTableToolbarFilters
+                    idPrefix="execution-outcome"
+                    algorithmOptions={algorithmOptions}
+                    filters={executionTableFilters.outcome}
+                    onChange={(patch) => onExecutionTableFiltersChange("outcome", patch)}
+                  />
+                )}
               />
             </MDBox>
           </Card>
@@ -139,6 +174,17 @@ function DashboardExecutionsTab({
                 noEndBorder
                 virtualization={virtualizedFeedTableConfig}
                 serverPagination={localSearchProgressServerPagination}
+                onExportCsv={onExportLocalSearchProgressCsv}
+                onExportJson={onExportLocalSearchProgressJson}
+                exportDisabled={exportBusy}
+                toolbarContent={(
+                  <FeedTableToolbarFilters
+                    idPrefix="execution-progress"
+                    algorithmOptions={algorithmOptions}
+                    filters={executionTableFilters.progress}
+                    onChange={(patch) => onExecutionTableFiltersChange("progress", patch)}
+                  />
+                )}
               />
             </MDBox>
           </Card>
@@ -173,6 +219,17 @@ function DashboardExecutionsTab({
                 noEndBorder
                 virtualization={virtualizedFeedTableConfig}
                 serverPagination={bestSolutionMomentsServerPagination}
+                onExportCsv={onExportBestSolutionMomentsCsv}
+                onExportJson={onExportBestSolutionMomentsJson}
+                exportDisabled={exportBusy}
+                toolbarContent={(
+                  <FeedTableToolbarFilters
+                    idPrefix="execution-best"
+                    algorithmOptions={algorithmOptions}
+                    filters={executionTableFilters.best}
+                    onChange={(patch) => onExecutionTableFiltersChange("best", patch)}
+                  />
+                )}
               />
             </MDBox>
           </Card>
@@ -232,6 +289,18 @@ DashboardExecutionsTab.propTypes = {
   localSearchOutcomesServerPagination: PropTypes.object.isRequired,
   localSearchProgressServerPagination: PropTypes.object.isRequired,
   bestSolutionMomentsServerPagination: PropTypes.object.isRequired,
+  algorithmOptions: PropTypes.array.isRequired,
+  executionTableFilters: PropTypes.object.isRequired,
+  onExecutionTableFiltersChange: PropTypes.func.isRequired,
+  onExportInitialSolutionsCsv: PropTypes.func.isRequired,
+  onExportInitialSolutionsJson: PropTypes.func.isRequired,
+  onExportLocalSearchOutcomesCsv: PropTypes.func.isRequired,
+  onExportLocalSearchOutcomesJson: PropTypes.func.isRequired,
+  onExportLocalSearchProgressCsv: PropTypes.func.isRequired,
+  onExportLocalSearchProgressJson: PropTypes.func.isRequired,
+  onExportBestSolutionMomentsCsv: PropTypes.func.isRequired,
+  onExportBestSolutionMomentsJson: PropTypes.func.isRequired,
+  exportBusy: PropTypes.bool.isRequired,
 };
 
 export default memo(DashboardExecutionsTab);

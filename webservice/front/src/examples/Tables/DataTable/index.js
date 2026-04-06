@@ -129,6 +129,10 @@ function DataTable({
   canSearch,
   canExport,
   exportFileName,
+  onExportCsv,
+  onExportJson,
+  exportDisabled,
+  toolbarContent,
   showTotalEntries,
   table,
   pagination,
@@ -279,6 +283,11 @@ function DataTable({
   };
 
   const handleExportCsv = () => {
+    if (typeof onExportCsv === "function") {
+      onExportCsv();
+      return;
+    }
+
     const dataset = buildExportDataset();
     const csvRows = [
       dataset.columns.map((column) => escapeCsvValue(column.label)).join(","),
@@ -291,6 +300,11 @@ function DataTable({
   };
 
   const handleExportJson = () => {
+    if (typeof onExportJson === "function") {
+      onExportJson();
+      return;
+    }
+
     const dataset = buildExportDataset();
     const payload = {
       exportedAt: new Date().toISOString(),
@@ -575,7 +589,7 @@ function DataTable({
                   size="small"
                   startIcon={<Icon>table_view</Icon>}
                   onClick={handleExportCsv}
-                  disabled={totalEntries === 0}
+                  disabled={exportDisabled || totalEntries === 0}
                 >
                   {t("datatable.exportCsv")}
                 </MDButton>
@@ -585,12 +599,13 @@ function DataTable({
                   size="small"
                   startIcon={<Icon>data_object</Icon>}
                   onClick={handleExportJson}
-                  disabled={totalEntries === 0}
+                  disabled={exportDisabled || totalEntries === 0}
                 >
                   {t("datatable.exportJson")}
                 </MDButton>
               </MDBox>
             )}
+            {toolbarContent || null}
           </MDBox>
           {canSearch && (
             <MDBox width={{ xs: "100%", md: "12rem" }} ml={{ md: "auto" }}>
@@ -720,6 +735,10 @@ DataTable.defaultProps = {
   canSearch: false,
   canExport: true,
   exportFileName: null,
+  onExportCsv: null,
+  onExportJson: null,
+  exportDisabled: false,
+  toolbarContent: null,
   showTotalEntries: true,
   pagination: { variant: "gradient", color: "info" },
   isSorted: true,
@@ -740,6 +759,10 @@ DataTable.propTypes = {
   canSearch: PropTypes.bool,
   canExport: PropTypes.bool,
   exportFileName: PropTypes.string,
+  onExportCsv: PropTypes.func,
+  onExportJson: PropTypes.func,
+  exportDisabled: PropTypes.bool,
+  toolbarContent: PropTypes.node,
   showTotalEntries: PropTypes.bool,
   table: PropTypes.objectOf(PropTypes.array).isRequired,
   pagination: PropTypes.shape({

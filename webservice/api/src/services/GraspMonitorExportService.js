@@ -3,6 +3,7 @@ const { randomUUID } = require("crypto");
 const executionLaunchService = require("./ExecutionLaunchService");
 const graspExecutionStoreService = require("./GraspExecutionStoreService");
 const graspExecutionMonitorService = require("./GraspExecutionMonitorService");
+const graspMonitorFeedService = require("./GraspMonitorFeedService");
 
 const DEFAULT_JOB_TTL_MS = Math.max(Number(process.env.GRASP_EXPORT_JOB_TTL_MS || 15 * 60 * 1000), 60_000);
 const DEFAULT_EVENT_LIMIT = Math.max(Number(process.env.GRASP_EXPORT_EVENT_LIMIT || 10_000), 1_000);
@@ -161,6 +162,21 @@ class GraspMonitorExportService {
     };
   }
 
+  parseFeatureList(features) {
+    if (Array.isArray(features)) {
+      return features.map((feature) => String(feature));
+    }
+
+    if (typeof features === "string") {
+      return features
+        .split(/[\s,]+/)
+        .map((feature) => feature.trim())
+        .filter(Boolean);
+    }
+
+    return [];
+  }
+
   parseDateTime(value) {
     if (!value) {
       return null;
@@ -243,6 +259,49 @@ class GraspMonitorExportService {
       memoryUsage: entry?.memoryUsage ?? run?.memoryUsage ?? null,
       memoryUsagePercent: entry?.memoryUsagePercent ?? run?.memoryUsagePercent ?? null,
       cpuUsage: entry?.cpuUsage ?? run?.cpuUsage ?? null,
+    };
+  }
+
+  extractFeedSnapshot(event) {
+    const snapshot = event?.payload?.payload || event?.payload || {};
+    const historyEntry = snapshot.historyEntry || {};
+    const solutionFeatures = this.parseFeatureList(historyEntry.solutionFeatures || snapshot.solutionFeatures);
+    const rclFeatures = this.parseFeatureList(
+      historyEntry.rclFeatures || snapshot.rclFeatures || snapshot.rclfeatures
+    );
+
+    return {
+      ...event,
+      seedId: snapshot.seedId || event?.seedId || null,
+      requestId: snapshot.requestId || historyEntry.requestId || event?.requestId || null,
+      topic: historyEntry.topic || event?.topic || snapshot.topic || null,
+      stage: historyEntry.stage || event?.stage || snapshot.stage || null,
+      timestamp: event?.timestamp || snapshot.updatedAt || snapshot.createdAt || null,
+      rclAlgorithm: snapshot.rclAlgorithm || null,
+      classifier: snapshot.classifier || snapshot.classfier || null,
+      localSearch: historyEntry.localSearch || snapshot.localSearch || null,
+      neighborhood: historyEntry.neighborhood || snapshot.neighborhood || null,
+      currentF1Score: historyEntry.f1Score ?? snapshot.currentF1Score ?? snapshot.f1Score ?? null,
+      bestF1Score: snapshot.bestF1Score ?? snapshot.currentF1Score ?? snapshot.f1Score ?? null,
+      trainingFileName: snapshot.trainingFileName || null,
+      testingFileName: snapshot.testingFileName || null,
+      iterationNeighborhood: historyEntry.iterationNeighborhood ?? snapshot.iterationNeighborhood ?? null,
+      iterationLocalSearch: historyEntry.iterationLocalSearch ?? snapshot.iterationLocalSearch ?? null,
+      previousBestF1Score: historyEntry.previousBestF1Score ?? snapshot.previousBestF1Score ?? null,
+      scoreDelta: historyEntry.scoreDelta ?? snapshot.scoreDelta ?? null,
+      improved: historyEntry.improved ?? snapshot.improved ?? null,
+      solutionFeatures,
+      rclFeatures,
+      enabledLocalSearches: Array.isArray(historyEntry.enabledLocalSearches)
+        ? historyEntry.enabledLocalSearches
+        : Array.isArray(snapshot.enabledLocalSearches)
+          ? snapshot.enabledLocalSearches
+          : [],
+      solutionSize: historyEntry.solutionSize ?? snapshot.solutionSize ?? solutionFeatures.length,
+      rclSize: historyEntry.rclSize ?? snapshot.rclSize ?? rclFeatures.length,
+      memoryUsage: historyEntry.memoryUsage ?? snapshot.memoryUsage ?? null,
+      memoryUsagePercent: historyEntry.memoryUsagePercent ?? snapshot.memoryUsagePercent ?? null,
+      cpuUsage: historyEntry.cpuUsage ?? snapshot.cpuUsage ?? null,
     };
   }
 
@@ -359,6 +418,41 @@ class GraspMonitorExportService {
         request: null,
         runs: [run],
         snapshots: this.buildRunSnapshots(run, runFilters),
+        events: [],
+      };
+    }
+
+    if (scope === "feed") {
+      const feedOptions = {
+        topics: payload.topics || [],
+        algorithm: payload.algorithm || null,
+        datasetKey: payload.datasetKey || null,
+        status: payload.status || null,
+        searchLabel: payload.searchLabel || null,
+        requestId: payload.requestId || null,
+        seedId: payload.seedId || null,
+        start: payload.start || null,
+        end: payload.end || null,
+        query: payload.query || null,
+        minF1Score: payload.minF1Score ?? null,
+        maxF1Score: payload.maxF1Score ?? null,
+      };
+      const events = await graspMonitorFeedService.listAllFeed(feedOptions);
+      const snapshots = events.map((event) => this.extractFeedSnapshot(event));
+
+      return {
+        prefix: payload.prefix || "table-feed",
+        filters: {
+          ...commonFilters,
+          algorithm: feedOptions.algorithm || commonFilters.algorithm || null,
+          requestId: feedOptions.requestId || commonFilters.requestId || null,
+          seedId: feedOptions.seedId || commonFilters.seedId || null,
+          minF1Score: feedOptions.minF1Score,
+          maxF1Score: feedOptions.maxF1Score,
+        },
+        request: null,
+        runs: [],
+        snapshots,
         events: [],
       };
     }
