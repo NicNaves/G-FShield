@@ -122,6 +122,40 @@ class GraspController {
       : storedRun;
   }
 
+  async loadRunInsights(seedId, options = {}) {
+    const historyLimit = Math.max(Number(options.historyLimit || process.env.GRASP_RUN_SUMMARY_HISTORY_LIMIT || 24) || 24, 0);
+    const run = await this.loadMergedRun(seedId, historyLimit);
+
+    if (!run) {
+      return null;
+    }
+
+    const historyPageOptions = {
+      page: Number(options.page || 1),
+      pageSize: Number(options.pageSize || 50),
+      start: options.start || "",
+      end: options.end || "",
+    };
+
+    const timelineOptions = {
+      start: options.start || "",
+      end: options.end || "",
+      bucketMs: Number(options.timelineBucketMs || process.env.GRASP_RUN_TIMELINE_BUCKET_MS || 60_000),
+      bucketLimit: Number(options.timelineBucketLimit || process.env.GRASP_RUN_TIMELINE_BUCKET_LIMIT || 360),
+    };
+
+    const [historyPage, timelineAggregate] = await Promise.all([
+      graspExecutionStoreService.getRunHistoryPage(seedId, historyPageOptions),
+      graspExecutionStoreService.getRunTimelineAggregate(seedId, timelineOptions),
+    ]);
+
+    return {
+      ...run,
+      historyPage,
+      timelineAggregate,
+    };
+  }
+
   resolveCacheTtlMs(kind = "default") {
     const specificTtls = {
       runs: Number(process.env.GRASP_RUNS_CACHE_TTL_MS || 2500),
@@ -330,13 +364,28 @@ class GraspController {
   async getRun(req, res, next) {
     try {
       const historyLimit = Number(req.query.historyLimit || process.env.GRASP_RUN_HISTORY_LIMIT || 2000);
+      const includeInsights = String(req.query.includeInsights || "false").toLowerCase() === "true";
+      const options = {
+        historyLimit,
+        includeInsights,
+        page: Number(req.query.page || 1),
+        pageSize: Number(req.query.pageSize || 50),
+        start: req.query.start || "",
+        end: req.query.end || "",
+        timelineBucketMs: Number(req.query.timelineBucketMs || process.env.GRASP_RUN_TIMELINE_BUCKET_MS || 60_000),
+        timelineBucketLimit: Number(req.query.timelineBucketLimit || process.env.GRASP_RUN_TIMELINE_BUCKET_LIMIT || 360),
+      };
       const cacheKey = appCacheService.buildKey("monitor-run", {
         seedId: req.params.seedId,
-        historyLimit,
+        ...options,
       });
       const run = await appCacheService.remember(
         cacheKey,
-        () => this.loadMergedRun(req.params.seedId, historyLimit),
+        () => (
+          includeInsights
+            ? this.loadRunInsights(req.params.seedId, options)
+            : this.loadMergedRun(req.params.seedId, historyLimit)
+        ),
         this.resolveCacheTtlMs("run")
       );
 

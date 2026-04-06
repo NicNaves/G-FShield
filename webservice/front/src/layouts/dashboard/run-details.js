@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import Grid from "@mui/material/Grid";
@@ -7,7 +7,6 @@ import Stack from "@mui/material/Stack";
 import Chip from "@mui/material/Chip";
 import Alert from "@mui/material/Alert";
 import Divider from "@mui/material/Divider";
-import Icon from "@mui/material/Icon";
 
 import {
   Chart as ChartJS,
@@ -55,20 +54,104 @@ const virtualizedHistoryTableConfig = {
   overscan: 6,
 };
 
+const runTimeWindowOptions = [
+  { value: "all", labelKey: "dashboard.timelineWindowAll" },
+  { value: "1h", labelKey: "dashboard.timelineWindowLastHour" },
+  { value: "6h", labelKey: "dashboard.timelineWindowLast6Hours" },
+  { value: "24h", labelKey: "dashboard.timeWindowLast24Hours" },
+];
+
+const resolveRunRangeBounds = (timeWindow, anchorTimestamp) => {
+  const anchorMs = anchorTimestamp ? new Date(anchorTimestamp).getTime() : null;
+
+  if (!Number.isFinite(anchorMs)) {
+    return { start: null, end: null };
+  }
+
+  switch (timeWindow) {
+    case "1h":
+      return { start: anchorMs - 60 * 60 * 1000, end: anchorMs };
+    case "6h":
+      return { start: anchorMs - 6 * 60 * 60 * 1000, end: anchorMs };
+    case "24h":
+      return { start: anchorMs - 24 * 60 * 60 * 1000, end: anchorMs };
+    default:
+      return { start: null, end: null };
+  }
+};
+
 function RunDetails() {
   const { seedId } = useParams();
   const { t } = useI18n();
+  const [selectedTimeWindow, setSelectedTimeWindow] = useState("all");
+  const [historyPageIndex, setHistoryPageIndex] = useState(0);
+  const [historyPageSize, setHistoryPageSize] = useState(25);
+  const [rangeAnchorTimestamp, setRangeAnchorTimestamp] = useState(null);
+  const rangeBounds = useMemo(
+    () => resolveRunRangeBounds(selectedTimeWindow, rangeAnchorTimestamp),
+    [rangeAnchorTimestamp, selectedTimeWindow]
+  );
   const runQuery = useMonitorRunQuery(seedId, {
-    historyLimit: 2000,
+    historyLimit: 24,
+    includeInsights: true,
+    page: historyPageIndex + 1,
+    pageSize: historyPageSize,
+    start: rangeBounds.start !== null ? new Date(rangeBounds.start).toISOString() : undefined,
+    end: rangeBounds.end !== null ? new Date(rangeBounds.end).toISOString() : undefined,
+    timelineBucketLimit: selectedTimeWindow === "all" ? 360 : 180,
   });
   const run = runQuery.data || null;
   const loading = runQuery.isLoading || runQuery.isFetching;
   const error = runQuery.error?.message || "";
+  const timelineAnchorTimestamp = run?.timelineAggregate?.maxTimestampMs
+    ? new Date(run.timelineAggregate.maxTimestampMs).toISOString()
+    : (run?.updatedAt || null);
 
-  const history = useMemo(() => (Array.isArray(run?.history) ? [...run.history] : []), [run?.history]);
+  useEffect(() => {
+    setHistoryPageIndex(0);
+  }, [seedId, selectedTimeWindow]);
+
+  useEffect(() => {
+    setRangeAnchorTimestamp(null);
+  }, [seedId]);
+
+  useEffect(() => {
+    if (timelineAnchorTimestamp) {
+      setRangeAnchorTimestamp(timelineAnchorTimestamp);
+    }
+  }, [timelineAnchorTimestamp]);
+
+  const historyItems = useMemo(() => {
+    if (Array.isArray(run?.historyPage?.items)) {
+      return run.historyPage.items;
+    }
+
+    return Array.isArray(run?.history) ? [...run.history] : [];
+  }, [run?.history, run?.historyPage?.items]);
+  const historyTotal = run?.historyPage?.total ?? historyItems.length;
+  const historyPageCount = run?.historyPage?.totalPages ?? Math.max(Math.ceil(historyTotal / historyPageSize), 1);
+  const timelinePoints = useMemo(() => {
+    const aggregatePoints = Array.isArray(run?.timelineAggregate?.points) ? run.timelineAggregate.points : [];
+    if (aggregatePoints.length) {
+      return aggregatePoints;
+    }
+
+    const history = Array.isArray(run?.history) ? run.history : [];
+    return history.map((entry, index) => ({
+      timestamp: entry.timestamp,
+      latestScore: Number(entry.f1Score || 0),
+      averageScore: Number(entry.f1Score || 0),
+      bestScore: Number(entry.f1Score || 0),
+      avgCpuUsage: entry.cpuUsage ?? null,
+      avgMemoryUsagePercent: entry.memoryUsagePercent ?? null,
+      sampleCount: 1,
+      order: index + 1,
+      stage: entry.stage || null,
+    }));
+  }, [run?.history, run?.timelineAggregate?.points]);
 
   const timelineData = useMemo(() => {
-    if (history.length === 0) {
+    if (timelinePoints.length === 0) {
       return {
         labels: ["#1"],
         datasets: [
@@ -85,11 +168,11 @@ function RunDetails() {
     }
 
     return {
-      labels: history.map((entry) => formatShortTime(entry.timestamp)),
+      labels: timelinePoints.map((entry) => formatShortTime(entry.timestamp)),
       datasets: [
         {
           label: t("runDetails.f1Score"),
-          data: history.map((entry) => Number(entry.f1Score || 0)),
+          data: timelinePoints.map((entry) => Number(entry.latestScore ?? entry.averageScore ?? entry.bestScore ?? 0)),
           borderColor: "#4361ee",
           backgroundColor: "rgba(67, 97, 238, 0.10)",
           fill: true,
@@ -97,7 +180,7 @@ function RunDetails() {
         },
       ],
     };
-  }, [history, t]);
+  }, [t, timelinePoints]);
 
   const timelineOptions = useMemo(
     () => ({
@@ -137,7 +220,7 @@ function RunDetails() {
         { Header: t("runDetails.sizes"), accessor: "sizes", align: "left" },
         { Header: t("runDetails.features"), accessor: "features", align: "left" },
       ],
-      rows: history.map((entry) => ({
+      rows: historyItems.map((entry) => ({
         timestamp: formatDateTime(entry.timestamp),
         stage: getStageLabel(entry.stage),
         topic: entry.topic || "--",
@@ -150,7 +233,7 @@ function RunDetails() {
         features: formatFeatureSubset(entry.solutionFeatures, 8),
       })),
     }),
-    [history, t]
+    [historyItems, t]
   );
 
   const searchFlow = useMemo(() => {
@@ -161,16 +244,21 @@ function RunDetails() {
     if (run?.neighborhood) {
       values.push(run.neighborhood);
     }
-    history.forEach((entry) => {
-      if (entry.localSearch && !values.includes(entry.localSearch)) {
-        values.push(entry.localSearch);
-      }
-    });
+    (Array.isArray(run?.enabledLocalSearches) ? run.enabledLocalSearches : [])
+      .filter(Boolean)
+      .forEach((entry) => {
+        if (!values.includes(entry)) {
+          values.push(entry);
+        }
+      });
+    if (run?.localSearch && !values.includes(run.localSearch)) {
+      values.push(run.localSearch);
+    }
     if (run?.topic === "BEST_SOLUTION_TOPIC") {
       values.push("BEST");
     }
     return values;
-  }, [history, run]);
+  }, [run]);
 
   return (
     <DashboardLayout>
@@ -254,8 +342,30 @@ function RunDetails() {
                         {t("runDetails.timeline")}
                       </MDTypography>
                       <MDTypography variant="button" color="text">
-                        {`${run.rclAlgorithm || "GRASP-FS"} / ${run.classifier || "--"} / ${t("runDetails.checkpoints", { count: history.length })}`}
+                        {`${run.rclAlgorithm || "GRASP-FS"} / ${run.classifier || "--"} / ${t("runDetails.checkpoints", { count: run.timelineAggregate?.snapshotCount ?? historyTotal })}`}
                       </MDTypography>
+                      <MDTypography variant="caption" display="block" color="text" mt={1}>
+                        {t("runDetails.timelineWindowTitle")}
+                      </MDTypography>
+                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap mt={2}>
+                        {runTimeWindowOptions.map((option) => (
+                          <Chip
+                            key={option.value}
+                            label={t(option.labelKey)}
+                            clickable
+                            size="small"
+                            color={selectedTimeWindow === option.value ? "info" : "default"}
+                            variant={selectedTimeWindow === option.value ? "filled" : "outlined"}
+                            onClick={() => setSelectedTimeWindow(option.value)}
+                          />
+                        ))}
+                        <Chip
+                          label={t("runDetails.aggregatedCheckpoints", { count: timelinePoints.length })}
+                          size="small"
+                          color="success"
+                          variant="outlined"
+                        />
+                      </Stack>
                       <MDBox mt={3} height="340px">
                         <Line data={timelineData} options={timelineOptions} />
                       </MDBox>
@@ -380,16 +490,32 @@ function RunDetails() {
                     {t("runDetails.historyTable")}
                   </MDTypography>
                   <MDTypography variant="button" color="text">
-                    {history.length > 0 ? t("runDetails.persistedRecordsLoaded", { count: history.length }) : t("runDetails.noHistory")}
+                    {historyTotal > 0
+                      ? t("runDetails.persistedRecordsWindowLoaded", {
+                        shown: historyItems.length,
+                        total: historyTotal,
+                      })
+                      : (selectedTimeWindow === "all" ? t("runDetails.noHistory") : t("runDetails.noHistoryInWindow"))}
                   </MDTypography>
                 </MDBox>
                 <DataTable
                   table={historyTable}
                   entriesPerPage={{ defaultValue: 25, entries: [25, 50, 100] }}
-                  canSearch
+                  canSearch={false}
                   showTotalEntries
                   noEndBorder
                   virtualization={virtualizedHistoryTableConfig}
+                  serverPagination={run?.historyPage ? {
+                    pageIndex: Math.max((run.historyPage.page || 1) - 1, 0),
+                    pageSize: run.historyPage.pageSize || historyPageSize,
+                    totalEntries: historyTotal,
+                    pageCount: historyPageCount,
+                    onPageChange: (nextPageIndex) => setHistoryPageIndex(nextPageIndex),
+                    onPageSizeChange: (nextPageSize) => {
+                      setHistoryPageSize(nextPageSize);
+                      setHistoryPageIndex(0);
+                    },
+                  } : null}
                 />
               </Card>
             </MDBox>

@@ -1,5 +1,16 @@
 const queryKeys = {
-  monitorRun: (seedId, options = {}) => ["monitor-run", seedId || "none", options.historyLimit || "default"],
+  monitorRun: (seedId, options = {}) => [
+    "monitor-run",
+    seedId || "none",
+    options.historyLimit || "default",
+    Boolean(options.includeInsights),
+    options.page || 1,
+    options.pageSize || "default",
+    options.start || "all",
+    options.end || "all",
+    options.timelineBucketMs || "default",
+    options.timelineBucketLimit || "default",
+  ],
   executionLaunch: (requestId, options = {}) => [
     "execution-launch",
     requestId || "none",

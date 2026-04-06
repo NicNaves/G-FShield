@@ -1,6 +1,61 @@
+const { Prisma } = require("@prisma/client");
+
 const prisma = require("../lib/prisma");
 const logger = require("../utils/jsonLogger");
 const { MONITOR_SCHEMA_VERSION } = require("./GraspMonitorSummaryService");
+
+const RUN_HISTORY_EVENT_TYPES = ["kafka.update", "kafka.progress"];
+const RUN_HISTORY_NUMERIC_REGEX = "^-?[0-9]+(?:\\.[0-9]+)?$";
+
+const buildRunNumericJsonExtractor = (paths = []) => {
+  const coalesced = paths.map((path) => `"payload"#>>'${path}'`).join(", ");
+  return `
+    CASE
+      WHEN NULLIF(COALESCE(${coalesced}), '') ~ '${RUN_HISTORY_NUMERIC_REGEX}'
+        THEN NULLIF(COALESCE(${coalesced}), '')::double precision
+      ELSE NULL
+    END
+  `;
+};
+
+const RUN_SCORE_SQL = buildRunNumericJsonExtractor([
+  "{payload,historyEntry,f1Score}",
+  "{payload,bestF1Score}",
+  "{payload,currentF1Score}",
+  "{payload,f1Score}",
+  "{historyEntry,f1Score}",
+  "{bestF1Score}",
+  "{currentF1Score}",
+  "{f1Score}",
+]);
+
+const RUN_CPU_USAGE_SQL = buildRunNumericJsonExtractor([
+  "{payload,historyEntry,cpuUsage}",
+  "{payload,cpuUsage}",
+  "{historyEntry,cpuUsage}",
+  "{cpuUsage}",
+]);
+
+const RUN_MEMORY_USAGE_PERCENT_SQL = buildRunNumericJsonExtractor([
+  "{payload,historyEntry,memoryUsagePercent}",
+  "{payload,memoryUsagePercent}",
+  "{historyEntry,memoryUsagePercent}",
+  "{memoryUsagePercent}",
+]);
+
+const RUN_STAGE_SQL = `COALESCE(
+  NULLIF(
+    COALESCE(
+      "stage",
+      "payload"#>>'{payload,historyEntry,stage}',
+      "payload"#>>'{payload,stage}',
+      "payload"#>>'{historyEntry,stage}',
+      "payload"#>>'{stage}'
+    ),
+    ''
+  ),
+  'Unknown'
+)`;
 
 class GraspExecutionStoreService {
   isProgressTopic(topic) {
@@ -117,37 +172,41 @@ class GraspExecutionStoreService {
   buildHistory(events = []) {
     return events
       .map((event) => {
-        const payload = event.payload || {};
-        const snapshot = payload.payload || {};
-        const historyEntry = snapshot.historyEntry || {};
-        const solutionFeatures = historyEntry.solutionFeatures || snapshot.solutionFeatures || [];
-        const rclFeatures = historyEntry.rclFeatures || snapshot.rclfeatures || snapshot.rclFeatures || [];
-
-        return {
-          timestamp: event.createdAt.toISOString(),
-          requestId: this.resolveEventRequestId(event),
-          stage: historyEntry.stage || event.stage || snapshot.stage || null,
-          topic: historyEntry.topic || event.topic || snapshot.topic || null,
-          eventType: event.eventType || null,
-          f1Score: historyEntry.f1Score ?? snapshot.currentF1Score ?? snapshot.f1Score ?? null,
-          previousBestF1Score: historyEntry.previousBestF1Score ?? snapshot.previousBestF1Score ?? null,
-          scoreDelta: historyEntry.scoreDelta ?? snapshot.scoreDelta ?? null,
-          improved: historyEntry.improved ?? snapshot.improved ?? null,
-          cpuUsage: historyEntry.cpuUsage ?? snapshot.cpuUsage ?? null,
-          memoryUsage: historyEntry.memoryUsage ?? snapshot.memoryUsage ?? null,
-          memoryUsagePercent: historyEntry.memoryUsagePercent ?? snapshot.memoryUsagePercent ?? null,
-          localSearch: historyEntry.localSearch || snapshot.localSearch || null,
-          neighborhood: historyEntry.neighborhood || snapshot.neighborhood || null,
-          iterationNeighborhood: historyEntry.iterationNeighborhood ?? snapshot.iterationNeighborhood ?? null,
-          iterationLocalSearch: historyEntry.iterationLocalSearch ?? snapshot.iterationLocalSearch ?? null,
-          solutionSize: historyEntry.solutionSize ?? snapshot.solutionSize ?? solutionFeatures.length,
-          rclSize: historyEntry.rclSize ?? snapshot.rclSize ?? rclFeatures.length,
-          enabledLocalSearches: historyEntry.enabledLocalSearches || snapshot.enabledLocalSearches || [],
-          rclFeatures,
-          solutionFeatures,
-        };
+        return this.mapHistoryEntry(event);
       })
       .reverse();
+  }
+
+  mapHistoryEntry(event) {
+    const payload = event.payload || {};
+    const snapshot = payload.payload || {};
+    const historyEntry = snapshot.historyEntry || {};
+    const solutionFeatures = historyEntry.solutionFeatures || snapshot.solutionFeatures || [];
+    const rclFeatures = historyEntry.rclFeatures || snapshot.rclfeatures || snapshot.rclFeatures || [];
+
+    return {
+      timestamp: event.createdAt.toISOString(),
+      requestId: this.resolveEventRequestId(event),
+      stage: historyEntry.stage || event.stage || snapshot.stage || null,
+      topic: historyEntry.topic || event.topic || snapshot.topic || null,
+      eventType: event.eventType || null,
+      f1Score: historyEntry.f1Score ?? snapshot.currentF1Score ?? snapshot.f1Score ?? null,
+      previousBestF1Score: historyEntry.previousBestF1Score ?? snapshot.previousBestF1Score ?? null,
+      scoreDelta: historyEntry.scoreDelta ?? snapshot.scoreDelta ?? null,
+      improved: historyEntry.improved ?? snapshot.improved ?? null,
+      cpuUsage: historyEntry.cpuUsage ?? snapshot.cpuUsage ?? null,
+      memoryUsage: historyEntry.memoryUsage ?? snapshot.memoryUsage ?? null,
+      memoryUsagePercent: historyEntry.memoryUsagePercent ?? snapshot.memoryUsagePercent ?? null,
+      localSearch: historyEntry.localSearch || snapshot.localSearch || null,
+      neighborhood: historyEntry.neighborhood || snapshot.neighborhood || null,
+      iterationNeighborhood: historyEntry.iterationNeighborhood ?? snapshot.iterationNeighborhood ?? null,
+      iterationLocalSearch: historyEntry.iterationLocalSearch ?? snapshot.iterationLocalSearch ?? null,
+      solutionSize: historyEntry.solutionSize ?? snapshot.solutionSize ?? solutionFeatures.length,
+      rclSize: historyEntry.rclSize ?? snapshot.rclSize ?? rclFeatures.length,
+      enabledLocalSearches: historyEntry.enabledLocalSearches || snapshot.enabledLocalSearches || [],
+      rclFeatures,
+      solutionFeatures,
+    };
   }
 
   mapRun(runRecord) {
@@ -386,6 +445,200 @@ class GraspExecutionStoreService {
       ...run,
       bestSolutionEvents: bestSolutionEvent ? [bestSolutionEvent] : [],
     });
+  }
+
+  parseIsoTimestamp(value) {
+    if (!value) {
+      return null;
+    }
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  normalizeHistoryPageOptions(options = {}) {
+    const page = Math.max(Number(options.page || 1) || 1, 1);
+    const pageSize = Math.min(Math.max(Number(options.pageSize || 25) || 25, 1), 200);
+    const start = this.parseIsoTimestamp(options.start);
+    const end = this.parseIsoTimestamp(options.end);
+
+    return {
+      page,
+      pageSize,
+      start,
+      end,
+    };
+  }
+
+  buildRunHistoryWhere(seedId, options = {}) {
+    const normalizedOptions = this.normalizeHistoryPageOptions(options);
+    const where = {
+      seedId,
+      eventType: { in: RUN_HISTORY_EVENT_TYPES },
+    };
+
+    if (normalizedOptions.start || normalizedOptions.end) {
+      where.createdAt = {
+        ...(normalizedOptions.start ? { gte: normalizedOptions.start } : {}),
+        ...(normalizedOptions.end ? { lte: normalizedOptions.end } : {}),
+      };
+    }
+
+    return {
+      where,
+      ...normalizedOptions,
+    };
+  }
+
+  async getRunHistoryPage(seedId, options = {}) {
+    const { where, page, pageSize, start, end } = this.buildRunHistoryWhere(seedId, options);
+
+    const [total, events] = await Promise.all([
+      prisma.graspExecutionEvent.count({ where }),
+      prisma.graspExecutionEvent.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    const items = events.map((event) => this.mapHistoryEntry(event));
+    const totalPages = Math.max(Math.ceil(total / pageSize), 1);
+
+    return {
+      items,
+      page,
+      pageSize,
+      total,
+      totalPages,
+      hasPreviousPage: page > 1,
+      hasNextPage: page < totalPages,
+      range: {
+        start: start ? start.toISOString() : null,
+        end: end ? end.toISOString() : null,
+      },
+    };
+  }
+
+  normalizeBucketMs(value, fallback = 60_000) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(Math.floor(parsed), 10_000) : fallback;
+  }
+
+  normalizeBucketLimit(value, fallback = 240) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(Math.floor(parsed), 1) : fallback;
+  }
+
+  async getRunTimelineAggregate(seedId, options = {}) {
+    const { where, start, end } = this.buildRunHistoryWhere(seedId, options);
+    const bucketMs = this.normalizeBucketMs(options.bucketMs);
+    const bucketLimit = this.normalizeBucketLimit(options.bucketLimit);
+    const createdAtClause = where.createdAt || {};
+    const conditions = [
+      Prisma.sql`"seedId" = ${seedId}`,
+      Prisma.sql`"eventType" IN (${Prisma.join(RUN_HISTORY_EVENT_TYPES)})`,
+    ];
+
+    if (createdAtClause.gte) {
+      conditions.push(Prisma.sql`"createdAt" >= ${createdAtClause.gte}`);
+    }
+
+    if (createdAtClause.lte) {
+      conditions.push(Prisma.sql`"createdAt" <= ${createdAtClause.lte}`);
+    }
+
+    const rows = await prisma.$queryRaw`
+      WITH base AS (
+        SELECT
+          to_timestamp(
+            floor(extract(epoch from "createdAt") * 1000 / ${bucketMs}) * ${bucketMs} / 1000.0
+          ) AS bucket_timestamp,
+          ${Prisma.raw(RUN_SCORE_SQL)} AS score,
+          ${Prisma.raw(RUN_CPU_USAGE_SQL)} AS cpu_usage,
+          ${Prisma.raw(RUN_MEMORY_USAGE_PERCENT_SQL)} AS memory_usage_percent,
+          ${Prisma.raw(RUN_STAGE_SQL)} AS stage,
+          "createdAt" AS created_at
+        FROM "GraspExecutionEvent"
+        WHERE ${Prisma.join(conditions, " AND ")}
+      ),
+      ranked AS (
+        SELECT
+          *,
+          ROW_NUMBER() OVER (
+            PARTITION BY bucket_timestamp
+            ORDER BY created_at DESC
+          ) AS ranking
+        FROM base
+      )
+      SELECT
+        bucket_timestamp AS timestamp,
+        COUNT(*)::int AS "sampleCount",
+        MAX(CASE WHEN ranking = 1 THEN score ELSE NULL END)::double precision AS "latestScore",
+        AVG(score)::double precision AS "averageScore",
+        MAX(score)::double precision AS "bestScore",
+        AVG(cpu_usage)::double precision AS "avgCpuUsage",
+        AVG(memory_usage_percent)::double precision AS "avgMemoryUsagePercent",
+        MAX(CASE WHEN ranking = 1 THEN stage ELSE NULL END) AS stage
+      FROM ranked
+      GROUP BY bucket_timestamp
+      ORDER BY bucket_timestamp DESC
+      LIMIT ${bucketLimit}
+    `;
+
+    const orderedPoints = [...rows]
+      .map((row) => {
+        const timestamp = this.parseIsoTimestamp(row.timestamp);
+        const timestampMs = timestamp ? timestamp.getTime() : null;
+
+        return {
+          timestamp: timestamp ? timestamp.toISOString() : null,
+          timestampMs,
+          latestScore: row.latestScore !== null && row.latestScore !== undefined ? Number(row.latestScore) : null,
+          averageScore: row.averageScore !== null && row.averageScore !== undefined ? Number(row.averageScore) : null,
+          bestScore: row.bestScore !== null && row.bestScore !== undefined ? Number(row.bestScore) : null,
+          avgCpuUsage: row.avgCpuUsage !== null && row.avgCpuUsage !== undefined ? Number(row.avgCpuUsage) : null,
+          avgMemoryUsagePercent:
+            row.avgMemoryUsagePercent !== null && row.avgMemoryUsagePercent !== undefined
+              ? Number(row.avgMemoryUsagePercent)
+              : null,
+          sampleCount: Number(row.sampleCount || 0),
+          stage: row.stage || null,
+        };
+      })
+      .filter((row) => row.timestampMs !== null)
+      .sort((left, right) => left.timestampMs - right.timestampMs);
+
+    return {
+      bucketIntervalMs: bucketMs,
+      bucketCount: orderedPoints.length,
+      snapshotCount: orderedPoints.reduce((sum, point) => sum + point.sampleCount, 0),
+      minTimestampMs: orderedPoints[0]?.timestampMs ?? null,
+      maxTimestampMs: orderedPoints[orderedPoints.length - 1]?.timestampMs ?? null,
+      range: {
+        start: start ? start.toISOString() : null,
+        end: end ? end.toISOString() : null,
+      },
+      points: orderedPoints.map((point, index) => ({
+        ...point,
+        order: index + 1,
+      })),
+      cpuPoints: orderedPoints
+        .filter((point) => point.avgCpuUsage !== null)
+        .map((point) => ({
+          x: point.timestampMs,
+          y: point.avgCpuUsage,
+          sampleCount: point.sampleCount,
+        })),
+      memoryPoints: orderedPoints
+        .filter((point) => point.avgMemoryUsagePercent !== null)
+        .map((point) => ({
+          x: point.timestampMs,
+          y: point.avgMemoryUsagePercent,
+          sampleCount: point.sampleCount,
+        })),
+    };
   }
 
   async listEvents(limit = 100) {

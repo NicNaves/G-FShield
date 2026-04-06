@@ -4,11 +4,41 @@ import { getMonitorRun } from "api/grasp";
 import queryKeys from "./queryKeys";
 
 export default function useMonitorRunQuery(seedId, options = {}) {
-  const { historyLimit, enabled = Boolean(seedId), ...queryOptions } = options;
+  const {
+    historyLimit,
+    includeInsights,
+    page,
+    pageSize,
+    start,
+    end,
+    timelineBucketMs,
+    timelineBucketLimit,
+    enabled = Boolean(seedId),
+    ...queryOptions
+  } = options;
+  const requestOptions = {
+    ...(historyLimit ? { historyLimit } : {}),
+    ...(includeInsights ? { includeInsights: true } : {}),
+    ...(page ? { page } : {}),
+    ...(pageSize ? { pageSize } : {}),
+    ...(start ? { start } : {}),
+    ...(end ? { end } : {}),
+    ...(timelineBucketMs ? { timelineBucketMs } : {}),
+    ...(timelineBucketLimit ? { timelineBucketLimit } : {}),
+  };
 
   return useQuery({
-    queryKey: queryKeys.monitorRun(seedId, { historyLimit }),
-    queryFn: () => getMonitorRun(seedId, historyLimit ? { historyLimit } : {}),
+    queryKey: queryKeys.monitorRun(seedId, {
+      historyLimit,
+      includeInsights,
+      page,
+      pageSize,
+      start,
+      end,
+      timelineBucketMs,
+      timelineBucketLimit,
+    }),
+    queryFn: () => getMonitorRun(seedId, requestOptions),
     enabled,
     ...queryOptions,
   });
