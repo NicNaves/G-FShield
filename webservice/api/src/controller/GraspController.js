@@ -122,6 +122,41 @@ class GraspController {
       : storedRun;
   }
 
+  toComparisonRun(run) {
+    if (!run) {
+      return null;
+    }
+
+    const {
+      history,
+      historyPage,
+      timelineAggregate,
+      ...summaryRun
+    } = run;
+
+    return {
+      ...summaryRun,
+      historyCount: Array.isArray(history) ? history.length : Number(historyPage?.total || 0),
+    };
+  }
+
+  async loadComparisonRun(seedId, options = {}) {
+    if (options.includeInsights) {
+      const runWithInsights = await this.loadRunInsights(seedId, {
+        historyLimit: Number(options.historyLimit || 0),
+        page: 1,
+        pageSize: 1,
+        timelineBucketMs: Number(options.timelineBucketMs || process.env.GRASP_RUN_TIMELINE_BUCKET_MS || 60_000),
+        timelineBucketLimit: Number(options.timelineBucketLimit || 120),
+      });
+
+      return options.summaryOnly ? this.toComparisonRun(runWithInsights) : runWithInsights;
+    }
+
+    const run = await this.loadMergedRun(seedId, Number(options.historyLimit || 0));
+    return options.summaryOnly ? this.toComparisonRun(run) : run;
+  }
+
   async loadRunInsights(seedId, options = {}) {
     const historyLimit = Math.max(Number(options.historyLimit || process.env.GRASP_RUN_SUMMARY_HISTORY_LIMIT || 24) || 24, 0);
     const run = await this.loadMergedRun(seedId, historyLimit);
@@ -406,16 +441,30 @@ class GraspController {
         return res.status(400).json({ error: "Select at least two seedIds to compare." });
       }
 
-      const historyLimit = Number(req.query.historyLimit || process.env.GRASP_RUN_SUMMARY_HISTORY_LIMIT || 50);
+      const historyLimit = Number(req.query.historyLimit || 0);
+      const includeInsights = String(req.query.includeInsights || "false").toLowerCase() === "true";
+      const summaryOnly = String(req.query.summaryOnly || "true").toLowerCase() !== "false";
+      const timelineBucketMs = Number(req.query.timelineBucketMs || process.env.GRASP_RUN_TIMELINE_BUCKET_MS || 60_000);
+      const timelineBucketLimit = Number(req.query.timelineBucketLimit || 120);
       const cacheKey = appCacheService.buildKey("monitor-compare", {
         seedIds,
         historyLimit,
+        includeInsights,
+        summaryOnly,
+        timelineBucketMs,
+        timelineBucketLimit,
       });
       const runs = await appCacheService.remember(
         cacheKey,
         async () => (
           await Promise.all(
-            seedIds.map((seedId) => this.loadMergedRun(seedId, historyLimit))
+            seedIds.map((seedId) => this.loadComparisonRun(seedId, {
+              historyLimit,
+              includeInsights,
+              summaryOnly,
+              timelineBucketMs,
+              timelineBucketLimit,
+            }))
           )
         ).filter(Boolean),
         this.resolveCacheTtlMs("compare")

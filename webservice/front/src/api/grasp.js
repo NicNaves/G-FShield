@@ -62,11 +62,15 @@ export const getMonitorRun = async (seedId, options = {}) => {
   return data;
 };
 
-export const compareMonitorRuns = async (seedIds = [], historyLimit = 50) => {
+export const compareMonitorRuns = async (seedIds = [], options = {}) => {
   const { data } = await api.get("/grasp/monitor/compare", {
     params: {
       seedIds: seedIds.join(","),
-      historyLimit,
+      historyLimit: options.historyLimit ?? 0,
+      summaryOnly: options.summaryOnly ?? true,
+      includeInsights: options.includeInsights ?? false,
+      timelineBucketMs: options.timelineBucketMs,
+      timelineBucketLimit: options.timelineBucketLimit,
     },
   });
 

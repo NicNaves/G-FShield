@@ -58,7 +58,10 @@ function ExecutionComparison({ runs }) {
       try {
         setLoading(true);
         setError("");
-        const response = await compareMonitorRuns(selectedSeedIds, 50);
+        const response = await compareMonitorRuns(selectedSeedIds, {
+          historyLimit: 0,
+          summaryOnly: true,
+        });
         if (!cancelled) {
           setComparisonRuns(response.runs || []);
           setComparison(response.comparison || null);
