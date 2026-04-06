@@ -62,6 +62,39 @@ export const getMonitorRun = async (seedId, options = {}) => {
   return data;
 };
 
+export const createMonitorExportJob = async (payload = {}) => {
+  const { data } = await api.post("/grasp/monitor/export-jobs", payload);
+  return data.job || null;
+};
+
+export const getMonitorExportJob = async (jobId) => {
+  const { data } = await api.get(`/grasp/monitor/export-jobs/${jobId}`);
+  return data.job || null;
+};
+
+const resolveDownloadFilename = (headerValue, fallback = "dashboard-export.txt") => {
+  const rawHeader = String(headerValue || "");
+  const utf8Match = rawHeader.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+
+  const basicMatch = rawHeader.match(/filename=\"?([^\";]+)\"?/i);
+  return basicMatch?.[1] || fallback;
+};
+
+export const downloadMonitorExportJob = async (jobId) => {
+  const response = await api.get(`/grasp/monitor/export-jobs/${jobId}/download`, {
+    responseType: "blob",
+  });
+
+  return {
+    blob: response.data,
+    filename: resolveDownloadFilename(response.headers?.["content-disposition"]),
+    mimeType: response.headers?.["content-type"] || "application/octet-stream",
+  };
+};
+
 export const compareMonitorRuns = async (seedIds = [], options = {}) => {
   const { data } = await api.get("/grasp/monitor/compare", {
     params: {

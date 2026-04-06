@@ -132,6 +132,9 @@ router.get("/monitor/bootstrap", authMiddleware, anyRoleMiddleware(["ADMIN", "VI
 router.get("/monitor/projection", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.getProjection(req, res, next));
 router.get("/monitor/feed", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.getFeed(req, res, next));
 router.get("/monitor/dashboard", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.getDashboardAggregate(req, res, next));
+router.post("/monitor/export-jobs", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.createExportJob(req, res, next));
+router.get("/monitor/export-jobs/:jobId", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.getExportJob(req, res, next));
+router.get("/monitor/export-jobs/:jobId/download", authMiddleware, anyRoleMiddleware(["ADMIN", "VIEWER"]), (req, res, next) => graspController.downloadExportJob(req, res, next));
 
 /**
  * @swagger

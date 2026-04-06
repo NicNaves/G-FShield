@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import PropTypes from "prop-types";
+import { toast } from "react-toastify";
 
 import Grid from "@mui/material/Grid";
 import Card from "@mui/material/Card";
@@ -52,6 +53,11 @@ import useMonitorEventFeedQuery from "hooks/queries/useMonitorEventFeedQuery";
 import useMonitorRunQuery from "hooks/queries/useMonitorRunQuery";
 import { useMaterialUIController } from "context";
 import {
+  createMonitorExportJob,
+  downloadMonitorExportJob,
+  getMonitorExportJob,
+} from "api/grasp";
+import {
   formatCompactPercent,
   formatDateTime,
   formatDuration,
@@ -67,6 +73,7 @@ import {
   buildDashboardExportFileName,
   buildDashboardExportPayload,
   buildMonitorSnapshotsCsv,
+  downloadBlobFile,
   downloadTextFile,
 } from "utils/graspDashboardExport";
 
@@ -1786,6 +1793,11 @@ function Dashboard() {
   const [timelineRangeEnd, setTimelineRangeEnd] = useState("");
   const [timelineTimestampQuery, setTimelineTimestampQuery] = useState("");
   const [selectedExportScope, setSelectedExportScope] = useState("visible");
+  const [exportJobState, setExportJobState] = useState({
+    loading: false,
+    format: "",
+    jobId: "",
+  });
   const [feedControls, setFeedControls] = useState({
     analytics: { pageIndex: 0, pageSize: 25, search: "" },
     executionInitial: { pageIndex: 0, pageSize: 6, search: "" },
@@ -2885,6 +2897,10 @@ function Dashboard() {
   );
 
   const exportDisabled = useMemo(() => {
+    if (exportJobState.loading) {
+      return true;
+    }
+
     if (selectedExportScope === "request") {
       return !selectedRequestId || requestDetailsLoading;
     }
@@ -2894,7 +2910,7 @@ function Dashboard() {
     }
 
     return false;
-  }, [featuredRun, requestDetailsLoading, selectedExportScope, selectedRequestId]);
+  }, [exportJobState.loading, featuredRun, requestDetailsLoading, selectedExportScope, selectedRequestId]);
 
   const customGlobalRangeHelper = useMemo(() => {
     if (customRangeStart || customRangeEnd) {
@@ -3164,27 +3180,125 @@ function Dashboard() {
     timelineTimestampQuery,
   ]);
 
-  const handleExportCsv = () => {
-    const fileName = `${buildDashboardExportFileName(exportSelection.prefix, exportSelection.filters)}.csv`;
-    downloadTextFile(
-      fileName,
-      buildMonitorSnapshotsCsv(exportSelection.snapshots),
-      "text/csv;charset=utf-8"
-    );
-  };
+  const runAsyncExportJob = useCallback(
+    async (format) => {
+      const requestedFormat = String(format || "json").toLowerCase() === "csv" ? "csv" : "json";
+      const toastId = `export-job-${requestedFormat}-${selectedExportScope}`;
 
-  const handleExportJson = () => {
-    const fileName = `${buildDashboardExportFileName(exportSelection.prefix, exportSelection.filters)}.json`;
-    const payload = buildDashboardExportPayload({
-      filters: exportSelection.filters,
-      request: exportSelection.request,
-      runs: exportSelection.runs,
-      snapshots: exportSelection.snapshots,
-      events: exportSelection.events,
-    });
+      try {
+        setExportJobState({
+          loading: true,
+          format: requestedFormat,
+          jobId: "",
+        });
+        toast.info("Preparando exportacao no servidor...", { toastId });
 
-    downloadTextFile(fileName, JSON.stringify(payload, null, 2), "application/json;charset=utf-8");
-  };
+        const job = await createMonitorExportJob({
+          format: requestedFormat,
+          scope: selectedExportScope,
+          seedId: featuredRun?.seedId || null,
+          requestId: selectedRequestDetails?.requestId || selectedRequestId || null,
+          timelineStart: selectedExportScope === "timeline" ? timelineRangeStart || null : null,
+          timelineEnd: selectedExportScope === "timeline" ? timelineRangeEnd || null : null,
+          timelineTimestampQuery: selectedExportScope === "timeline" ? timelineTimestampQuery || null : null,
+          filters: exportSelection.filters,
+        });
+
+        setExportJobState({
+          loading: true,
+          format: requestedFormat,
+          jobId: job?.jobId || "",
+        });
+
+        let attempts = 0;
+        let currentJob = job;
+
+        while (attempts < 60) {
+          if (currentJob?.status === "completed") {
+            break;
+          }
+
+          if (currentJob?.status === "failed") {
+            throw new Error(currentJob.error || "Nao foi possivel gerar a exportacao.");
+          }
+
+          await new Promise((resolve) => {
+            window.setTimeout(resolve, 1500);
+          });
+
+          currentJob = await getMonitorExportJob(job.jobId);
+          attempts += 1;
+        }
+
+        if (currentJob?.status !== "completed") {
+          throw new Error("A exportacao demorou mais do que o esperado.");
+        }
+
+        const download = await downloadMonitorExportJob(currentJob.jobId);
+        downloadBlobFile(download.filename, download.blob);
+        toast.success("Exportacao concluida.", { toastId });
+      } catch (requestError) {
+        toast.error(requestError.message || "Nao foi possivel exportar agora.", { toastId });
+      } finally {
+        setExportJobState({
+          loading: false,
+          format: "",
+          jobId: "",
+        });
+      }
+    },
+    [
+      exportSelection.filters,
+      featuredRun?.seedId,
+      selectedExportScope,
+      selectedRequestDetails?.requestId,
+      selectedRequestId,
+      timelineRangeEnd,
+      timelineRangeStart,
+      timelineTimestampQuery,
+    ]
+  );
+
+  const handleExportCsv = useCallback(() => {
+    if (selectedExportScope === "visible") {
+      const fileName = `${buildDashboardExportFileName(exportSelection.prefix, exportSelection.filters)}.csv`;
+      downloadTextFile(
+        fileName,
+        buildMonitorSnapshotsCsv(exportSelection.snapshots),
+        "text/csv;charset=utf-8"
+      );
+      return;
+    }
+
+    runAsyncExportJob("csv");
+  }, [exportSelection.filters, exportSelection.prefix, exportSelection.snapshots, runAsyncExportJob, selectedExportScope]);
+
+  const handleExportJson = useCallback(() => {
+    if (selectedExportScope === "visible") {
+      const fileName = `${buildDashboardExportFileName(exportSelection.prefix, exportSelection.filters)}.json`;
+      const payload = buildDashboardExportPayload({
+        filters: exportSelection.filters,
+        request: exportSelection.request,
+        runs: exportSelection.runs,
+        snapshots: exportSelection.snapshots,
+        events: exportSelection.events,
+      });
+
+      downloadTextFile(fileName, JSON.stringify(payload, null, 2), "application/json;charset=utf-8");
+      return;
+    }
+
+    runAsyncExportJob("json");
+  }, [
+    exportSelection.events,
+    exportSelection.filters,
+    exportSelection.prefix,
+    exportSelection.request,
+    exportSelection.runs,
+    exportSelection.snapshots,
+    runAsyncExportJob,
+    selectedExportScope,
+  ]);
 
   const fullTimelineComparison = useMemo(() => {
     let snapshotCount = 0;

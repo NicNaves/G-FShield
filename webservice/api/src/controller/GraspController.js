@@ -7,6 +7,7 @@ const environmentResetService = require("../services/EnvironmentResetService");
 const appCacheService = require("../services/AppCacheService");
 const graspDashboardAggregateService = require("../services/GraspDashboardAggregateService");
 const graspMonitorFeedService = require("../services/GraspMonitorFeedService");
+const graspMonitorExportService = require("../services/GraspMonitorExportService");
 const { MONITOR_SCHEMA_VERSION, graspMonitorSummaryService } = require("../services/GraspMonitorSummaryService");
 
 class GraspController {
@@ -619,6 +620,49 @@ class GraspController {
 
       res.json(this.buildEnvelope({ dashboard }));
     } catch (error) {
+      next(error);
+    }
+  }
+
+  async createExportJob(req, res, next) {
+    try {
+      const job = graspMonitorExportService.createJob(req.body || {}, req.user);
+      res.status(202).json(this.buildEnvelope({ job }));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getExportJob(req, res, next) {
+    try {
+      const job = graspMonitorExportService.getJob(req.params.jobId);
+
+      if (!job) {
+        return res.status(404).json({ error: "Export job not found." });
+      }
+
+      return res.json(this.buildEnvelope({ job }));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async downloadExportJob(req, res, next) {
+    try {
+      const jobContent = graspMonitorExportService.getJobContent(req.params.jobId);
+
+      if (!jobContent) {
+        return res.status(404).json({ error: "Export job not found." });
+      }
+
+      res.setHeader("Content-Type", jobContent.mimeType);
+      res.setHeader("Content-Disposition", `attachment; filename="${jobContent.filename}"`);
+      return res.send(jobContent.content);
+    } catch (error) {
+      if (error.message === "Export job is not ready.") {
+        return res.status(409).json({ error: error.message });
+      }
+
       next(error);
     }
   }

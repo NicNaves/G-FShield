@@ -158,3 +158,16 @@ export const downloadTextFile = (filename, content, mimeType = "text/plain;chars
 
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
 };
+
+export const downloadBlobFile = (filename, blob) => {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+};
