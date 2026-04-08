@@ -21,7 +21,9 @@ Por isso, os containers mais recentes tendem a aparecer como:
 - `g-fshield-grasp-fs-dls-vnd-1`
 - `g-fshield-postgres`
 - `g-fshield-redis`
-- `g-fshield-api-dev-local` e `g-fshield-front-dev-local` quando o modo local usa Node em Docker
+- `g-fshield-api-dev-local`
+- `g-fshield-front-dev-local`
+- `g-fshield-front-server-static`
 
 Se voce ainda tiver uma stack antiga `gf-shield-*`, derrube-a antes de misturar os ambientes.
 
@@ -37,6 +39,10 @@ docker compose -p g-fshield logs --tail=100
 
 ```powershell
 docker compose -f .\webservice\api\docker-compose.db.yml ps
+```
+
+```powershell
+curl.exe -I http://localhost:3000
 ```
 
 ### Logs uteis
@@ -57,11 +63,12 @@ docker logs -f g-fshield-postgres
 docker logs -f g-fshield-redis
 ```
 
-API e front no modo local com Node em Docker:
+API e front:
 
 ```powershell
 docker logs -f g-fshield-api-dev-local
 docker logs -f g-fshield-front-dev-local
+docker logs -f g-fshield-front-server-static
 ```
 
 Logs gravados pelos scripts:
@@ -76,13 +83,22 @@ Windows:
 - start local: `.\scripts\start-local-dev.ps1`
 - stop local: `.\scripts\stop-local-dev.ps1`
 - start local com Node em Docker: `.\scripts\start-local-dev.ps1 -DevNodeImage node:24`
+- start local com front estatico/Nginx: `.\scripts\start-local-dev.ps1 -DevNodeImage node:24 -FrontendMode Preview`
 - start server: `.\scripts\start-server-dev.ps1`
 
 Ubuntu:
 
 - start local: `bash scripts/start-local-dev.sh`
 - stop local: `bash scripts/stop-local-dev.sh`
-- start server com Node em Docker:
+
+Start local com front estatico:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-local-dev.sh --frontend-mode Preview
+```
+
+Start server com Node em Docker:
 
 ```bash
 export DEV_NODE_IMAGE=node:24
@@ -110,7 +126,7 @@ Para tambem remover volumes:
 docker compose -p g-fshield down -v
 ```
 
-### Banco da API
+### Banco da API, cache e read model
 
 Reset do banco:
 
@@ -135,6 +151,21 @@ REDIS_ENABLED=true
 REDIS_URL=redis://localhost:6379
 ```
 
+Observacao de funcionamento:
+
+- o `AppCacheService` sempre usa memoria local primeiro
+- quando `REDIS_ENABLED=true`, a API replica as entradas tambem no Redis
+- se o Redis ficar indisponivel, a API cai automaticamente para memoria local
+
+Read model materializado do dashboard:
+
+- `GraspDashboardReadModel`
+- `GraspDashboardTopicMetric`
+- `GraspDashboardActivityBucket`
+- `GraspDashboardResourceMetric`
+- `GraspDashboardAlgorithmMetric`
+- `GraspDashboardTimelineBucket`
+
 ### Reset do monitor e reset completo
 
 No dashboard:
@@ -142,9 +173,10 @@ No dashboard:
 - `Settings > Operations > Reset monitor`
 - `Settings > Operations > Restart and clean environment`
 
-Observacao importante:
+Observacoes importantes:
 
 - o reset completo exige que a API esteja rodando no modo Docker dos scripts, com acesso ao Docker/Compose do host
+- se o binario `docker` nao existir dentro do container da API, o reset faz fallback para o Docker socket do host
 
 ### Kafka e replay
 
@@ -183,6 +215,11 @@ Os endpoints abaixo ajudam a distinguir payload bruto de agregado:
 - `GET /api/grasp/monitor/bootstrap`
 - `GET /api/grasp/monitor/projection`
 - `GET /api/grasp/monitor/summary`
+- `GET /api/grasp/monitor/dashboard`
+- `GET /api/grasp/monitor/feed`
+- `POST /api/grasp/monitor/export-jobs`
+- `GET /api/grasp/monitor/export-jobs/:jobId`
+- `GET /api/grasp/monitor/export-jobs/:jobId/download`
 
 ### Rebuild seletivo
 
@@ -224,10 +261,14 @@ Isso remove:
 
 ### Dicas de diagnostico
 
-- se o dashboard parecer pesado, verifique se o browser esta com build antigo em cache e consulte `monitor/bootstrap` e `monitor/projection`
+- se o dashboard parecer pesado, verifique se o browser esta com build antigo em cache e consulte `monitor/bootstrap`, `monitor/projection` e `monitor/dashboard`
+- se o front estiver abrindo devagar, prefira `Preview` ou o fluxo de servidor, que servem o build por `Nginx` com `gzip`, cache de assets e proxy `/api`
 - se o `DLS Outcome Summary` mostrar menos algoritmos do que o esperado, cheque os logs de `VND` e `IWSSR` para confirmar se houve atividade real
 - se o cache nao estiver surtindo efeito, confirme `REDIS_ENABLED=true` e `docker exec g-fshield-redis redis-cli ping`
+- se a tabela estiver grande demais, valide se ela esta lendo `GET /api/grasp/monitor/feed` com paginacao server-side
+- se a exportacao estiver demorando, acompanhe o status do job em `GET /api/grasp/monitor/export-jobs/:jobId`
 - se o login falhar em acesso remoto, revise `CORS_ORIGINS` e a porta publica do front
+- se `3001` e `4000` nao estiverem acessiveis externamente, use tunel SSH: `ssh -p 2289 -L 3001:localhost:3001 -L 4000:localhost:4000 idscps@200.156.91.194`
 
 ## EN-US
 
@@ -250,7 +291,9 @@ Because of that, the latest containers usually look like:
 - `g-fshield-grasp-fs-dls-vnd-1`
 - `g-fshield-postgres`
 - `g-fshield-redis`
-- `g-fshield-api-dev-local` and `g-fshield-front-dev-local` when local mode uses Docker Node
+- `g-fshield-api-dev-local`
+- `g-fshield-front-dev-local`
+- `g-fshield-front-server-static`
 
 If you still have an older `gf-shield-*` stack, stop it before mixing environments.
 
@@ -266,6 +309,10 @@ docker compose -p g-fshield logs --tail=100
 
 ```powershell
 docker compose -f .\webservice\api\docker-compose.db.yml ps
+```
+
+```powershell
+curl.exe -I http://localhost:3000
 ```
 
 ### Useful logs
@@ -286,11 +333,12 @@ docker logs -f g-fshield-postgres
 docker logs -f g-fshield-redis
 ```
 
-API and front-end in local Docker-Node mode:
+API and front-end:
 
 ```powershell
 docker logs -f g-fshield-api-dev-local
 docker logs -f g-fshield-front-dev-local
+docker logs -f g-fshield-front-server-static
 ```
 
 Script-managed logs:
@@ -305,13 +353,22 @@ Windows:
 - local start: `.\scripts\start-local-dev.ps1`
 - local stop: `.\scripts\stop-local-dev.ps1`
 - local start with Docker Node: `.\scripts\start-local-dev.ps1 -DevNodeImage node:24`
+- local start with a static/Nginx front-end: `.\scripts\start-local-dev.ps1 -DevNodeImage node:24 -FrontendMode Preview`
 - server start: `.\scripts\start-server-dev.ps1`
 
 Ubuntu:
 
 - local start: `bash scripts/start-local-dev.sh`
 - local stop: `bash scripts/stop-local-dev.sh`
-- server start with Docker Node:
+
+Local start with a static front-end:
+
+```bash
+export DEV_NODE_IMAGE=node:24
+bash scripts/start-local-dev.sh --frontend-mode Preview
+```
+
+Server start with Docker Node:
 
 ```bash
 export DEV_NODE_IMAGE=node:24
@@ -339,7 +396,7 @@ To also remove volumes:
 docker compose -p g-fshield down -v
 ```
 
-### API database
+### API database, cache, and read model
 
 Database reset:
 
@@ -364,6 +421,21 @@ REDIS_ENABLED=true
 REDIS_URL=redis://localhost:6379
 ```
 
+Runtime behavior:
+
+- `AppCacheService` always serves local memory first
+- when `REDIS_ENABLED=true`, the API mirrors entries to Redis as a second cache layer
+- if Redis becomes unavailable, the API automatically falls back to local memory
+
+Materialized dashboard read model tables:
+
+- `GraspDashboardReadModel`
+- `GraspDashboardTopicMetric`
+- `GraspDashboardActivityBucket`
+- `GraspDashboardResourceMetric`
+- `GraspDashboardAlgorithmMetric`
+- `GraspDashboardTimelineBucket`
+
 ### Monitor reset and full reset
 
 From the dashboard:
@@ -371,9 +443,10 @@ From the dashboard:
 - `Settings > Operations > Reset monitor`
 - `Settings > Operations > Restart and clean environment`
 
-Important note:
+Important notes:
 
 - the full reset requires the API to run in the Docker script mode, with access to the host Docker/Compose runtime
+- if the `docker` binary is unavailable inside the API container, the reset falls back to the host Docker socket
 
 ### Kafka and replay
 
@@ -412,6 +485,11 @@ These endpoints help distinguish raw payloads from aggregated data:
 - `GET /api/grasp/monitor/bootstrap`
 - `GET /api/grasp/monitor/projection`
 - `GET /api/grasp/monitor/summary`
+- `GET /api/grasp/monitor/dashboard`
+- `GET /api/grasp/monitor/feed`
+- `POST /api/grasp/monitor/export-jobs`
+- `GET /api/grasp/monitor/export-jobs/:jobId`
+- `GET /api/grasp/monitor/export-jobs/:jobId/download`
 
 ### Selective rebuild
 
@@ -453,7 +531,11 @@ This removes:
 
 ### Diagnostic hints
 
-- if the dashboard feels heavy, check whether the browser is still serving an older cached build and inspect `monitor/bootstrap` and `monitor/projection`
+- if the dashboard feels heavy, check whether the browser is still serving an older cached build and inspect `monitor/bootstrap`, `monitor/projection`, and `monitor/dashboard`
+- if the site opens slowly, prefer `Preview` or the server flow, which serve the front-end through `Nginx` with `gzip`, asset caching, and `/api` proxying
 - if `DLS Outcome Summary` shows fewer algorithms than expected, inspect the `VND` and `IWSSR` logs to confirm actual activity
 - if caching does not seem effective, confirm `REDIS_ENABLED=true` and `docker exec g-fshield-redis redis-cli ping`
+- if a table is too large, verify that it is reading `GET /api/grasp/monitor/feed` with server-side pagination
+- if export takes time, follow the async job status at `GET /api/grasp/monitor/export-jobs/:jobId`
 - if remote login fails, review `CORS_ORIGINS` and the public front-end port
+- if `3001` and `4000` are not exposed publicly yet, use an SSH tunnel: `ssh -p 2289 -L 3001:localhost:3001 -L 4000:localhost:4000 idscps@200.156.91.194`
