@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import PropTypes from "prop-types";
 import { toast } from "react-toastify";
@@ -336,6 +336,16 @@ const createDefaultFeedTableFilters = () => ({
   minF1Score: "",
   maxF1Score: "",
 });
+
+const ANALYTICS_SECTION_ACTIVITY = "activity";
+const ANALYTICS_SECTION_TOPICS = "topics";
+const ANALYTICS_SECTION_FEED = "feed";
+
+const EXECUTIONS_SECTION_COMPARISON = "comparison";
+const EXECUTIONS_SECTION_INITIAL = "initial";
+const EXECUTIONS_SECTION_OUTCOME = "outcome";
+const EXECUTIONS_SECTION_PROGRESS = "progress";
+const EXECUTIONS_SECTION_BEST = "best";
 
 const limitDashboardRows = (rows = [], limit = DASHBOARD_TABLE_ROW_LIMIT) =>
   rows.length > limit ? rows.slice(0, limit) : rows;
@@ -727,17 +737,29 @@ const getBarPaletteForLabels = (labels = [], paletteName = "algorithm") => {
 };
 
 const filterPanelSx = (darkMode) => ({
+  position: "relative",
+  overflow: "hidden",
   height: "100%",
-  p: 2.25,
+  p: 2.5,
   borderRadius: 3,
   color: darkMode ? "#edf4ff" : "#1f2937",
   border: `1px solid ${darkMode ? "rgba(255, 255, 255, 0.08)" : "rgba(15, 23, 42, 0.08)"}`,
   background: darkMode
-    ? "linear-gradient(180deg, rgba(14, 22, 37, 0.92) 0%, rgba(18, 28, 47, 0.94) 100%)"
-    : "linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(255, 255, 255, 0.92) 100%)",
+    ? "linear-gradient(180deg, rgba(14, 22, 37, 0.88) 0%, rgba(18, 28, 47, 0.94) 100%)"
+    : "linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 247, 251, 0.94) 100%)",
   boxShadow: darkMode
-    ? "0 22px 42px rgba(2, 6, 23, 0.34)"
-    : "0 14px 30px rgba(15, 23, 42, 0.06)",
+    ? "0 22px 42px rgba(2, 6, 23, 0.28)"
+    : "0 14px 30px rgba(15, 23, 42, 0.05)",
+  backdropFilter: "blur(14px)",
+  "&::before": {
+    content: "\"\"",
+    position: "absolute",
+    inset: "0 0 auto 0",
+    height: 1,
+    background: darkMode
+      ? "linear-gradient(90deg, rgba(96, 165, 250, 0) 0%, rgba(96, 165, 250, 0.48) 48%, rgba(96, 165, 250, 0) 100%)"
+      : "linear-gradient(90deg, rgba(59, 130, 246, 0) 0%, rgba(59, 130, 246, 0.34) 48%, rgba(59, 130, 246, 0) 100%)",
+  },
   "& .MuiFormControl-root": {
     mb: 0,
   },
@@ -773,6 +795,7 @@ const filterPanelSx = (darkMode) => ({
 
 const filterPanelHeadingSx = (darkMode) => ({
   color: darkMode ? "#f8fafc" : "#1f2937",
+  letterSpacing: "0.01em",
 });
 
 const filterPanelCaptionSx = (darkMode) => ({
@@ -782,11 +805,16 @@ const filterPanelCaptionSx = (darkMode) => ({
 const dashboardContentSx = (darkMode) => ({
   "& .MuiCard-root": {
     borderRadius: 3,
-    border: darkMode ? "1px solid rgba(255, 255, 255, 0.08)" : undefined,
+    border: darkMode
+      ? "1px solid rgba(255, 255, 255, 0.08)"
+      : "1px solid rgba(148, 163, 184, 0.16)",
     background: darkMode
       ? "linear-gradient(180deg, rgba(16, 24, 38, 0.94) 0%, rgba(18, 28, 47, 0.96) 100%)"
-      : undefined,
-    boxShadow: darkMode ? "0 20px 40px rgba(2, 6, 23, 0.32)" : undefined,
+      : "linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%)",
+    boxShadow: darkMode
+      ? "0 20px 40px rgba(2, 6, 23, 0.32)"
+      : "0 18px 36px rgba(15, 23, 42, 0.06)",
+    backdropFilter: "blur(14px)",
   },
   "& .MuiCard-root .MuiTypography-root": {
     color: darkMode ? "#edf4ff !important" : undefined,
@@ -794,8 +822,55 @@ const dashboardContentSx = (darkMode) => ({
   "& .MuiCard-root .MuiTypography-caption, & .MuiCard-root .MuiTypography-button, & .MuiCard-root .MuiTypography-body2": {
     color: darkMode ? "rgba(212, 222, 238, 0.76) !important" : undefined,
   },
+  "& .MuiCard-root .MuiChip-root": {
+    borderRadius: 999,
+    borderColor: darkMode ? "rgba(148, 163, 184, 0.26)" : "rgba(148, 163, 184, 0.24)",
+    backgroundColor: darkMode ? "rgba(15, 23, 42, 0.42)" : "rgba(248, 250, 252, 0.92)",
+  },
   "& .MuiCard-root .MuiDivider-root": {
-    borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : undefined,
+    borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "rgba(148, 163, 184, 0.18)",
+  },
+});
+
+const dashboardTabRailSx = (darkMode) => ({
+  overflow: "hidden",
+  borderRadius: 3,
+  border: darkMode ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid rgba(148, 163, 184, 0.18)",
+  background: darkMode
+    ? "linear-gradient(180deg, rgba(12, 19, 32, 0.96) 0%, rgba(17, 26, 43, 0.92) 100%)"
+    : "linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(243, 247, 252, 0.96) 100%)",
+  boxShadow: darkMode ? "0 18px 40px rgba(2, 6, 23, 0.28)" : "0 16px 30px rgba(15, 23, 42, 0.05)",
+});
+
+const dashboardTabsSx = (darkMode) => ({
+  minHeight: 60,
+  px: 1,
+  py: 0.5,
+  "& .MuiTabs-indicator": {
+    display: "none",
+  },
+  "& .MuiTabs-flexContainer": {
+    gap: 1,
+  },
+  "& .MuiTab-root": {
+    minHeight: 48,
+    minWidth: 146,
+    borderRadius: 2.5,
+    textTransform: "none",
+    fontWeight: 600,
+    color: darkMode ? "rgba(212, 222, 238, 0.74)" : "rgba(71, 85, 105, 0.92)",
+    transition: "all 180ms ease",
+  },
+  "& .MuiTab-root:hover": {
+    color: darkMode ? "#f8fafc" : "#0f172a",
+    backgroundColor: darkMode ? "rgba(59, 130, 246, 0.08)" : "rgba(59, 130, 246, 0.06)",
+  },
+  "& .MuiTab-root.Mui-selected": {
+    color: darkMode ? "#f8fafc" : "#0f172a",
+    background: darkMode
+      ? "linear-gradient(180deg, rgba(37, 99, 235, 0.22) 0%, rgba(30, 64, 175, 0.18) 100%)"
+      : "linear-gradient(180deg, rgba(239, 246, 255, 1) 0%, rgba(219, 234, 254, 0.98) 100%)",
+    boxShadow: darkMode ? "0 10px 22px rgba(15, 23, 42, 0.28)" : "0 10px 18px rgba(59, 130, 246, 0.12)",
   },
 });
 
@@ -1811,6 +1886,8 @@ function Dashboard() {
     executionProgress: createDefaultFeedTableFilters(),
     executionBestMoments: createDefaultFeedTableFilters(),
   });
+  const [analyticsSection, setAnalyticsSection] = useState(ANALYTICS_SECTION_ACTIVITY);
+  const [executionsSection, setExecutionsSection] = useState(EXECUTIONS_SECTION_COMPARISON);
   const [feedControls, setFeedControls] = useState({
     analytics: { pageIndex: 0, pageSize: 25, search: "" },
     executionInitial: { pageIndex: 0, pageSize: 6, search: "" },
@@ -1822,6 +1899,32 @@ function Dashboard() {
   const isAlgorithmsTabActive = activeTab === "algorithms";
   const isAnalyticsTabActive = activeTab === "analytics";
   const isExecutionsTabActive = activeTab === "executions";
+  const isAnalyticsActivitySectionActive =
+    isAnalyticsTabActive && analyticsSection === ANALYTICS_SECTION_ACTIVITY;
+  const isAnalyticsTopicsSectionActive =
+    isAnalyticsTabActive && analyticsSection === ANALYTICS_SECTION_TOPICS;
+  const isAnalyticsFeedSectionActive =
+    isAnalyticsTabActive && analyticsSection === ANALYTICS_SECTION_FEED;
+  const isExecutionsComparisonSectionActive =
+    isExecutionsTabActive && executionsSection === EXECUTIONS_SECTION_COMPARISON;
+  const isExecutionsInitialSectionActive =
+    isExecutionsTabActive && executionsSection === EXECUTIONS_SECTION_INITIAL;
+  const isExecutionsOutcomeSectionActive =
+    isExecutionsTabActive && executionsSection === EXECUTIONS_SECTION_OUTCOME;
+  const isExecutionsProgressSectionActive =
+    isExecutionsTabActive && executionsSection === EXECUTIONS_SECTION_PROGRESS;
+  const isExecutionsBestSectionActive =
+    isExecutionsTabActive && executionsSection === EXECUTIONS_SECTION_BEST;
+  const handleAnalyticsSectionChange = useCallback((nextSection) => {
+    startTransition(() => {
+      setAnalyticsSection(nextSection);
+    });
+  }, []);
+  const handleExecutionsSectionChange = useCallback((nextSection) => {
+    startTransition(() => {
+      setExecutionsSection(nextSection);
+    });
+  }, []);
   const updateFeedControl = useCallback((key, patch) => {
     setFeedControls((current) => {
       const nextSlice = {
@@ -2125,6 +2228,11 @@ function Dashboard() {
     canUsePersistentDashboardAggregate
     && Array.isArray(dashboardAggregate?.timelineSeedSeries)
     && dashboardAggregate.timelineSeedSeries.length > 0;
+  const shouldBuildSnapshotAnalytics =
+    activeTab === "overview"
+    || isPerformanceTabActive
+    || isAlgorithmsTabActive
+    || (isAnalyticsTabActive && !canUsePersistentDashboardAggregate);
   const persistentTimelineSeedSeriesBySeed = useMemo(
     () =>
       new Map(
@@ -2215,42 +2323,59 @@ function Dashboard() {
 
   const analyticsFeedQuery = useMonitorEventFeedQuery({
     ...resolveFeedQueryOptions("analytics", analyticsFeedTopics, feedControls.analytics),
-    enabled: isAnalyticsTabActive,
+    enabled: isAnalyticsFeedSectionActive,
     staleTime: 10_000,
   });
   const executionInitialFeedQuery = useMonitorEventFeedQuery({
     ...resolveFeedQueryOptions("executionInitial", executionInitialFeedTopics, feedControls.executionInitial),
-    enabled: isExecutionsTabActive && (selectedStageLens === "all" || executionInitialFeedTopics.length > 0),
+    enabled:
+      isExecutionsInitialSectionActive
+      && (selectedStageLens === "all" || executionInitialFeedTopics.length > 0),
     staleTime: 10_000,
   });
   const executionOutcomeFeedQuery = useMonitorEventFeedQuery({
     ...resolveFeedQueryOptions("executionOutcome", executionOutcomeFeedTopics, feedControls.executionOutcome),
-    enabled: isExecutionsTabActive && (selectedStageLens === "all" || executionOutcomeFeedTopics.length > 0),
+    enabled:
+      isExecutionsOutcomeSectionActive
+      && (selectedStageLens === "all" || executionOutcomeFeedTopics.length > 0),
     staleTime: 10_000,
   });
   const executionProgressFeedQuery = useMonitorEventFeedQuery({
     ...resolveFeedQueryOptions("executionProgress", executionProgressFeedTopics, feedControls.executionProgress),
-    enabled: isExecutionsTabActive && (selectedStageLens === "all" || executionProgressFeedTopics.length > 0),
+    enabled:
+      isExecutionsProgressSectionActive
+      && (selectedStageLens === "all" || executionProgressFeedTopics.length > 0),
     staleTime: 10_000,
   });
   const executionBestMomentsFeedQuery = useMonitorEventFeedQuery({
     ...resolveFeedQueryOptions("executionBestMoments", executionBestMomentsFeedTopics, feedControls.executionBestMoments),
-    enabled: isExecutionsTabActive && (selectedStageLens === "all" || executionBestMomentsFeedTopics.length > 0),
+    enabled:
+      isExecutionsBestSectionActive
+      && (selectedStageLens === "all" || executionBestMomentsFeedTopics.length > 0),
     staleTime: 10_000,
   });
 
   const historySnapshots = useMemo(
-    () =>
-      filteredRuns.flatMap((run) =>
+    () => {
+      if (!shouldBuildSnapshotAnalytics) {
+        return [];
+      }
+
+      return filteredRuns.flatMap((run) =>
         (run.history || [])
           .filter((entry) => entry?.topic)
           .map((entry) => extractHistorySnapshot(run, entry))
           .filter(matchesSelection)
-      ),
-    [filteredRuns, matchesSelection]
+      );
+    },
+    [filteredRuns, matchesSelection, shouldBuildSnapshotAnalytics]
   );
 
   const monitorSnapshots = useMemo(() => {
+    if (!shouldBuildSnapshotAnalytics) {
+      return [];
+    }
+
     const merged = new Map();
 
     [...historySnapshots, ...filteredSnapshotEvents].forEach((event) => {
@@ -2269,7 +2394,7 @@ function Dashboard() {
       (left, right) => getSortableDateValue(right.timestamp) - getSortableDateValue(left.timestamp)
     )
       .slice(0, DASHBOARD_VISIBLE_SNAPSHOT_LIMIT);
-  }, [historySnapshots, filteredSnapshotEvents]);
+  }, [filteredSnapshotEvents, historySnapshots, shouldBuildSnapshotAnalytics]);
 
   const monitorSnapshotAnalytics = useMemo(
     () => buildMonitorSnapshotAnalytics(monitorSnapshots),
@@ -2401,8 +2526,29 @@ function Dashboard() {
   }, [filteredRuns, bestSolutionRuns]);
 
   const initialEventBySeed = useMemo(
-    () => new Map(initialSolutionEvents.map((event) => [event.seedId, event])),
-    [initialSolutionEvents]
+    () => {
+      if (initialSolutionEvents.length) {
+        return new Map(initialSolutionEvents.map((event) => [event.seedId, event]));
+      }
+
+      const next = new Map();
+
+      filteredRuns.forEach((run) => {
+        if (!run?.seedId || !Array.isArray(run.history)) {
+          return;
+        }
+
+        const initialEntry = run.history.find((entry) => entry?.topic === "INITIAL_SOLUTION_TOPIC");
+        if (!initialEntry) {
+          return;
+        }
+
+        next.set(run.seedId, extractHistorySnapshot(run, initialEntry));
+      });
+
+      return next;
+    },
+    [filteredRuns, initialSolutionEvents]
   );
 
   const derivedFinalRunsByAlgorithm = useMemo(() => {
@@ -3996,6 +4142,9 @@ function Dashboard() {
     () => ({
       responsive: true,
       maintainAspectRatio: false,
+      parsing: false,
+      normalized: true,
+      animation: false,
       indexAxis: "y",
       plugins: {
         legend: {
@@ -4057,6 +4206,7 @@ function Dashboard() {
     () => ({
       responsive: true,
       maintainAspectRatio: false,
+      animation: false,
       plugins: {
         legend: {
           position: "bottom",
@@ -4316,7 +4466,7 @@ function Dashboard() {
   }, [isPerformanceTabActive, resourceAveragesByLocalSearch]);
 
   const hourlyActivityChartData = useMemo(() => {
-    if (!isAnalyticsTabActive) {
+    if (!isAnalyticsActivitySectionActive) {
       return buildEmptyBarData("Hourly activity");
     }
 
@@ -4353,17 +4503,26 @@ function Dashboard() {
         },
       ],
     };
-  }, [hourlyActivityMetrics, isAnalyticsTabActive, t]);
+  }, [hourlyActivityMetrics, isAnalyticsActivitySectionActive, t]);
 
   const hourlyActivityChartOptions = useMemo(
     () => ({
       responsive: true,
       maintainAspectRatio: false,
+      parsing: false,
+      normalized: true,
+      animation: false,
       interaction: {
         mode: "index",
         intersect: false,
       },
       plugins: {
+        decimation: {
+          enabled: hourlyActivityMetrics.length > 120,
+          algorithm: "lttb",
+          samples: 72,
+          threshold: 120,
+        },
         legend: {
           position: "bottom",
           labels: {
@@ -4406,7 +4565,7 @@ function Dashboard() {
   );
 
   const rawTopicVolumeChartData = useMemo(() => {
-    if (!isAnalyticsTabActive) {
+    if (!isAnalyticsTopicsSectionActive) {
       return buildEmptyBarData("Topic volume");
     }
 
@@ -4432,7 +4591,7 @@ function Dashboard() {
         },
       ],
     };
-  }, [isAnalyticsTabActive, rawTopicMetrics]);
+  }, [isAnalyticsTopicsSectionActive, rawTopicMetrics]);
 
   const analyticsFeed = analyticsFeedQuery.data || createEmptyPaginatedFeed(feedControls.analytics.pageSize);
   const executionInitialFeed = executionInitialFeedQuery.data
@@ -4445,24 +4604,24 @@ function Dashboard() {
     || createEmptyPaginatedFeed(feedControls.executionBestMoments.pageSize);
 
   const pagedAnalyticsFeedEvents = useMemo(
-    () => analyticsFeed.items.map(extractEventSnapshot),
-    [analyticsFeed.items]
+    () => (isAnalyticsFeedSectionActive ? analyticsFeed.items.map(extractEventSnapshot) : []),
+    [analyticsFeed.items, isAnalyticsFeedSectionActive]
   );
   const pagedInitialSolutionEvents = useMemo(
-    () => executionInitialFeed.items.map(extractEventSnapshot),
-    [executionInitialFeed.items]
+    () => (isExecutionsInitialSectionActive ? executionInitialFeed.items.map(extractEventSnapshot) : []),
+    [executionInitialFeed.items, isExecutionsInitialSectionActive]
   );
   const pagedLocalSearchOutcomeEvents = useMemo(
-    () => executionOutcomeFeed.items.map(extractEventSnapshot),
-    [executionOutcomeFeed.items]
+    () => (isExecutionsOutcomeSectionActive ? executionOutcomeFeed.items.map(extractEventSnapshot) : []),
+    [executionOutcomeFeed.items, isExecutionsOutcomeSectionActive]
   );
   const pagedLocalSearchProgressEvents = useMemo(
-    () => executionProgressFeed.items.map(extractEventSnapshot),
-    [executionProgressFeed.items]
+    () => (isExecutionsProgressSectionActive ? executionProgressFeed.items.map(extractEventSnapshot) : []),
+    [executionProgressFeed.items, isExecutionsProgressSectionActive]
   );
   const pagedBestSolutionMomentEvents = useMemo(
-    () => executionBestMomentsFeed.items.map(extractEventSnapshot),
-    [executionBestMomentsFeed.items]
+    () => (isExecutionsBestSectionActive ? executionBestMomentsFeed.items.map(extractEventSnapshot) : []),
+    [executionBestMomentsFeed.items, isExecutionsBestSectionActive]
   );
 
   const analyticsFeedServerPagination = useMemo(
@@ -4535,34 +4694,9 @@ function Dashboard() {
     [executionBestMomentsFeed.pagination?.page, executionBestMomentsFeed.pagination?.pageSize, executionBestMomentsFeed.pagination?.total, executionBestMomentsFeed.pagination?.totalPages, feedControls.executionBestMoments.pageSize, feedControls.executionBestMoments.search, updateFeedControl]
   );
 
-  const visibleInitialSolutionEvents = useMemo(
-    () => (isExecutionsTabActive ? limitDashboardRows(initialSolutionEvents) : []),
-    [initialSolutionEvents, isExecutionsTabActive]
-  );
-
-  const visibleLocalSearchOutcomeEvents = useMemo(
-    () => (isExecutionsTabActive ? limitDashboardRows(localSearchOutcomeEvents) : []),
-    [isExecutionsTabActive, localSearchOutcomeEvents]
-  );
-
-  const visibleLocalSearchProgressEvents = useMemo(
-    () => (isExecutionsTabActive ? limitDashboardRows(localSearchProgressEvents) : []),
-    [isExecutionsTabActive, localSearchProgressEvents]
-  );
-
-  const visibleBestSolutionSnapshotEvents = useMemo(
-    () => (isExecutionsTabActive ? limitDashboardRows(bestSolutionSnapshotEvents) : []),
-    [bestSolutionSnapshotEvents, isExecutionsTabActive]
-  );
-
   const visibleBestSolutionRuns = useMemo(
-    () => (isExecutionsTabActive ? limitDashboardRows(bestSolutionRuns) : []),
-    [bestSolutionRuns, isExecutionsTabActive]
-  );
-
-  const visibleMonitorSnapshots = useMemo(
-    () => (isAnalyticsTabActive ? limitDashboardRows(monitorSnapshots) : []),
-    [isAnalyticsTabActive, monitorSnapshots]
+    () => (isExecutionsBestSectionActive ? limitDashboardRows(bestSolutionRuns) : []),
+    [bestSolutionRuns, isExecutionsBestSectionActive]
   );
 
   const resourceSummaryTableData = useMemo(
@@ -4625,6 +4759,9 @@ function Dashboard() {
     () => ({
       responsive: true,
       maintainAspectRatio: false,
+      parsing: false,
+      normalized: true,
+      animation: false,
       plugins: {
         legend: {
           display: false,
@@ -4662,7 +4799,7 @@ function Dashboard() {
         { Header: "Dataset", accessor: "dataset", align: "left" },
       ];
 
-      if (!isExecutionsTabActive) {
+      if (!isExecutionsInitialSectionActive) {
         return { columns, rows: [] };
       }
 
@@ -4743,7 +4880,7 @@ function Dashboard() {
       }),
       };
     },
-    [isExecutionsTabActive, pagedInitialSolutionEvents, preferredRunBySeed]
+    [isExecutionsInitialSectionActive, pagedInitialSolutionEvents, preferredRunBySeed]
   );
 
   const localSearchTableData = useMemo(
@@ -4759,7 +4896,7 @@ function Dashboard() {
         { Header: "Seed", accessor: "seed", align: "left" },
       ];
 
-      if (!isExecutionsTabActive) {
+      if (!isExecutionsOutcomeSectionActive) {
         return { columns, rows: [] };
       }
 
@@ -4810,7 +4947,7 @@ function Dashboard() {
       }),
       };
     },
-    [initialEventBySeed, isExecutionsTabActive, pagedLocalSearchOutcomeEvents, preferredRunBySeed]
+    [initialEventBySeed, isExecutionsOutcomeSectionActive, pagedLocalSearchOutcomeEvents, preferredRunBySeed]
   );
 
   const localSearchProgressTableData = useMemo(
@@ -4825,7 +4962,7 @@ function Dashboard() {
         { Header: "Seed", accessor: "seed", align: "left" },
       ];
 
-      if (!isExecutionsTabActive) {
+      if (!isExecutionsProgressSectionActive) {
         return { columns, rows: [] };
       }
 
@@ -4865,7 +5002,7 @@ function Dashboard() {
       })),
       };
     },
-    [isExecutionsTabActive, pagedLocalSearchProgressEvents]
+    [isExecutionsProgressSectionActive, pagedLocalSearchProgressEvents]
   );
 
   const rawTopicTableData = useMemo(
@@ -4878,7 +5015,7 @@ function Dashboard() {
         { Header: "Best F1", accessor: "bestScore", align: "left" },
       ];
 
-      if (!isAnalyticsTabActive) {
+      if (!isAnalyticsTopicsSectionActive) {
         return { columns, rows: [] };
       }
 
@@ -4909,7 +5046,7 @@ function Dashboard() {
       })),
       };
     },
-    [isAnalyticsTabActive, rawTopicMetrics]
+    [isAnalyticsTopicsSectionActive, rawTopicMetrics]
   );
 
   const rawSolutionFeedTableData = useMemo(
@@ -4926,7 +5063,7 @@ function Dashboard() {
         { Header: "Dataset", accessor: "dataset", align: "left" },
       ];
 
-      if (!isAnalyticsTabActive) {
+      if (!isAnalyticsFeedSectionActive) {
         return { columns, rows: [] };
       }
 
@@ -5002,7 +5139,7 @@ function Dashboard() {
       })),
       };
     },
-    [isAnalyticsTabActive, pagedAnalyticsFeedEvents]
+    [isAnalyticsFeedSectionActive, pagedAnalyticsFeedEvents]
   );
 
   const bestSolutionsDetailedTableData = useMemo(
@@ -5016,7 +5153,7 @@ function Dashboard() {
         { Header: "Seed", accessor: "seed", align: "left" },
       ];
 
-      if (!isExecutionsTabActive) {
+      if (!isExecutionsBestSectionActive) {
         return { columns, rows: [] };
       }
 
@@ -5054,7 +5191,7 @@ function Dashboard() {
       }),
       };
     },
-    [initialEventBySeed, isExecutionsTabActive, visibleBestSolutionRuns]
+    [initialEventBySeed, isExecutionsBestSectionActive, visibleBestSolutionRuns]
   );
 
   const bestSolutionMomentsTableData = useMemo(
@@ -5070,7 +5207,7 @@ function Dashboard() {
         { Header: "Dataset", accessor: "dataset", align: "left" },
       ];
 
-      if (!isExecutionsTabActive) {
+      if (!isExecutionsBestSectionActive) {
         return { columns, rows: [] };
       }
 
@@ -5127,7 +5264,7 @@ function Dashboard() {
       })),
       };
     },
-    [isExecutionsTabActive, pagedBestSolutionMomentEvents]
+    [isExecutionsBestSectionActive, pagedBestSolutionMomentEvents]
   );
 
   const rclAlgorithmSummaryTableData = useMemo(
@@ -5402,7 +5539,7 @@ function Dashboard() {
         />
 
         <MDBox mt={3}>
-          <Card>
+          <Card sx={dashboardTabRailSx(darkMode)}>
             <MDBox px={2} pt={1.5} pb={1}>
               <Tabs
                 value={activeTab}
@@ -5410,13 +5547,7 @@ function Dashboard() {
                 variant="scrollable"
                 scrollButtons="auto"
                 allowScrollButtonsMobile
-                sx={{
-                  minHeight: 56,
-                  "& .MuiTabs-indicator": {
-                    height: 3,
-                    borderRadius: 999,
-                  },
-                }}
+                sx={dashboardTabsSx(darkMode)}
               >
                 {dashboardTabs.map((tab) => (
                   <Tab
@@ -5425,13 +5556,6 @@ function Dashboard() {
                     label={t(tab.labelKey)}
                     icon={<Icon fontSize="small">{tab.icon}</Icon>}
                     iconPosition="start"
-                    sx={{
-                      minHeight: 52,
-                      minWidth: 140,
-                      borderRadius: 2,
-                      textTransform: "none",
-                      fontWeight: 500,
-                    }}
                   />
                 ))}
               </Tabs>
@@ -6195,6 +6319,9 @@ function Dashboard() {
           <Suspense fallback={tabPanelFallback}>
             <DashboardAnalyticsTab
               t={t}
+              darkMode={darkMode}
+              section={analyticsSection}
+              onSectionChange={handleAnalyticsSectionChange}
               analyticsOverview={analyticsOverview}
               analyticsAvgInitialF1={formatCompactPercent(analyticsOverview.avgInitialF1)}
               hourlyActivityMetrics={hourlyActivityMetrics}
@@ -6222,6 +6349,9 @@ function Dashboard() {
           <Suspense fallback={tabPanelFallback}>
             <DashboardExecutionsTab
               t={t}
+              darkMode={darkMode}
+              section={executionsSection}
+              onSectionChange={handleExecutionsSectionChange}
               filteredRuns={filteredRuns}
               initialSolutionsTotal={executionInitialFeed.pagination?.total || 0}
               initialSolutionsTableData={initialSolutionsTableData}

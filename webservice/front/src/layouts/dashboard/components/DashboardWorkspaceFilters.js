@@ -17,6 +17,31 @@ import MDBox from "components/MDBox";
 import MDButton from "components/MDButton";
 import MDTypography from "components/MDTypography";
 
+const workspaceSurfaceSx = (darkMode) => ({
+  overflow: "hidden",
+  borderRadius: 3,
+  border: darkMode ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid rgba(148, 163, 184, 0.18)",
+  background: darkMode
+    ? "linear-gradient(180deg, rgba(12, 18, 31, 0.96) 0%, rgba(18, 28, 47, 0.92) 100%)"
+    : "linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 247, 251, 0.96) 100%)",
+  boxShadow: darkMode ? "0 18px 42px rgba(2, 6, 23, 0.28)" : "0 18px 34px rgba(15, 23, 42, 0.05)",
+});
+
+const workspaceMetaChipSx = (darkMode) => ({
+  borderRadius: 999,
+  borderColor: darkMode ? "rgba(148, 163, 184, 0.24)" : "rgba(148, 163, 184, 0.22)",
+  backgroundColor: darkMode ? "rgba(15, 23, 42, 0.42)" : "rgba(248, 250, 252, 0.92)",
+  "& .MuiChip-label": {
+    fontWeight: 500,
+  },
+});
+
+const panelBadgeSx = (darkMode) => ({
+  borderRadius: 999,
+  borderColor: darkMode ? "rgba(96, 165, 250, 0.28)" : "rgba(59, 130, 246, 0.22)",
+  backgroundColor: darkMode ? "rgba(30, 41, 59, 0.48)" : "rgba(239, 246, 255, 0.88)",
+});
+
 function DashboardWorkspaceFilters({
   t,
   activeTab,
@@ -91,7 +116,7 @@ function DashboardWorkspaceFilters({
 }) {
   return (
     <MDBox mt={4}>
-      <Card>
+      <Card sx={workspaceSurfaceSx(darkMode)}>
         <MDBox p={3}>
           <MDBox
             display="flex"
@@ -102,6 +127,17 @@ function DashboardWorkspaceFilters({
             mb={3}
           >
             <MDBox>
+              <MDTypography
+                variant="caption"
+                fontWeight="medium"
+                sx={{
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: darkMode ? "rgba(148, 163, 184, 0.8)" : "rgba(71, 85, 105, 0.82)",
+                }}
+              >
+                {t("dashboard.filterFocus")}
+              </MDTypography>
               <MDTypography variant="h5" color="dark">
                 {t("dashboard.workspaceTitle")}
               </MDTypography>
@@ -111,25 +147,28 @@ function DashboardWorkspaceFilters({
             </MDBox>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap" useFlexGap>
-              <Chip label={`${overview.datasetPairs} datasets`} color="info" size="small" variant="outlined" />
-              <Chip label={`${overview.algorithms} algorithms`} color="secondary" size="small" variant="outlined" />
+              <Chip label={`${overview.datasetPairs} datasets`} color="info" size="small" variant="outlined" sx={workspaceMetaChipSx(darkMode)} />
+              <Chip label={`${overview.algorithms} algorithms`} color="secondary" size="small" variant="outlined" sx={workspaceMetaChipSx(darkMode)} />
               <Chip
                 label={`${filteredRuns.length}/${runs.length || filteredRuns.length} runs`}
                 color="primary"
                 size="small"
                 variant="outlined"
+                sx={workspaceMetaChipSx(darkMode)}
               />
               <Chip
                 label={`${analyticsOverview.rawEvents} live events`}
                 color="warning"
                 size="small"
                 variant="outlined"
+                sx={workspaceMetaChipSx(darkMode)}
               />
               <Chip
                 label={`${analyticsOverview.rawSnapshots} visible snapshots`}
                 color="success"
                 size="small"
                 variant="outlined"
+                sx={workspaceMetaChipSx(darkMode)}
               />
               <Chip
                 label={
@@ -141,12 +180,14 @@ function DashboardWorkspaceFilters({
                 size="small"
                 variant="outlined"
                 onClick={activeFilterCount > 0 ? resetWorkspaceFilters : undefined}
+                sx={workspaceMetaChipSx(darkMode)}
               />
               <Chip
                 label={connected ? t("dashboard.realtimeConnected") : t("dashboard.offlineSnapshot")}
                 color={connected ? "success" : "warning"}
                 size="small"
                 variant="outlined"
+                sx={workspaceMetaChipSx(darkMode)}
               />
               {loading || detailsLoading ? <CircularProgress size={18} /> : null}
             </Stack>
@@ -164,7 +205,7 @@ function DashboardWorkspaceFilters({
                       {t("dashboard.dataScopeSubtitle")}
                     </MDTypography>
                   </MDBox>
-                  <Chip label={t("dashboard.filterBase")} color="info" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.filterBase")} color="info" size="small" variant="outlined" sx={panelBadgeSx(darkMode)} />
                 </MDBox>
 
                 <Grid container spacing={2}>
@@ -303,7 +344,7 @@ function DashboardWorkspaceFilters({
                       {t("dashboard.pipelineLensSubtitle")}
                     </MDTypography>
                   </MDBox>
-                  <Chip label={t("dashboard.filterMonitor")} color="warning" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.filterMonitor")} color="warning" size="small" variant="outlined" sx={panelBadgeSx(darkMode)} />
                 </MDBox>
 
                 <Grid container spacing={2}>
@@ -396,7 +437,7 @@ function DashboardWorkspaceFilters({
                       {t("dashboard.executionFocusSubtitle")}
                     </MDTypography>
                   </MDBox>
-                  <Chip label={t("dashboard.filterFocus")} color="secondary" size="small" variant="outlined" />
+                  <Chip label={t("dashboard.filterFocus")} color="secondary" size="small" variant="outlined" sx={panelBadgeSx(darkMode)} />
                 </MDBox>
 
                 <FormControl size="small" fullWidth>
@@ -428,6 +469,7 @@ function DashboardWorkspaceFilters({
                     color="info"
                     size="small"
                     variant="outlined"
+                    sx={workspaceMetaChipSx(darkMode)}
                   />
                   <Chip
                     label={
@@ -438,6 +480,7 @@ function DashboardWorkspaceFilters({
                     color="warning"
                     size="small"
                     variant="outlined"
+                    sx={workspaceMetaChipSx(darkMode)}
                   />
                   <Chip
                     label={
@@ -448,12 +491,14 @@ function DashboardWorkspaceFilters({
                     color={requestFilterIsActive ? "secondary" : "default"}
                     size="small"
                     variant="outlined"
+                    sx={workspaceMetaChipSx(darkMode)}
                   />
                   <Chip
                     label={`${t("dashboard.filterTimeWindow")}: ${activeTimeWindowLabel}`}
                     color="secondary"
                     size="small"
                     variant="outlined"
+                    sx={workspaceMetaChipSx(darkMode)}
                   />
                 </Stack>
 
@@ -549,8 +594,12 @@ function DashboardWorkspaceFilters({
             py={1.5}
             sx={{
               borderRadius: 3,
-              background: "rgba(67, 97, 238, 0.06)",
-              border: "1px dashed rgba(67, 97, 238, 0.18)",
+              background: darkMode
+                ? "linear-gradient(180deg, rgba(30, 41, 59, 0.42) 0%, rgba(15, 23, 42, 0.38) 100%)"
+                : "linear-gradient(180deg, rgba(239, 246, 255, 0.88) 0%, rgba(248, 250, 252, 0.94) 100%)",
+              border: darkMode
+                ? "1px dashed rgba(96, 165, 250, 0.22)"
+                : "1px dashed rgba(59, 130, 246, 0.18)",
             }}
           >
             <MDBox
@@ -570,6 +619,7 @@ function DashboardWorkspaceFilters({
                   size="small"
                   variant="outlined"
                   onClick={resetWorkspaceFilters}
+                  sx={workspaceMetaChipSx(darkMode)}
                 />
               ) : null}
             </MDBox>

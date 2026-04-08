@@ -10,6 +10,8 @@ import { pushGraspNotification } from "utils/graspNotifications";
 
 const MONITOR_STREAM_FLUSH_MS = 250;
 const MONITOR_STREAM_HIDDEN_FLUSH_MS = 1200;
+const MONITOR_STREAM_SCROLL_FLUSH_MS = 900;
+const MONITOR_SCROLL_IDLE_MS = 180;
 
 const topicPriority = (topic) => {
   if (topic === "BEST_SOLUTION_TOPIC") {
@@ -140,6 +142,22 @@ export default function useGraspMonitor(limit = 100, options = {}) {
     Number(options.summaryEventLimit ?? Math.min(safeLimit, 300)) || Math.min(safeLimit, 300),
     1
   );
+  const visibleFlushMs = Math.max(
+    Number(options.visibleFlushMs ?? MONITOR_STREAM_FLUSH_MS) || MONITOR_STREAM_FLUSH_MS,
+    50
+  );
+  const hiddenFlushMs = Math.max(
+    Number(options.hiddenFlushMs ?? MONITOR_STREAM_HIDDEN_FLUSH_MS) || MONITOR_STREAM_HIDDEN_FLUSH_MS,
+    visibleFlushMs
+  );
+  const scrollFlushMs = Math.max(
+    Number(options.scrollFlushMs ?? MONITOR_STREAM_SCROLL_FLUSH_MS) || MONITOR_STREAM_SCROLL_FLUSH_MS,
+    visibleFlushMs
+  );
+  const scrollIdleMs = Math.max(
+    Number(options.scrollIdleMs ?? MONITOR_SCROLL_IDLE_MS) || MONITOR_SCROLL_IDLE_MS,
+    50
+  );
   const [runs, setRuns] = useState([]);
   const [events, setEvents] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -159,6 +177,8 @@ export default function useGraspMonitor(limit = 100, options = {}) {
   const projectionFingerprintRef = useRef("");
   const streamBufferRef = useRef([]);
   const streamFlushTimerRef = useRef(null);
+  const scrollIdleTimerRef = useRef(null);
+  const userScrollingRef = useRef(false);
 
   const registerCurrentRuns = (nextRuns = []) => {
     const nextScores = new Map();
@@ -298,6 +318,13 @@ export default function useGraspMonitor(limit = 100, options = {}) {
       }
     };
 
+    const clearScrollIdleTimer = () => {
+      if (scrollIdleTimerRef.current !== null) {
+        window.clearTimeout(scrollIdleTimerRef.current);
+        scrollIdleTimerRef.current = null;
+      }
+    };
+
     const flushBufferedMessages = () => {
       const bufferedMessages = streamBufferRef.current;
       if (!bufferedMessages.length) {
@@ -349,7 +376,11 @@ export default function useGraspMonitor(limit = 100, options = {}) {
         return;
       }
 
-      const delay = document.hidden ? MONITOR_STREAM_HIDDEN_FLUSH_MS : MONITOR_STREAM_FLUSH_MS;
+      const delay = document.hidden
+        ? hiddenFlushMs
+        : userScrollingRef.current
+          ? scrollFlushMs
+          : visibleFlushMs;
       streamFlushTimerRef.current = window.setTimeout(() => {
         streamFlushTimerRef.current = null;
 
@@ -368,6 +399,24 @@ export default function useGraspMonitor(limit = 100, options = {}) {
         clearScheduledFlush();
         flushBufferedMessages();
       }
+    };
+
+    const finishScrolling = () => {
+      userScrollingRef.current = false;
+      clearScrollIdleTimer();
+      clearScheduledFlush();
+
+      if (!cancelled) {
+        flushBufferedMessages();
+      }
+    };
+
+    const handleScroll = () => {
+      userScrollingRef.current = true;
+      clearScrollIdleTimer();
+      scrollIdleTimerRef.current = window.setTimeout(() => {
+        finishScrolling();
+      }, scrollIdleMs);
     };
 
     const load = async () => {
@@ -446,15 +495,26 @@ export default function useGraspMonitor(limit = 100, options = {}) {
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
       cancelled = true;
       clearScheduledFlush();
+      clearScrollIdleTimer();
       streamBufferRef.current = [];
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("scroll", handleScroll);
       stream.close();
     };
-  }, [configuredHistoryLimit, configuredSummaryEventLimit, safeLimit]);
+  }, [
+    configuredHistoryLimit,
+    configuredSummaryEventLimit,
+    hiddenFlushMs,
+    safeLimit,
+    scrollFlushMs,
+    scrollIdleMs,
+    visibleFlushMs,
+  ]);
 
   return {
     runs,

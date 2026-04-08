@@ -19,12 +19,24 @@ import {
 } from "utils/graspFormatters";
 
 const metricBoxSx = (darkMode) => ({
+  position: "relative",
+  overflow: "hidden",
   height: "100%",
   borderRadius: 2.5,
   border: "1px solid rgba(148, 163, 184, 0.18)",
   background: darkMode
-    ? "linear-gradient(180deg, rgba(15, 23, 42, 0.32) 0%, rgba(30, 41, 59, 0.2) 100%)"
-    : "linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(241, 245, 249, 0.9) 100%)",
+    ? "linear-gradient(180deg, rgba(15, 23, 42, 0.48) 0%, rgba(30, 41, 59, 0.28) 100%)"
+    : "linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 247, 251, 0.92) 100%)",
+  boxShadow: darkMode ? "0 18px 28px rgba(2, 6, 23, 0.18)" : "0 14px 24px rgba(15, 23, 42, 0.05)",
+  "&::before": {
+    content: "\"\"",
+    position: "absolute",
+    inset: "0 0 auto 0",
+    height: 2,
+    background: darkMode
+      ? "linear-gradient(90deg, rgba(96, 165, 250, 0) 0%, rgba(96, 165, 250, 0.5) 50%, rgba(96, 165, 250, 0) 100%)"
+      : "linear-gradient(90deg, rgba(59, 130, 246, 0) 0%, rgba(59, 130, 246, 0.36) 50%, rgba(59, 130, 246, 0) 100%)",
+  },
 });
 
 const toPercentValue = (ratio) => {
@@ -55,7 +67,16 @@ function ResearchSnapshotPanel({ summary, darkMode, t }) {
     : t("common.notAvailable");
 
   return (
-    <Card>
+    <Card
+      sx={{
+        overflow: "hidden",
+        borderRadius: 3,
+        border: darkMode ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid rgba(148, 163, 184, 0.18)",
+        background: darkMode
+          ? "linear-gradient(180deg, rgba(12, 18, 31, 0.96) 0%, rgba(18, 28, 47, 0.92) 100%)"
+          : "linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 247, 251, 0.96) 100%)",
+      }}
+    >
       <MDBox p={3}>
         <MDBox
           display="flex"
@@ -78,12 +99,20 @@ function ResearchSnapshotPanel({ summary, darkMode, t }) {
               color="info"
               size="small"
               variant="outlined"
+              sx={{
+                borderRadius: 999,
+                backgroundColor: darkMode ? "rgba(15, 23, 42, 0.42)" : "rgba(248, 250, 252, 0.92)",
+              }}
             />
             <Chip
               label={t("dashboard.researchObservationWindow", { value: observationWindowLabel })}
               color="secondary"
               size="small"
               variant="outlined"
+              sx={{
+                borderRadius: 999,
+                backgroundColor: darkMode ? "rgba(15, 23, 42, 0.42)" : "rgba(248, 250, 252, 0.92)",
+              }}
             />
           </Stack>
         </MDBox>
@@ -152,7 +181,7 @@ function ResearchSnapshotPanel({ summary, darkMode, t }) {
           </Grid>
         </Grid>
 
-        <Divider sx={{ my: 2.5 }} />
+        <Divider sx={{ my: 2.5, opacity: 0.72 }} />
 
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           <Chip
@@ -160,36 +189,42 @@ function ResearchSnapshotPanel({ summary, darkMode, t }) {
             color="primary"
             size="small"
             variant="outlined"
+            sx={{ borderRadius: 999 }}
           />
           <Chip
             label={t("dashboard.researchAvgSolutionSize", { value: formatMetric(exploration.avgSolutionSize) })}
             color="info"
             size="small"
             variant="outlined"
+            sx={{ borderRadius: 999 }}
           />
           <Chip
             label={t("dashboard.researchAvgRclSize", { value: formatMetric(exploration.avgRclSize) })}
             color="info"
             size="small"
             variant="outlined"
+            sx={{ borderRadius: 999 }}
           />
           <Chip
             label={t("dashboard.researchAvgSearchPlan", { value: formatMetric(exploration.avgEnabledLocalSearches) })}
             color="secondary"
             size="small"
             variant="outlined"
+            sx={{ borderRadius: 999 }}
           />
           <Chip
             label={t("dashboard.researchAvgImprovementGain", { value: formatMetric(quality.averageImprovementGain, " pp") })}
             color="success"
             size="small"
             variant="outlined"
+            sx={{ borderRadius: 999 }}
           />
           <Chip
             label={t("dashboard.researchLargestImprovementGain", { value: formatMetric(quality.largestImprovementGain, " pp") })}
             color="warning"
             size="small"
             variant="outlined"
+            sx={{ borderRadius: 999 }}
           />
         </Stack>
 
