@@ -1201,6 +1201,12 @@ const finalizeTopicMetrics = (grouped = new Map()) =>
     }))
     .sort((left, right) => right.count - left.count);
 
+const getLocalSearchMetricLabel = (entry = {}) =>
+  entry.localSearch
+  || entry.search
+  || entry.algorithm
+  || "Unknown";
+
 const buildMonitorSnapshotAnalytics = (monitorSnapshots = []) => {
   const initialBySeed = new Map();
   const outcomesBySeedAndSearch = new Map();
@@ -2371,7 +2377,7 @@ function Dashboard() {
     [filteredRuns, matchesSelection, shouldBuildSnapshotAnalytics]
   );
 
-  const monitorSnapshots = useMemo(() => {
+  const analyticsMonitorSnapshots = useMemo(() => {
     if (!shouldBuildSnapshotAnalytics) {
       return [];
     }
@@ -2392,13 +2398,17 @@ function Dashboard() {
 
     return [...merged.values()].sort(
       (left, right) => getSortableDateValue(right.timestamp) - getSortableDateValue(left.timestamp)
-    )
-      .slice(0, DASHBOARD_VISIBLE_SNAPSHOT_LIMIT);
+    );
   }, [filteredSnapshotEvents, historySnapshots, shouldBuildSnapshotAnalytics]);
 
+  const monitorSnapshots = useMemo(
+    () => analyticsMonitorSnapshots.slice(0, DASHBOARD_VISIBLE_SNAPSHOT_LIMIT),
+    [analyticsMonitorSnapshots]
+  );
+
   const monitorSnapshotAnalytics = useMemo(
-    () => buildMonitorSnapshotAnalytics(monitorSnapshots),
-    [monitorSnapshots]
+    () => buildMonitorSnapshotAnalytics(analyticsMonitorSnapshots),
+    [analyticsMonitorSnapshots]
   );
 
   const {
@@ -2489,7 +2499,7 @@ function Dashboard() {
           bestBySeed.set(run.seedId, pickPreferredRun(bestBySeed.get(run.seedId), run));
         });
 
-      monitorSnapshots
+      analyticsMonitorSnapshots
         .filter((event) => event.topic === "BEST_SOLUTION_TOPIC" && event.seedId)
         .forEach((event) => {
           const promotedRun = promoteBestSolutionEvent(event);
@@ -2500,7 +2510,7 @@ function Dashboard() {
         (left, right) => getSortableDateValue(right.updatedAt) - getSortableDateValue(left.updatedAt)
       );
     },
-    [filteredRuns, monitorSnapshots]
+    [analyticsMonitorSnapshots, filteredRuns]
   );
 
   const preferredRunBySeed = useMemo(() => {
@@ -4173,10 +4183,29 @@ function Dashboard() {
       return buildEmptyDoughnutData();
     }
 
+    const aggregateInitialCount = canUsePersistentDashboardAggregate && dashboardAggregate?.finalRunsByRclAlgorithm?.length
+      ? dashboardAggregate.finalRunsByRclAlgorithm.reduce(
+          (total, entry) => total + Number(entry.initialSeedCount || 0),
+          0
+        )
+      : 0;
+    const aggregateOutcomeCount = canUsePersistentDashboardAggregate && dashboardAggregate?.dlsOutcomeSummary?.length
+      ? dashboardAggregate.dlsOutcomeSummary.reduce(
+          (total, entry) => total + Number(entry.visibleOutcomeSeedCount || 0),
+          0
+        )
+      : 0;
+    const aggregateBestCount = canUsePersistentDashboardAggregate && dashboardAggregate?.finalRunsByAlgorithm?.length
+      ? dashboardAggregate.finalRunsByAlgorithm.reduce(
+          (total, entry) => total + Number(entry.runCount || 0),
+          0
+        )
+      : 0;
+
     const distribution = [
-      ["Initial Solution", initialSolutionEvents.length],
-      ["Local Search Final", localSearchOutcomeEvents.length],
-      ["Best Solution", bestSolutionRuns.length],
+      ["Initial Solution", aggregateInitialCount || initialSolutionEvents.length],
+      ["Local Search Final", aggregateOutcomeCount || localSearchOutcomeEvents.length],
+      ["Best Solution", aggregateBestCount || bestSolutionRuns.length],
     ].filter(([, count]) => count > 0);
 
     if (!distribution.length) {
@@ -4197,6 +4226,10 @@ function Dashboard() {
     };
   }, [
     bestSolutionRuns.length,
+    canUsePersistentDashboardAggregate,
+    dashboardAggregate?.dlsOutcomeSummary,
+    dashboardAggregate?.finalRunsByAlgorithm,
+    dashboardAggregate?.finalRunsByRclAlgorithm,
     initialSolutionEvents.length,
     isPerformanceTabActive,
     localSearchOutcomeEvents.length,
@@ -4222,6 +4255,18 @@ function Dashboard() {
   );
 
   const initialSolutionsByAlgorithm = useMemo(() => {
+    if (canUsePersistentDashboardAggregate && dashboardAggregate?.finalRunsByRclAlgorithm?.length) {
+      return dashboardAggregate.finalRunsByRclAlgorithm
+        .map((entry) => ({
+          algorithm: entry.algorithm || "Unknown",
+          count: Number(entry.initialSeedCount || 0),
+          bestInitialF1Score: Number.NEGATIVE_INFINITY,
+          bestFinalF1Score: getNumericScore(entry.bestRun?.bestF1Score, 0),
+        }))
+        .filter((entry) => entry.count > 0)
+        .sort((left, right) => right.count - left.count);
+    }
+
     const grouped = new Map();
 
     initialSolutionEvents.forEach((event) => {
@@ -4241,9 +4286,20 @@ function Dashboard() {
     });
 
     return [...grouped.values()].sort((left, right) => right.count - left.count);
-  }, [initialSolutionEvents, preferredRunBySeed]);
+  }, [canUsePersistentDashboardAggregate, dashboardAggregate?.finalRunsByRclAlgorithm, initialSolutionEvents, preferredRunBySeed]);
 
   const localSearchOutcomesBySearch = useMemo(() => {
+    if (canUsePersistentDashboardAggregate && dashboardAggregate?.dlsOutcomeSummary?.length) {
+      return dashboardAggregate.dlsOutcomeSummary
+        .map((entry) => ({
+          search: getLocalSearchMetricLabel(entry),
+          count: Number(entry.visibleOutcomeSeedCount || 0),
+          bestF1Score: getNumericScore(entry.bestOutcome?.bestF1Score ?? entry.avgLocalF1Score, 0),
+        }))
+        .filter((entry) => entry.count > 0 || entry.bestF1Score > 0)
+        .sort((left, right) => right.bestF1Score - left.bestF1Score);
+    }
+
     const grouped = new Map();
 
     localSearchOutcomeEvents.forEach((event) => {
@@ -4260,7 +4316,7 @@ function Dashboard() {
     });
 
     return [...grouped.values()].sort((left, right) => right.bestF1Score - left.bestF1Score);
-  }, [localSearchOutcomeEvents]);
+  }, [canUsePersistentDashboardAggregate, dashboardAggregate?.dlsOutcomeSummary, localSearchOutcomeEvents]);
 
   const initialSolutionsChartData = useMemo(() => {
     if (!isPerformanceTabActive) {
@@ -4416,7 +4472,7 @@ function Dashboard() {
       return buildEmptyBarData("Average CPU");
     }
 
-    const labels = resourceAveragesByLocalSearch.map((entry) => entry.algorithm);
+    const labels = resourceAveragesByLocalSearch.map((entry) => getLocalSearchMetricLabel(entry));
     const palette = getBarPaletteForLabels(labels, "search");
 
     return {
@@ -4445,7 +4501,7 @@ function Dashboard() {
       return buildEmptyBarData("Average memory");
     }
 
-    const labels = resourceAveragesByLocalSearch.map((entry) => entry.algorithm);
+    const labels = resourceAveragesByLocalSearch.map((entry) => getLocalSearchMetricLabel(entry));
     const palette = getBarPaletteForLabels(labels, "search");
 
     return {
@@ -4744,7 +4800,7 @@ function Dashboard() {
       return {
         columns,
         rows: resourceAveragesByLocalSearch.map((entry) => ({
-          algorithm: entry.algorithm,
+          algorithm: getLocalSearchMetricLabel(entry),
           avgCpu: formatMetric(entry.avgCpuUsage, "%"),
           avgMemory: formatMetric(entry.avgMemoryUsage, " MB"),
           avgMemoryPercent: formatMetric(entry.avgMemoryUsagePercent, "%"),
@@ -4759,7 +4815,6 @@ function Dashboard() {
     () => ({
       responsive: true,
       maintainAspectRatio: false,
-      parsing: false,
       normalized: true,
       animation: false,
       plugins: {
