@@ -115,6 +115,14 @@ class GraspDashboardAggregateService {
       Number(process.env.GRASP_DASHBOARD_READ_MODEL_MAX_AGE_MS || 10 * 60 * 1000) || (10 * 60 * 1000),
       30_000
     );
+    this.readModelPersistTimeoutMs = Math.max(
+      Number(process.env.GRASP_DASHBOARD_READ_MODEL_PERSIST_TIMEOUT_MS || 30_000) || 30_000,
+      5_000
+    );
+    this.readModelPersistMaxWaitMs = Math.max(
+      Number(process.env.GRASP_DASHBOARD_READ_MODEL_PERSIST_MAX_WAIT_MS || 10_000) || 10_000,
+      1_000
+    );
   }
 
   normalizeCount(value) {
@@ -907,58 +915,64 @@ class GraspDashboardAggregateService {
       source: "database-read-model",
     };
 
-    const record = await prisma.$transaction(async (tx) => {
-      const persistedReadModel = await tx.graspDashboardReadModel.upsert({
-        where: { key: this.readModelKey },
-        update: {
-          schemaVersion: MONITOR_SCHEMA_VERSION,
-          bucketIntervalMs: this.bucketIntervalMs,
-          sourceEventCount: Number(sourceWatermark.sourceEventCount || 0),
-          sourceRunCount: Number(sourceWatermark.sourceRunCount || 0),
-          sourceMaxEventAt: sourceWatermark.sourceMaxEventAt ? new Date(sourceWatermark.sourceMaxEventAt) : null,
-          sourceMaxRunAt: sourceWatermark.sourceMaxRunAt ? new Date(sourceWatermark.sourceMaxRunAt) : null,
-          generatedAt: new Date(),
-          payload: aggregatePayload,
-        },
-        create: {
-          key: this.readModelKey,
-          schemaVersion: MONITOR_SCHEMA_VERSION,
-          bucketIntervalMs: this.bucketIntervalMs,
-          sourceEventCount: Number(sourceWatermark.sourceEventCount || 0),
-          sourceRunCount: Number(sourceWatermark.sourceRunCount || 0),
-          sourceMaxEventAt: sourceWatermark.sourceMaxEventAt ? new Date(sourceWatermark.sourceMaxEventAt) : null,
-          sourceMaxRunAt: sourceWatermark.sourceMaxRunAt ? new Date(sourceWatermark.sourceMaxRunAt) : null,
-          generatedAt: new Date(),
-          payload: aggregatePayload,
-        },
-      });
+    const record = await prisma.$transaction(
+      async (tx) => {
+        const persistedReadModel = await tx.graspDashboardReadModel.upsert({
+          where: { key: this.readModelKey },
+          update: {
+            schemaVersion: MONITOR_SCHEMA_VERSION,
+            bucketIntervalMs: this.bucketIntervalMs,
+            sourceEventCount: Number(sourceWatermark.sourceEventCount || 0),
+            sourceRunCount: Number(sourceWatermark.sourceRunCount || 0),
+            sourceMaxEventAt: sourceWatermark.sourceMaxEventAt ? new Date(sourceWatermark.sourceMaxEventAt) : null,
+            sourceMaxRunAt: sourceWatermark.sourceMaxRunAt ? new Date(sourceWatermark.sourceMaxRunAt) : null,
+            generatedAt: new Date(),
+            payload: aggregatePayload,
+          },
+          create: {
+            key: this.readModelKey,
+            schemaVersion: MONITOR_SCHEMA_VERSION,
+            bucketIntervalMs: this.bucketIntervalMs,
+            sourceEventCount: Number(sourceWatermark.sourceEventCount || 0),
+            sourceRunCount: Number(sourceWatermark.sourceRunCount || 0),
+            sourceMaxEventAt: sourceWatermark.sourceMaxEventAt ? new Date(sourceWatermark.sourceMaxEventAt) : null,
+            sourceMaxRunAt: sourceWatermark.sourceMaxRunAt ? new Date(sourceWatermark.sourceMaxRunAt) : null,
+            generatedAt: new Date(),
+            payload: aggregatePayload,
+          },
+        });
 
-      const rows = this.buildMaterializedRows(persistedReadModel.id, aggregatePayload);
+        const rows = this.buildMaterializedRows(persistedReadModel.id, aggregatePayload);
 
-      await tx.graspDashboardTopicMetric.deleteMany({ where: { readModelId: persistedReadModel.id } });
-      await tx.graspDashboardActivityBucket.deleteMany({ where: { readModelId: persistedReadModel.id } });
-      await tx.graspDashboardResourceMetric.deleteMany({ where: { readModelId: persistedReadModel.id } });
-      await tx.graspDashboardAlgorithmMetric.deleteMany({ where: { readModelId: persistedReadModel.id } });
-      await tx.graspDashboardTimelineBucket.deleteMany({ where: { readModelId: persistedReadModel.id } });
+        await tx.graspDashboardTopicMetric.deleteMany({ where: { readModelId: persistedReadModel.id } });
+        await tx.graspDashboardActivityBucket.deleteMany({ where: { readModelId: persistedReadModel.id } });
+        await tx.graspDashboardResourceMetric.deleteMany({ where: { readModelId: persistedReadModel.id } });
+        await tx.graspDashboardAlgorithmMetric.deleteMany({ where: { readModelId: persistedReadModel.id } });
+        await tx.graspDashboardTimelineBucket.deleteMany({ where: { readModelId: persistedReadModel.id } });
 
-      if (rows.topicMetrics.length) {
-        await tx.graspDashboardTopicMetric.createMany({ data: rows.topicMetrics });
-      }
-      if (rows.activityBuckets.length) {
-        await tx.graspDashboardActivityBucket.createMany({ data: rows.activityBuckets });
-      }
-      if (rows.resourceMetrics.length) {
-        await tx.graspDashboardResourceMetric.createMany({ data: rows.resourceMetrics });
-      }
-      if (rows.algorithmMetrics.length) {
-        await tx.graspDashboardAlgorithmMetric.createMany({ data: rows.algorithmMetrics });
-      }
-      if (rows.timelineBuckets.length) {
-        await tx.graspDashboardTimelineBucket.createMany({ data: rows.timelineBuckets });
-      }
+        if (rows.topicMetrics.length) {
+          await tx.graspDashboardTopicMetric.createMany({ data: rows.topicMetrics });
+        }
+        if (rows.activityBuckets.length) {
+          await tx.graspDashboardActivityBucket.createMany({ data: rows.activityBuckets });
+        }
+        if (rows.resourceMetrics.length) {
+          await tx.graspDashboardResourceMetric.createMany({ data: rows.resourceMetrics });
+        }
+        if (rows.algorithmMetrics.length) {
+          await tx.graspDashboardAlgorithmMetric.createMany({ data: rows.algorithmMetrics });
+        }
+        if (rows.timelineBuckets.length) {
+          await tx.graspDashboardTimelineBucket.createMany({ data: rows.timelineBuckets });
+        }
 
-      return persistedReadModel;
-    });
+        return persistedReadModel;
+      },
+      {
+        maxWait: this.readModelPersistMaxWaitMs,
+        timeout: this.readModelPersistTimeoutMs,
+      }
+    );
 
     return {
       ...aggregatePayload,
