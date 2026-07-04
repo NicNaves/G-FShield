@@ -25,6 +25,7 @@ Esta pasta concentra a documentacao operacional e de onboarding do GF-Shield.
 2. Use [`LOCAL_DEV_RUNBOOK.md`](./LOCAL_DEV_RUNBOOK.md) para subir o ambiente.
 3. Use [`OPERATIONS.md`](./OPERATIONS.md) para reset, logs, rebuild ou manutencao.
 
+
 ## EN-US
 
 This folder contains GF-Shield operational and onboarding documentation.

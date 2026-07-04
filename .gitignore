@@ -40,6 +40,11 @@ Thumbs.db
 
 # Estado local dos scripts de desenvolvimento
 .local-dev/
+.playwright-cli/
+output/
+Mestrado/
+artifacts/
+tmp/
 
 # Cache local de npm em container (scripts dev)
 **/.docker-home/
