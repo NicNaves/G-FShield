@@ -1,11 +1,13 @@
 import { memo } from "react";
 import PropTypes from "prop-types";
 
+import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
 import Card from "@mui/material/Card";
 import Chip from "@mui/material/Chip";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
+import Stack from "@mui/material/Stack";
 
 import { Bar } from "react-chartjs-2";
 
@@ -14,6 +16,7 @@ import MDTypography from "components/MDTypography";
 import ComplexStatisticsCard from "examples/Cards/StatisticsCards/ComplexStatisticsCard";
 import DataTable from "examples/Tables/DataTable";
 import FeedTableToolbarFilters from "./FeedTableToolbarFilters";
+import { formatDateTime } from "utils/graspFormatters";
 
 const virtualizedFeedTableConfig = {
   enabled: true,
@@ -24,13 +27,11 @@ const virtualizedFeedTableConfig = {
 };
 
 const deferredAnalyticsSectionSx = {
-  contentVisibility: "auto",
   contain: "layout paint style",
   containIntrinsicSize: "480px",
 };
 
 const deferredAnalyticsFeedSectionSx = {
-  contentVisibility: "auto",
   contain: "layout paint style",
   containIntrinsicSize: "760px",
 };
@@ -179,9 +180,81 @@ function DashboardAnalyticsTab({
                   sx={sectionChipSx}
                 />
               </MDBox>
-              <MDBox height="340px" mt={2} px={3} pb={3}>
-                <Bar data={hourlyActivityChartData} options={hourlyActivityChartOptions} />
-              </MDBox>
+              <Stack spacing={1.75} mt={2} px={3} pb={3}>
+                {hourlyActivityMetrics.length ? (() => {
+                  const maxCount = Math.max(...hourlyActivityMetrics.map((entry) => entry.count || 0), 1);
+                  const maxLogWeight = Math.log10(maxCount + 1) || 1;
+
+                  return hourlyActivityMetrics.map((entry) => {
+                    const logWeight = Math.log10((entry.count || 0) + 1);
+                    const barWidth = Math.max(12, Math.round((logWeight / maxLogWeight) * 100));
+                    const bestScore = Number.isFinite(Number(entry.bestScore)) ? Number(entry.bestScore) : 0;
+
+                    return (
+                      <Stack key={entry.timestamp} spacing={0.75}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
+                          <MDTypography variant="button" color="text" sx={{ fontWeight: 600 }}>
+                            {formatDateTime(entry.timestamp)}
+                          </MDTypography>
+                          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" justifyContent="flex-end">
+                            <Chip
+                              label={`${entry.count ?? 0} snapshots`}
+                              color="info"
+                              size="small"
+                              variant="outlined"
+                              sx={sectionChipSx}
+                            />
+                            <Chip
+                              label={`Best F1 ${bestScore.toFixed(1)}%`}
+                              color="success"
+                              size="small"
+                              variant="outlined"
+                              sx={sectionChipSx}
+                            />
+                          </Stack>
+                        </Stack>
+                        <Box
+                          sx={{
+                            width: "100%",
+                            height: 16,
+                            borderRadius: 999,
+                            backgroundColor: darkMode ? "rgba(148, 163, 184, 0.12)" : "rgba(148, 163, 184, 0.14)",
+                            overflow: "hidden",
+                            position: "relative",
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: `${barWidth}%`,
+                              height: "100%",
+                              borderRadius: 999,
+                              background: "linear-gradient(90deg, rgba(67, 97, 238, 0.92), rgba(124, 156, 255, 0.95))",
+                              boxShadow: "0 0 18px rgba(67, 97, 238, 0.25)",
+                            }}
+                          />
+                          <Box
+                            sx={{
+                              position: "absolute",
+                              right: `${Math.max(0, Math.min(100, Math.round(bestScore)))}%`,
+                              top: "50%",
+                              transform: "translate(50%, -50%)",
+                              width: 10,
+                              height: 10,
+                              borderRadius: "50%",
+                              backgroundColor: "#36c56c",
+                              boxShadow: "0 0 0 3px rgba(54, 197, 108, 0.18)",
+                            }}
+                          />
+                        </Box>
+                      </Stack>
+                    );
+                  });
+                })() : (
+                  <MDTypography variant="caption" color="text">
+                    No hourly activity is available yet for the current filters.
+                  </MDTypography>
+                )}
+              </Stack>
             </Card>
           </Grid>
         ) : null}

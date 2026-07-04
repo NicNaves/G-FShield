@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import Grid from "@mui/material/Grid";
 import Card from "@mui/material/Card";
 import Chip from "@mui/material/Chip";
+import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
 import Alert from "@mui/material/Alert";
@@ -373,7 +374,14 @@ const takeLatestEntries = (entries = [], limit = DASHBOARD_HISTORY_PREVIEW_PER_R
   return entries.slice(-limit);
 };
 
-const getEntryTimestamp = (entry = {}) => entry?.timestamp || entry?.updatedAt || entry?.createdAt || null;
+const getEntryTimestamp = (entry = {}) =>
+  entry?.timestamp
+  || entry?.updatedAt
+  || entry?.createdAt
+  || entry?.created_at
+  || entry?.updated_at
+  || entry?.eventTimestamp
+  || null;
 
 const parseDateTimeValue = (value) => {
   if (!value) {
@@ -744,42 +752,31 @@ const filterPanelSx = (darkMode) => ({
   borderRadius: 3,
   color: darkMode ? "#edf4ff" : "#1f2937",
   border: `1px solid ${darkMode ? "rgba(255, 255, 255, 0.08)" : "rgba(15, 23, 42, 0.08)"}`,
-  background: darkMode
-    ? "linear-gradient(180deg, rgba(14, 22, 37, 0.88) 0%, rgba(18, 28, 47, 0.94) 100%)"
-    : "linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 247, 251, 0.94) 100%)",
+  backgroundColor: darkMode ? "rgba(15, 23, 42, 0.88)" : "rgba(255, 255, 255, 0.98)",
   boxShadow: darkMode
-    ? "0 22px 42px rgba(2, 6, 23, 0.28)"
-    : "0 14px 30px rgba(15, 23, 42, 0.05)",
-  backdropFilter: "blur(14px)",
-  "&::before": {
-    content: "\"\"",
-    position: "absolute",
-    inset: "0 0 auto 0",
-    height: 1,
-    background: darkMode
-      ? "linear-gradient(90deg, rgba(96, 165, 250, 0) 0%, rgba(96, 165, 250, 0.48) 48%, rgba(96, 165, 250, 0) 100%)"
-      : "linear-gradient(90deg, rgba(59, 130, 246, 0) 0%, rgba(59, 130, 246, 0.34) 48%, rgba(59, 130, 246, 0) 100%)",
-  },
+    ? "0 10px 24px rgba(2, 6, 23, 0.18)"
+    : "0 10px 20px rgba(15, 23, 42, 0.04)",
+  backdropFilter: "none",
   "& .MuiFormControl-root": {
     mb: 0,
   },
   "& .MuiInputLabel-root": {
-    color: darkMode ? "rgba(212, 222, 238, 0.76)" : "rgba(71, 85, 105, 0.82)",
+    color: darkMode ? "rgba(212, 222, 238, 0.72)" : "rgba(71, 85, 105, 0.82)",
   },
   "& .MuiInputLabel-root.Mui-focused": {
-    color: darkMode ? "#8dc2ff" : "#3d8ef5",
+    color: darkMode ? "#9bc5ff" : "#3d8ef5",
   },
   "& .MuiOutlinedInput-root": {
     color: darkMode ? "#edf4ff" : "#1f2937",
-    backgroundColor: darkMode ? "rgba(8, 14, 24, 0.44)" : "rgba(255, 255, 255, 0.82)",
+    backgroundColor: darkMode ? "rgba(8, 14, 24, 0.36)" : "rgba(255, 255, 255, 0.94)",
     borderRadius: 2.2,
-    transition: "border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease",
+    transition: "border-color 180ms ease, background-color 180ms ease",
   },
   "& .MuiOutlinedInput-notchedOutline": {
-    borderColor: darkMode ? "rgba(143, 160, 191, 0.28)" : "rgba(15, 23, 42, 0.12)",
+    borderColor: darkMode ? "rgba(143, 160, 191, 0.2)" : "rgba(15, 23, 42, 0.1)",
   },
   "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline": {
-    borderColor: darkMode ? "rgba(141, 194, 255, 0.48)" : "rgba(61, 142, 245, 0.28)",
+    borderColor: darkMode ? "rgba(141, 194, 255, 0.32)" : "rgba(61, 142, 245, 0.22)",
   },
   "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
     borderColor: darkMode ? "#8dc2ff" : "#3d8ef5",
@@ -800,6 +797,36 @@ const filterPanelHeadingSx = (darkMode) => ({
 
 const filterPanelCaptionSx = (darkMode) => ({
   color: darkMode ? "rgba(212, 222, 238, 0.68)" : "rgba(71, 85, 105, 0.9)",
+});
+
+const timelineChipSx = (darkMode, selected) => ({
+  borderRadius: 999,
+  fontWeight: 600,
+  transition: "transform 160ms ease, background-color 160ms ease, color 160ms ease, border-color 160ms ease",
+  "& .MuiChip-label": {
+    color: "inherit",
+    fontWeight: 600,
+  },
+  ...(selected
+    ? {
+        color: darkMode ? "#ffffff" : "#111111",
+        borderColor: darkMode ? "rgba(125, 211, 252, 0.64)" : "rgba(37, 99, 235, 0.42)",
+        backgroundColor: darkMode ? "#2563eb" : "rgba(219, 234, 254, 0.96)",
+        boxShadow: darkMode ? "0 10px 20px rgba(37, 99, 235, 0.26)" : "0 8px 16px rgba(37, 99, 235, 0.14)",
+        "&:hover": {
+          backgroundColor: darkMode ? "#1d4ed8" : "rgba(191, 219, 254, 0.98)",
+          borderColor: darkMode ? "rgba(147, 197, 253, 0.82)" : "rgba(37, 99, 235, 0.58)",
+        },
+      }
+    : {
+        color: darkMode ? "rgba(226, 232, 240, 0.82)" : "#2563eb",
+        borderColor: darkMode ? "rgba(148, 163, 184, 0.24)" : "rgba(37, 99, 235, 0.24)",
+        backgroundColor: darkMode ? "rgba(15, 23, 42, 0.42)" : "rgba(255, 255, 255, 0.98)",
+        "&:hover": {
+          backgroundColor: darkMode ? "rgba(30, 41, 59, 0.72)" : "rgba(219, 234, 254, 0.88)",
+          borderColor: darkMode ? "rgba(125, 211, 252, 0.44)" : "rgba(37, 99, 235, 0.42)",
+        },
+      }),
 });
 
 const dashboardContentSx = (darkMode) => ({
@@ -836,10 +863,8 @@ const dashboardTabRailSx = (darkMode) => ({
   overflow: "hidden",
   borderRadius: 3,
   border: darkMode ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid rgba(148, 163, 184, 0.18)",
-  background: darkMode
-    ? "linear-gradient(180deg, rgba(12, 19, 32, 0.96) 0%, rgba(17, 26, 43, 0.92) 100%)"
-    : "linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(243, 247, 252, 0.96) 100%)",
-  boxShadow: darkMode ? "0 18px 40px rgba(2, 6, 23, 0.28)" : "0 16px 30px rgba(15, 23, 42, 0.05)",
+  backgroundColor: darkMode ? "rgba(12, 19, 32, 0.92)" : "rgba(255, 255, 255, 0.98)",
+  boxShadow: darkMode ? "0 10px 24px rgba(2, 6, 23, 0.18)" : "0 10px 20px rgba(15, 23, 42, 0.04)",
 });
 
 const dashboardTabsSx = (darkMode) => ({
@@ -2238,7 +2263,7 @@ function Dashboard() {
     activeTab === "overview"
     || isPerformanceTabActive
     || isAlgorithmsTabActive
-    || (isAnalyticsTabActive && !canUsePersistentDashboardAggregate);
+    || isAnalyticsTabActive;
   const persistentTimelineSeedSeriesBySeed = useMemo(
     () =>
       new Map(
@@ -4126,6 +4151,7 @@ function Dashboard() {
       });
     });
 
+    const totalOccurrences = [...counts.values()].reduce((sum, count) => sum + count, 0);
     const topFeatures = [...counts.entries()]
       .sort((left, right) => right[1] - left[1])
       .slice(0, 10);
@@ -4135,16 +4161,14 @@ function Dashboard() {
     }
 
     return {
-      labels: topFeatures.map(([feature]) => `Feature ${feature}`),
-      datasets: [
-        {
-          label: "Occurrences",
-          data: topFeatures.map(([, count]) => count),
-          backgroundColor: "#4361ee",
-          borderRadius: 8,
-          borderSkipped: false,
-        },
-      ],
+      labels: topFeatures.map(([feature, count]) => {
+        const share = totalOccurrences > 0 ? ((count / totalOccurrences) * 100).toFixed(1) : "0.0";
+        return {
+          feature,
+          count,
+          share: Number(share),
+        };
+      }),
     };
   }, [bestSolutionRuns]);
 
@@ -4164,8 +4188,12 @@ function Dashboard() {
       scales: {
         x: {
           beginAtZero: true,
+          max: 100,
           grid: {
             color: "rgba(31, 41, 55, 0.08)",
+          },
+          ticks: {
+            callback: (value) => `${value}%`,
           },
         },
         y: {
@@ -5698,6 +5726,7 @@ function Dashboard() {
                                       setTimelineRangeEnd("");
                                     }
                                   }}
+                                  sx={timelineChipSx(darkMode, selectedTimelineWindow === option.value)}
                                 />
                               ))}
                             </Stack>
@@ -5718,6 +5747,7 @@ function Dashboard() {
                                   variant={selectedTimelineSeriesMode === option.value ? "filled" : "outlined"}
                                   size="small"
                                   onClick={() => setSelectedTimelineSeriesMode(option.value)}
+                                  sx={timelineChipSx(darkMode, selectedTimelineSeriesMode === option.value)}
                                 />
                               ))}
                             </Stack>
@@ -5749,17 +5779,18 @@ function Dashboard() {
 
                                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                                   {timelineTimestampSuggestions.map((suggestion) => (
-                                    <Chip
-                                      key={suggestion.value}
-                                      label={suggestion.label}
-                                      clickable
-                                      size="small"
-                                      color="secondary"
-                                      variant="outlined"
-                                      onClick={() => setTimelineTimestampQuery(suggestion.value)}
-                                    />
-                                  ))}
-                                </Stack>
+                                  <Chip
+                                    key={suggestion.value}
+                                    label={suggestion.label}
+                                    clickable
+                                    size="small"
+                                    color="secondary"
+                                    variant="outlined"
+                                    onClick={() => setTimelineTimestampQuery(suggestion.value)}
+                                    sx={timelineChipSx(darkMode, timelineTimestampQuery === suggestion.value)}
+                                  />
+                                ))}
+                              </Stack>
                               </Stack>
                             ) : null}
 
@@ -5873,9 +5904,62 @@ function Dashboard() {
                       <MDTypography variant="button" color="text">
                         {t("dashboard.featureFrequencySubtitle")}
                       </MDTypography>
-                      <MDBox height="300px" mt={2}>
-                        <Bar data={featureFrequencyChartData} options={featureFrequencyChartOptions} />
-                      </MDBox>
+                      <Stack spacing={1.5} mt={2}>
+                        {(() => {
+                          const entries = Array.isArray(featureFrequencyChartData.labels)
+                            ? featureFrequencyChartData.labels.filter((entry) => entry && typeof entry === "object")
+                            : [];
+
+                          if (!entries.length) {
+                            return (
+                              <MDTypography variant="caption" color="text">
+                                No best-solution features are available yet for the current filters.
+                              </MDTypography>
+                            );
+                          }
+
+                          const maxCount = Math.max(...entries.map((entry) => entry.count || 0), 1);
+                          const maxLogWeight = Math.log10(maxCount + 1) || 1;
+
+                          return entries.map((entry) => {
+                            const logWeight = Math.log10((entry.count || 0) + 1);
+                            const normalizedWidth = maxLogWeight > 0 ? (logWeight / maxLogWeight) * 100 : 0;
+                            const barWidth = Math.max(10, Math.round(normalizedWidth));
+
+                            return (
+                              <Stack key={entry.feature} spacing={0.75}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
+                                  <MDTypography variant="button" color="text" sx={{ fontWeight: 600 }}>
+                                    {`Feature ${entry.feature}`}
+                                  </MDTypography>
+                                  <MDTypography variant="caption" color="text">
+                                    {`${entry.count ?? 0} mentions · ${Number.isFinite(Number(entry.share)) ? Number(entry.share).toFixed(1) : "0.0"}%`}
+                                  </MDTypography>
+                                </Stack>
+                                <Box
+                                  sx={{
+                                    width: "100%",
+                                    height: 14,
+                                    borderRadius: 999,
+                                    backgroundColor: darkMode ? "rgba(148, 163, 184, 0.12)" : "rgba(148, 163, 184, 0.14)",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      width: `${barWidth}%`,
+                                      height: "100%",
+                                      borderRadius: 999,
+                                      background: "linear-gradient(90deg, rgba(67, 97, 238, 0.92), rgba(124, 156, 255, 0.95))",
+                                      boxShadow: "0 0 18px rgba(67, 97, 238, 0.25)",
+                                    }}
+                                  />
+                                </Box>
+                              </Stack>
+                            );
+                          });
+                        })()}
+                      </Stack>
                     </MDBox>
                   </Card>
                 </Grid>
