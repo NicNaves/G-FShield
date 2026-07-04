@@ -3,7 +3,7 @@ services:
     cpus: 0.50
     mem_limit: 512m
     image: postgres:14
-    container_name: g-fshield-postgres
+    container_name: "${GF_SHIELD_COMPOSE_PROJECT_NAME:-g-fshield}-postgres"
     restart: unless-stopped
     ports:
       - "5432:5432"
@@ -23,13 +23,18 @@ services:
     cpus: 0.25
     mem_limit: 256m
     image: redis:7-alpine
-    container_name: g-fshield-redis
+    container_name: "${GF_SHIELD_COMPOSE_PROJECT_NAME:-g-fshield}-redis"
     restart: unless-stopped
     ports:
       - "6379:6379"
     command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
     volumes:
       - g-fshield-webservice-api-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
 volumes:
   g-fshield-webservice-api-pg-data:

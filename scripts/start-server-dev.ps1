@@ -271,7 +271,19 @@ Write-Host "Subindo stack server do GF-Shield..."
 Invoke-Compose -WorkingDirectory $repoRoot -Arguments $rootComposeArgs -ProjectName $composeProjectName
 
 Write-Host "Subindo banco server do webservice/api..."
-Invoke-Compose -WorkingDirectory $repoRoot -Arguments @("-f", $dbComposeFile, "-f", $dbPresetComposeFile, "up", "-d")
+$previousComposeProjectName = $env:GF_SHIELD_COMPOSE_PROJECT_NAME
+try {
+  $env:GF_SHIELD_COMPOSE_PROJECT_NAME = $composeProjectName
+  Invoke-Compose -WorkingDirectory $repoRoot -Arguments @("-f", $dbComposeFile, "-f", $dbPresetComposeFile, "up", "-d")
+}
+finally {
+  if ($null -ne $previousComposeProjectName) {
+    $env:GF_SHIELD_COMPOSE_PROJECT_NAME = $previousComposeProjectName
+  }
+  else {
+    Remove-Item Env:GF_SHIELD_COMPOSE_PROJECT_NAME -ErrorAction SilentlyContinue
+  }
+}
 
 $apiLog = Join-Path $stateDir "api.log"
 $frontLog = Join-Path $stateDir "front.log"

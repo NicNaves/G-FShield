@@ -170,7 +170,7 @@ echo "Subindo stack server do GF-Shield..."
 invoke_compose "$REPO_ROOT" "${ROOT_COMPOSE_ARGS[@]}"
 
 echo "Subindo banco server do webservice/api..."
-invoke_compose "$REPO_ROOT" -f "$DB_COMPOSE_FILE" -f "$DB_PRESET_COMPOSE_FILE" up -d
+GF_SHIELD_COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" invoke_compose "$REPO_ROOT" -f "$DB_COMPOSE_FILE" -f "$DB_PRESET_COMPOSE_FILE" up -d
 
 API_LOG="${STATE_DIR}/api.log"
 FRONT_LOG="${STATE_DIR}/front.log"

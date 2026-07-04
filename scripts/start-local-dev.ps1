@@ -509,7 +509,19 @@ Write-Host "Subindo stack principal do G-FShield..."
 Invoke-Compose -WorkingDirectory $repoRoot -Arguments $rootComposeArgs -ProjectName $composeProjectName
 
 Write-Host "Subindo banco local do webservice/api..."
-Invoke-Compose -WorkingDirectory $repoRoot -Arguments @("-f", $dbComposeFile, "-f", $dbPresetComposeFile, "up", "-d")
+$previousComposeProjectName = $env:GF_SHIELD_COMPOSE_PROJECT_NAME
+try {
+  $env:GF_SHIELD_COMPOSE_PROJECT_NAME = $composeProjectName
+  Invoke-Compose -WorkingDirectory $repoRoot -Arguments @("-f", $dbComposeFile, "-f", $dbPresetComposeFile, "up", "-d")
+}
+finally {
+  if ($null -ne $previousComposeProjectName) {
+    $env:GF_SHIELD_COMPOSE_PROJECT_NAME = $previousComposeProjectName
+  }
+  else {
+    Remove-Item Env:GF_SHIELD_COMPOSE_PROJECT_NAME -ErrorAction SilentlyContinue
+  }
+}
 
 $state = [ordered]@{
   startedAt = (Get-Date).ToString("o")

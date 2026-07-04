@@ -33,7 +33,7 @@ services:
       - metrics_volume:/metrics
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
   grasp-fs-rcl-rf:
     <<: *rcl-service
     build:
@@ -50,7 +50,7 @@ services:
       - metrics_volume:/metrics
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
   grasp-fs-rcl-ig:
     <<: *rcl-service
     build:
@@ -67,7 +67,7 @@ services:
       - metrics_volume:/metrics
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
   grasp-fs-rcl-gr:
     <<: *rcl-service
     build:
@@ -84,7 +84,7 @@ services:
       - metrics_volume:/metrics
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
   grasp-fs.dls.verify:
     <<: *neighborhood-service
     build:
@@ -99,7 +99,7 @@ services:
       - metrics_volume:/metrics
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
   grasp-fs-dls-bf:
     <<: *dls-service
     build:
@@ -115,7 +115,7 @@ services:
       - metrics_volume:/metrics
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
   grasp-fs-dls-iw:
     <<: *dls-service
     build:
@@ -131,7 +131,7 @@ services:
       - metrics_volume:/metrics
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
   grasp-fs-dls-iwr:
     <<: *dls-service
     build:
@@ -147,7 +147,7 @@ services:
       - metrics_volume:/metrics
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
   grasp-fs-dls-rvnd:
     <<: *neighborhood-service
     build:
@@ -162,7 +162,7 @@ services:
       - metrics_volume:/metrics
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
   grasp-fs-dls-vnd:
     <<: *neighborhood-service
     build:
@@ -177,7 +177,7 @@ services:
       - metrics_volume:/metrics
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
   zookeeper:
     restart: unless-stopped
     cpus: 0.50
@@ -188,6 +188,12 @@ services:
     environment:
       - ZOOKEEPER_CLIENT_PORT=2181
       - ZOOKEEPER_TICK_TIME=2000
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc -w 2 localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
   kafka:
     restart: unless-stopped
@@ -214,6 +220,12 @@ services:
       - KAFKA_JMX_HOSTNAME=localhost
     depends_on:
       - zookeeper
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
 
   kafbat-ui:
     restart: unless-stopped
@@ -227,7 +239,7 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:29092"
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   dataset_volume:
