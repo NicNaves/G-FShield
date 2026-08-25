@@ -49,6 +49,13 @@ def load_json(path: Path) -> dict[str, Any]:
         return json.load(handle)
 
 
+def git_value(repo_root: Path, *arguments: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(repo_root), *arguments],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+
 def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> list[str]:
     errors: list[str] = []
     campaign = manifest.get("campaign", {})
@@ -113,6 +120,19 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
             errors.append("resource budget is not frozen")
         if "TO_BE_FROZEN" in json.dumps(manifest.get("classifier", {})):
             errors.append("classifier version/parameters are not frozen")
+        if manifest.get("pilot_evidence", {}).get("approved") is not True:
+            errors.append("formal pilot evidence is not approved")
+        images = manifest.get("images", {})
+        local_images = [value for value in images.values() if isinstance(value, dict) and value.get("image_id")]
+        if len(local_images) < 13 or any(
+            not isinstance(value.get("image_id"), str)
+            or not value["image_id"].startswith("sha256:")
+            or len(value["image_id"]) != 71
+            for value in local_images
+        ):
+            errors.append("immutable local image IDs are incomplete or invalid")
+        if any("{result_dir}" not in json.dumps(arm.get("command")) for arm in arms):
+            errors.append("every arm command must write to its isolated result directory")
     return errors
 
 
@@ -317,6 +337,18 @@ def execute(manifest_path: Path, state_path: Path) -> int:
             print(f"PRECHECK ERROR: {error}", file=sys.stderr)
         return 2
 
+    repo_root = manifest_path.resolve().parents[2]
+    campaign_tag = manifest.get("git", {}).get("campaign_tag")
+    try:
+        launch_commit = git_value(repo_root, "rev-parse", "HEAD")
+        tag_commit = git_value(repo_root, "rev-list", "-n", "1", str(campaign_tag))
+    except subprocess.CalledProcessError as error:
+        print(f"PRECHECK ERROR: unable to resolve campaign Git tag: {error}", file=sys.stderr)
+        return 2
+    if launch_commit != tag_commit:
+        print("PRECHECK ERROR: campaign tag does not resolve to the launch commit", file=sys.stderr)
+        return 2
+
     lock_path = state_path.with_suffix(".lock")
     with CampaignLock(lock_path):
         if state_path.exists():
@@ -332,6 +364,13 @@ def execute(manifest_path: Path, state_path: Path) -> int:
                 ),
                 "next_arm_index": 0,
                 "completed_runs": [],
+                "provenance": {
+                    "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+                    "launch_commit": launch_commit,
+                    "campaign_tag": campaign_tag,
+                    "campaign_tag_commit": tag_commit,
+                    "image_source_commit": manifest.get("git", {}).get("image_source_commit"),
+                },
             }
             atomic_json(state_path, state)
 
@@ -406,6 +445,7 @@ def execute(manifest_path: Path, state_path: Path) -> int:
                         "seed": seed,
                         "run_timeout_seconds": arm["run_timeout_seconds"],
                         "result_dir": str(run_output),
+                        "repo_root": str(repo_root),
                     }
                     command = format_command(arm["command"], context)
                     environment = os.environ.copy()
@@ -502,6 +542,7 @@ def execute(manifest_path: Path, state_path: Path) -> int:
                     "seed": seed,
                     "run_timeout_seconds": timeout_seconds,
                     "result_dir": str(run_output),
+                    "repo_root": str(repo_root),
                 }
                 command = format_command(baseline["command"], context)
                 environment = os.environ.copy()
