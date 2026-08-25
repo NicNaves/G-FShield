@@ -57,6 +57,11 @@ python3 experiments/10-day-campaign/run_resilience_pilot.py \
   --output-dir /path/to/formal-pilots
 ```
 
+Each formal pilot invocation uses a persisted unique namespace for campaign
+and run identifiers. If an operator interrupts the pilot, its child process
+group is terminated and recorded before the tmux session exits, preventing a
+late cleanup from colliding with a replacement pilot.
+
 Manifest freezing requires both the formal report and the resulting approved
 `resilience-report.json`.
 The freeze step also writes tracked `frozen-compose.yaml` and

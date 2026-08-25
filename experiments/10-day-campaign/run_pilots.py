@@ -29,10 +29,11 @@ def utc_now() -> str:
 
 
 def common_arguments(args: argparse.Namespace, case: dict[str, str], output: Path) -> list[str]:
+    run_id = f"{args.pilot_namespace}-{case['name']}"
     return [
-        "--campaign-id", "gfshield-formal-pilots",
+        "--campaign-id", f"gfshield-formal-pilots-{args.pilot_namespace}",
         "--arm-id", case["name"],
-        "--run-id", case["name"],
+        "--run-id", run_id,
         "--seed", str(args.seed),
         "--dataset-dir", str(args.dataset_dir.resolve()),
         "--output-dir", str(output.resolve()),
@@ -209,6 +210,7 @@ def main() -> int:
     parser.add_argument("--duration-seconds", type=int, default=30 * 60)
     parser.add_argument("--finalization-reserve-seconds", type=int, default=5 * 60)
     parser.add_argument("--seed", type=int, default=104729)
+    parser.add_argument("--pilot-namespace")
     args = parser.parse_args()
     if args.finalization_reserve_seconds >= args.duration_seconds:
         parser.error("finalization reserve must be shorter than pilot duration")
@@ -221,11 +223,16 @@ def main() -> int:
         "duration_seconds": args.duration_seconds,
         "seed": args.seed,
         "cases": {},
+        "pilot_namespace": args.pilot_namespace
+        or f"p{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
     }
     if state_path.exists():
         state = json.loads(state_path.read_text(encoding="utf-8"))
         if state.get("image_tag") != args.image_tag:
             raise RuntimeError("existing pilot state belongs to a different image tag")
+        if args.pilot_namespace and state.get("pilot_namespace") != args.pilot_namespace:
+            raise RuntimeError("existing pilot state belongs to a different pilot namespace")
+    args.pilot_namespace = state["pilot_namespace"]
     atomic_json(state_path, state)
     for case in cases():
         output = args.output_root / case["name"]
@@ -247,6 +254,24 @@ def main() -> int:
             )
             try:
                 return_code = process.wait(timeout=args.duration_seconds + 5 * 60)
+            except KeyboardInterrupt:
+                if os.name == "posix":
+                    os.killpg(process.pid, signal.SIGTERM)
+                else:
+                    process.terminate()
+                try:
+                    return_code = process.wait(timeout=60)
+                except subprocess.TimeoutExpired:
+                    if os.name == "posix":
+                        os.killpg(process.pid, signal.SIGKILL)
+                    else:
+                        process.kill()
+                    return_code = process.wait()
+                state["interrupted_utc"] = utc_now()
+                state["interrupted_case"] = case["name"]
+                state.pop("active_case", None)
+                atomic_json(state_path, state)
+                return 130
             except subprocess.TimeoutExpired:
                 if os.name == "posix":
                     os.killpg(process.pid, signal.SIGKILL)
