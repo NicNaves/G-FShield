@@ -142,7 +142,11 @@ def main() -> int:
     try:
         with open(temporary_name, "wb") as binary_handle:
             with gzip.GzipFile(
-                filename="", fileobj=binary_handle, mode="wb", mtime=0
+                filename="",
+                fileobj=binary_handle,
+                mode="wb",
+                compresslevel=0,
+                mtime=0,
             ) as compressed:
                 with io.TextIOWrapper(compressed, encoding="utf-8", newline="") as handle:
                     # Canonical LF makes the compressed index byte-identical
