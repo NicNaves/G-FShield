@@ -5,19 +5,22 @@ campaign. Preparation and pilot runs happen before the official clock starts.
 
 The requested matrix has 24 distributed configurations and two monolithic
 comparators. A distributed arm is one construction method, VND or RVND, and
-one of Bit-Flip, IWSS, or IWSSR. Each of the 26 arms receives exactly eight
-hours; the protocol formula therefore caps each independent run at one hour.
-With one enabled neighborhood, VND and RVND are degenerate controller cases;
-the campaign preserves them as separate requested arms and flags this fact in
-the analysis instead of silently collapsing the matrix. Eight hours are
-reserved for the all-features baseline and 24 hours for transitions and final
-consolidation.
+one reproducible ordering of the Bit-Flip, IWSS, and IWSSR portfolio. The
+`local_search` arm factor names the first VND neighborhood (or preferred RVND
+neighborhood); all three operators remain enabled, so neither controller is a
+singleton or degenerate case. Each of the 26 arms receives exactly eight
+hours. Each independent run has an absolute 50-minute limit, including startup,
+selection, controlled shutdown, validation, and the single holdout evaluation;
+the final ten minutes of each arm window cover transitions and permit at least
+eight attempts. Eight hours are reserved for the all-features baseline and 24
+hours for campaign-level transitions and final consolidation.
 
 The checked-in `manifest.yaml` is JSON syntax, which is valid YAML 1.2 and can
 be parsed with Python's standard `json` module. `ready: false` is deliberate:
 the campaign must not start until the common Weka J48 implementation, resolved
-commands, target resource budget, pilot, clean commit, and image digests have
-all been frozen.
+commands, target resource budget, pilots, clean commit/tag, and every image
+digest have all been frozen. The runner rejects empty, non-positive, or
+duplicate feature subsets rather than silently normalizing them.
 
 Generated datasets, state, checkpoints, logs, and results are ignored by Git.
 Their SHA-256 hashes belong in the final manifest and report.

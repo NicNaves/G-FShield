@@ -64,6 +64,38 @@ class OrchestratorPreflightTest(unittest.TestCase):
                 with ORCHESTRATOR.CampaignLock(lock_path):
                     pass
 
+    def test_result_artifact_identity_and_status_are_verified(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            result_path = Path(temporary) / "final-result.json"
+            result_path.write_text(
+                json.dumps(
+                    {
+                        "campaign_id": "campaign",
+                        "arm_id": "arm",
+                        "run_id": "run",
+                        "status": "timeout",
+                        "stop_reason": "run_timeout",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            record = {}
+            self.assertTrue(
+                ORCHESTRATOR.attach_result_artifact(
+                    record, result_path, "campaign", "arm", "run"
+                )
+            )
+            self.assertTrue(record["artifact_valid"])
+            self.assertEqual("timeout", record["experimental_status"])
+
+            invalid = {}
+            self.assertFalse(
+                ORCHESTRATOR.attach_result_artifact(
+                    invalid, result_path, "campaign", "arm", "different-run"
+                )
+            )
+            self.assertEqual("result identity mismatch", invalid["artifact_error"])
+
 
 if __name__ == "__main__":
     unittest.main()

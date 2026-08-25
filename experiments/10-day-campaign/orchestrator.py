@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import signal
@@ -56,6 +57,7 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
     algorithm = campaign.get("algorithm_seconds")
     baseline = campaign.get("baseline_maximum_seconds")
     reserve = campaign.get("reserve_seconds")
+    supervisor_grace = manifest.get("stopping", {}).get("graceful_shutdown_seconds", 0)
 
     if maximum != 240 * 60 * 60:
         errors.append("campaign maximum must be exactly 240 hours")
@@ -85,7 +87,7 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
         timeout = arm.get("run_timeout_seconds", 0)
         if timeout <= 0 or window <= 0 or timeout + 10 * 60 > window:
             errors.append(f"invalid time budget for arm {arm_id}")
-        if 8 * timeout + 10 * 60 > window:
+        if 8 * (timeout + supervisor_grace) + 10 * 60 > window:
             errors.append(f"arm {arm_id} cannot attempt eight runs within its window")
         command = arm.get("command")
         if require_ready and (not arm.get("ready") or not isinstance(command, list) or not command):
@@ -262,6 +264,48 @@ def run_once(
     }
 
 
+def attach_result_artifact(
+    process_result: dict[str, object],
+    result_path: Path,
+    campaign_id: str,
+    arm_id: str,
+    run_id: str,
+) -> bool:
+    process_result["result_path"] = str(result_path)
+    if not result_path.exists():
+        process_result["artifact_valid"] = False
+        process_result["artifact_error"] = "final-result.json is missing"
+        return False
+    try:
+        raw = result_path.read_bytes()
+        result = json.loads(raw)
+    except (OSError, json.JSONDecodeError) as error:
+        process_result["artifact_valid"] = False
+        process_result["artifact_error"] = repr(error)
+        return False
+    identities_match = (
+        result.get("campaign_id") == campaign_id
+        and result.get("arm_id") == arm_id
+        and result.get("run_id") == run_id
+    )
+    experimental_status = result.get("status")
+    valid_status = experimental_status in {"completed", "timeout"}
+    process_result.update(
+        {
+            "artifact_valid": bool(identities_match and valid_status),
+            "result_sha256": hashlib.sha256(raw).hexdigest(),
+            "experimental_status": experimental_status,
+            "experimental_stop_reason": result.get("stop_reason"),
+            "experimental_error_code": result.get("error_code"),
+        }
+    )
+    if not identities_match:
+        process_result["artifact_error"] = "result identity mismatch"
+    elif not valid_status:
+        process_result["artifact_error"] = f"invalid experimental status: {experimental_status!r}"
+    return bool(process_result["artifact_valid"])
+
+
 def execute(manifest_path: Path, state_path: Path) -> int:
     manifest = load_json(manifest_path)
     errors = validate_manifest(manifest, require_ready=True)
@@ -340,51 +384,68 @@ def execute(manifest_path: Path, state_path: Path) -> int:
             completed_for_arm = {
                 run["seed"]
                 for run in state["completed_runs"]
-                if run["arm_id"] == arm["arm_id"]
+                if run["arm_id"] == arm["arm_id"] and run.get("artifact_valid") is True
             }
             for seed in seeds:
                 if seed in completed_for_arm:
                     continue
-                remaining = (arm_deadline - utc_now()).total_seconds()
-                if remaining < arm["run_timeout_seconds"] + 10 * 60:
-                    break
-                run_id = f"{arm['arm_id']}-s{seed}-{uuid.uuid4().hex[:12]}"
-                context = {
-                    "campaign_id": manifest["campaign_id"],
-                    "arm_id": arm["arm_id"],
-                    "run_id": run_id,
-                    "seed": seed,
-                    "run_timeout_seconds": arm["run_timeout_seconds"],
-                }
-                command = format_command(arm["command"], context)
-                environment = os.environ.copy()
-                environment.update({key.upper(): str(value) for key, value in context.items()})
-                def register_active_run(pid: int) -> None:
-                    state["active_run"] = {
-                        "pid": pid,
+                supervised_timeout = arm["run_timeout_seconds"] + grace
+                while seed not in completed_for_arm:
+                    remaining = (arm_deadline - utc_now()).total_seconds()
+                    if remaining < supervised_timeout + 10 * 60:
+                        break
+                    run_id = f"{arm['arm_id']}-s{seed}-{uuid.uuid4().hex[:12]}"
+                    run_output = (result_root / arm["arm_id"] / run_id).resolve()
+                    context = {
+                        "campaign_id": manifest["campaign_id"],
                         "arm_id": arm["arm_id"],
                         "run_id": run_id,
                         "seed": seed,
-                        "started_utc": iso(utc_now()),
+                        "run_timeout_seconds": arm["run_timeout_seconds"],
+                        "result_dir": str(run_output),
                     }
+                    command = format_command(arm["command"], context)
+                    environment = os.environ.copy()
+                    environment.update({key.upper(): str(value) for key, value in context.items()})
+                    def register_active_run(pid: int) -> None:
+                        state["active_run"] = {
+                            "pid": pid,
+                            "arm_id": arm["arm_id"],
+                            "run_id": run_id,
+                            "seed": seed,
+                            "started_utc": iso(utc_now()),
+                        }
+                        atomic_json(state_path, state)
+
+                    result = run_once(
+                        command,
+                        supervised_timeout,
+                        grace,
+                        run_output / "orchestrator.log",
+                        environment,
+                        register_active_run,
+                    )
+                    state.pop("active_run", None)
+                    result.update({"arm_id": arm["arm_id"], "run_id": run_id, "seed": seed})
+                    artifact_valid = attach_result_artifact(
+                        result,
+                        run_output / "final-result.json",
+                        manifest["campaign_id"],
+                        arm["arm_id"],
+                        run_id,
+                    )
+                    state["completed_runs"].append(result)
                     atomic_json(state_path, state)
+                    if artifact_valid:
+                        completed_for_arm.add(seed)
+                if seed not in completed_for_arm:
+                    break
 
-                result = run_once(
-                    command,
-                    arm["run_timeout_seconds"],
-                    grace,
-                    result_root / arm["arm_id"] / f"{run_id}.log",
-                    environment,
-                    register_active_run,
-                )
-                state.pop("active_run", None)
-                result.update({"arm_id": arm["arm_id"], "run_id": run_id, "seed": seed})
-                state["completed_runs"].append(result)
-                atomic_json(state_path, state)
-
+            valid_seed_count = len(completed_for_arm)
+            state["current_arm_valid_seed_count"] = valid_seed_count
             state["state"] = "FINALIZING_ARM"
             atomic_json(state_path, state)
-            state["state"] = "ARM_COMPLETED"
+            state["state"] = "ARM_COMPLETED" if valid_seed_count == len(seeds) else "ARM_INCOMPLETE"
             state["next_arm_index"] = arm_index + 1
             atomic_json(state_path, state)
 
@@ -418,55 +479,88 @@ def execute(manifest_path: Path, state_path: Path) -> int:
         completed_baseline_seeds = {
             run["seed"]
             for run in state["completed_runs"]
-            if run["arm_id"] == baseline["arm_id"]
+            if run["arm_id"] == baseline["arm_id"] and run.get("artifact_valid") is True
         }
         for seed in seeds:
             if seed in completed_baseline_seeds:
                 continue
-            remaining = (baseline_deadline - utc_now()).total_seconds()
             timeout_seconds = baseline["run_timeout_seconds"]
-            if remaining < timeout_seconds + 10 * 60:
-                break
-            run_id = f"{baseline['arm_id']}-s{seed}-{uuid.uuid4().hex[:12]}"
-            context = {
-                "campaign_id": manifest["campaign_id"],
-                "arm_id": baseline["arm_id"],
-                "run_id": run_id,
-                "seed": seed,
-                "run_timeout_seconds": timeout_seconds,
-            }
-            command = format_command(baseline["command"], context)
-            environment = os.environ.copy()
-            environment.update({key.upper(): str(value) for key, value in context.items()})
-            def register_active_baseline(pid: int) -> None:
-                state["active_run"] = {
-                    "pid": pid,
+            supervised_timeout = timeout_seconds + grace
+            while seed not in completed_baseline_seeds:
+                remaining = (baseline_deadline - utc_now()).total_seconds()
+                if remaining < supervised_timeout + 10 * 60:
+                    break
+                run_id = f"{baseline['arm_id']}-s{seed}-{uuid.uuid4().hex[:12]}"
+                run_output = (result_root / baseline["arm_id"] / run_id).resolve()
+                context = {
+                    "campaign_id": manifest["campaign_id"],
                     "arm_id": baseline["arm_id"],
                     "run_id": run_id,
                     "seed": seed,
-                    "started_utc": iso(utc_now()),
+                    "run_timeout_seconds": timeout_seconds,
+                    "result_dir": str(run_output),
                 }
-                atomic_json(state_path, state)
+                command = format_command(baseline["command"], context)
+                environment = os.environ.copy()
+                environment.update({key.upper(): str(value) for key, value in context.items()})
+                def register_active_baseline(pid: int) -> None:
+                    state["active_run"] = {
+                        "pid": pid,
+                        "arm_id": baseline["arm_id"],
+                        "run_id": run_id,
+                        "seed": seed,
+                        "started_utc": iso(utc_now()),
+                    }
+                    atomic_json(state_path, state)
 
-            result = run_once(
-                command,
-                timeout_seconds,
-                grace,
-                result_root / baseline["arm_id"] / f"{run_id}.log",
-                environment,
-                register_active_baseline,
-            )
-            state.pop("active_run", None)
-            result.update({"arm_id": baseline["arm_id"], "run_id": run_id, "seed": seed})
-            state["completed_runs"].append(result)
-            atomic_json(state_path, state)
+                result = run_once(
+                    command,
+                    supervised_timeout,
+                    grace,
+                    run_output / "orchestrator.log",
+                    environment,
+                    register_active_baseline,
+                )
+                state.pop("active_run", None)
+                result.update({"arm_id": baseline["arm_id"], "run_id": run_id, "seed": seed})
+                artifact_valid = attach_result_artifact(
+                    result,
+                    run_output / "final-result.json",
+                    manifest["campaign_id"],
+                    baseline["arm_id"],
+                    run_id,
+                )
+                state["completed_runs"].append(result)
+                atomic_json(state_path, state)
+                if artifact_valid:
+                    completed_baseline_seeds.add(seed)
+            if seed not in completed_baseline_seeds:
+                break
 
         state["state"] = "FINALIZING_ARM"
         atomic_json(state_path, state)
-        state["state"] = "CAMPAIGN_COMPLETED"
+        expected_arm_ids = [arm["arm_id"] for arm in manifest["arms"]] + [baseline["arm_id"]]
+        valid_seeds_by_arm = {
+            arm_id: sorted({
+                run["seed"]
+                for run in state["completed_runs"]
+                if run["arm_id"] == arm_id and run.get("artifact_valid") is True
+            })
+            for arm_id in expected_arm_ids
+        }
+        incomplete = {
+            arm_id: [seed for seed in seeds if seed not in valid_seeds]
+            for arm_id, valid_seeds in valid_seeds_by_arm.items()
+            if len(valid_seeds) != len(seeds)
+        }
+        state["completion_summary"] = {
+            "valid_seeds_by_arm": valid_seeds_by_arm,
+            "missing_seeds_by_arm": incomplete,
+        }
+        state["state"] = "CAMPAIGN_COMPLETED" if not incomplete else "CAMPAIGN_INCOMPLETE"
         state["current_arm"] = None
         atomic_json(state_path, state)
-    return 0
+    return 0 if not incomplete else 4
 
 
 def main() -> int:
