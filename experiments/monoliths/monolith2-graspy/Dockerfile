@@ -1,4 +1,4 @@
-FROM maven:3.9.6-eclipse-temurin-17 AS weka-builder
+FROM maven:3.9.6-eclipse-temurin-17@sha256:29a1658b1f3078e07c2b17f7b519b45eb47f65d9628e887eac45a8c5c8f939d4 AS weka-builder
 WORKDIR /build
 COPY experiments/common-weka-evaluator/pom.xml ./pom.xml
 COPY experiments/common-weka-evaluator/src ./src
@@ -10,7 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 WORKDIR /app
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openjdk-17-jre-headless \
+    && apt-get install -y --no-install-recommends openjdk-21-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 COPY experiments/monoliths/monolith2-graspy/requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
