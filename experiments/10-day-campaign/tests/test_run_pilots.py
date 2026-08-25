@@ -41,6 +41,7 @@ class RunPilotsTest(unittest.TestCase):
             '"--max-accepted-improvements", str(args.max_accepted_improvements)',
             source,
         )
+        self.assertIn('"--relieff-sample-size", str(args.relieff_sample_size)', source)
 
     def test_verify_consumes_best_so_far_progress(self):
         consumer = (

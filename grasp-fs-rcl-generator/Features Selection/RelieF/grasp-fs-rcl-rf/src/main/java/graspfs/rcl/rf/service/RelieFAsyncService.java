@@ -62,6 +62,7 @@ public class RelieFAsyncService {
         long campaignStartedMonotonic = environmentLong("CAMPAIGN_START_MONOTONIC_NS", requestStartedMonotonic);
         long deadlineEpochMs = environmentLong("CAMPAIGN_DEADLINE_EPOCH_MS", Long.MAX_VALUE);
         int campaignSeed = (int) environmentLong("CAMPAIGN_RANDOM_SEED", 0L);
+        int reliefSampleSize = positiveEnvironmentInt("CAMPAIGN_RELIEFF_SAMPLE_SIZE", 1000);
         Random campaignRandom = new Random(campaignSeed);
         try {
             logger.info("rcl async start algorithm={} requestId={}", ALGORITHM_NAME, requestId);
@@ -79,7 +80,8 @@ public class RelieFAsyncService {
 
             // This seed template is reused to create each stochastic generation sent to Kafka.
             DataSolution dataSolution = relieFService.doRelief(
-                    trainingDataset, rclCutoff, classifier, trainingFileName, testingFileName
+                    trainingDataset, rclCutoff, classifier, trainingFileName, testingFileName,
+                    reliefSampleSize, campaignSeed
             );
             configureNeighborhood(dataSolution, neighborhoodStrategy, localSearches,
                     neighborhoodMaxIterations, bitFlipMaxIterations, iwssMaxIterations, iwssrMaxIterations, useTrainingCache);
@@ -168,6 +170,14 @@ public class RelieFAsyncService {
         } catch (NumberFormatException ignored) {
             return fallback;
         }
+    }
+
+    private int positiveEnvironmentInt(String name, int fallback) {
+        long value = environmentLong(name, fallback);
+        if (value <= 0 || value > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException(name + " must be a positive 32-bit integer");
+        }
+        return (int) value;
     }
 
     private Instances loadDataset(String fileName, String datasetType, String requestId, boolean useTrainingCache) throws IOException {

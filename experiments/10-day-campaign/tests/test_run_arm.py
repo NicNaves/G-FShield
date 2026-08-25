@@ -63,6 +63,19 @@ class RunArmResultTest(unittest.TestCase):
         )
         self.assertIn('stop_reason = "accepted_improvement_limit"', source)
 
+    def test_relief_sample_size_is_explicit_and_propagated(self):
+        source = (ROOT / "run_arm.py").read_text(encoding="utf-8")
+        compose = (ROOT / "docker-compose.campaign.yml").read_text(encoding="utf-8")
+        relief = (
+            ROOT.parents[1]
+            / "grasp-fs-rcl-generator/Features Selection/RelieF/grasp-fs-rcl-rf"
+            / "src/main/java/graspfs/rcl/rf/service/RelieFService.java"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"CAMPAIGN_RELIEFF_SAMPLE_SIZE": str(args.relieff_sample_size)', source)
+        self.assertIn("CAMPAIGN_RELIEFF_SAMPLE_SIZE", compose)
+        self.assertIn("evaluator.setSampleSize(reliefSampleSize)", relief)
+        self.assertIn("evaluator.setSeed(seed)", relief)
+
 
 if __name__ == "__main__":
     unittest.main()

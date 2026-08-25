@@ -158,6 +158,7 @@ def distributed_command(manifest: dict[str, Any], arm: dict[str, Any], image_tag
         "--run-timeout-seconds", "{run_timeout_seconds}",
         "--finalization-reserve-seconds", "300", "--startup-timeout-seconds", "300",
         "--max-generations", "2147483647", "--rcl-cutoff", "30", "--sample-size", "5",
+        "--relieff-sample-size", str(manifest["feature_selection"]["relieff_sample_size"]),
         "--neighborhood-iterations", "100", "--local-search-iterations", "100",
         "--max-accepted-improvements", str(manifest["stopping"]["maximum_accepted_improvements"]),
         "--minimum-improvement", str(manifest["stopping"]["minimum_improvement"]),

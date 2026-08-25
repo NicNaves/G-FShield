@@ -57,6 +57,12 @@ retain 100 iterations and additionally persist best-so-far progress throughout
 the bounded run; the pilot report records its iteration limit explicitly.
 The pilot also uses a three-improvement cap to exercise the same stop-on-first
 criterion used by the official 500-improvement or 50-minute bound.
+ReliefF uses a fixed sample of 1,000 reference instances, selected reproducibly
+from the complete training split with the run seed. This is the Weka ReliefF
+ranking parameter only: candidate training, validation, and holdout evaluation
+still use their complete, immutable splits. The value is frozen in the manifest,
+resolved command, and container environment because Weka's all-instance default
+did not complete one ranking within the formal 25-minute pilot search window.
 
 ```sh
 python3 experiments/10-day-campaign/run_resilience_pilot.py \

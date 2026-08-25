@@ -27,16 +27,26 @@ public class RelieFService {
     /**
      * Calcula o ranking de features e deixa a seed com a RCL pronta para as geracoes seguintes.
      */
-    public void rankFeatures(DataSolution solution, Instances trainingDataset, int rclCutoff) throws Exception {
+    public void rankFeatures(
+            DataSolution solution,
+            Instances trainingDataset,
+            int rclCutoff,
+            int reliefSampleSize,
+            int seed
+    ) throws Exception {
         try {
             long rankingStartedAt = System.nanoTime();
             ArrayList<FeatureAvaliada> allFeatures = new ArrayList<>();
             ReliefFAttributeEval evaluator = new ReliefFAttributeEval();
+            evaluator.setSampleSize(reliefSampleSize);
+            evaluator.setSeed(seed);
             evaluator.buildEvaluator(trainingDataset);
             logger.info(
-                    "rcl evaluator ready algorithm=RF rows={} attributes={} elapsedMs={}",
+                    "rcl evaluator ready algorithm=RF rows={} attributes={} reliefSampleSize={} seed={} elapsedMs={}",
                     trainingDataset.numInstances(),
                     trainingDataset.numAttributes(),
+                    reliefSampleSize,
+                    seed,
                     (System.nanoTime() - rankingStartedAt) / 1_000_000L
             );
 
@@ -81,12 +91,14 @@ public class RelieFService {
             int rclCutoff,
             AbstractClassifier classifier,
             String trainingFileName,
-            String testingFileName
+            String testingFileName,
+            int reliefSampleSize,
+            int seed
     ) throws Exception {
         String classifierName = classifier.getClass().getSimpleName();
         DataSolution initialSolution = SelectionFeaturesUtils.createData(classifierName, trainingFileName, testingFileName);
         initialSolution.setRclAlgorithm("RF");
-        rankFeatures(initialSolution, trainingDataset, rclCutoff);
+        rankFeatures(initialSolution, trainingDataset, rclCutoff, reliefSampleSize, seed);
         logger.info(
                 "rcl seed template ready algorithm=RF classifier={} training={} testing={} rclSize={}",
                 classifierName,

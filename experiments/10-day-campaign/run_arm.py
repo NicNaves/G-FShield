@@ -529,6 +529,8 @@ def run_distributed(args: argparse.Namespace) -> int:
         raise ValueError("finalization reserve must be shorter than the absolute run timeout")
     if args.max_accepted_improvements <= 0:
         raise ValueError("maximum accepted improvements must be positive")
+    if args.relieff_sample_size <= 0:
+        raise ValueError("ReliefF sample size must be positive")
     absolute_deadline = started_monotonic + args.run_timeout_seconds
     selection_deadline = absolute_deadline - args.finalization_reserve_seconds
     deadline_epoch_ms = int((time.time() + max(0.0, selection_deadline - time.monotonic())) * 1000)
@@ -549,6 +551,7 @@ def run_distributed(args: argparse.Namespace) -> int:
             "CAMPAIGN_IMAGE_TAG": args.image_tag,
             "CAMPAIGN_MINIMUM_IMPROVEMENT": str(args.minimum_improvement),
             "CAMPAIGN_MAX_ACCEPTED_IMPROVEMENTS": str(args.max_accepted_improvements),
+            "CAMPAIGN_RELIEFF_SAMPLE_SIZE": str(args.relieff_sample_size),
         }
     )
     rcl_service, _container_port, route = RCL_SERVICES[args.construction]
@@ -700,6 +703,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--max-generations", type=int, default=2_147_483_647)
     result.add_argument("--rcl-cutoff", type=int, default=30)
     result.add_argument("--sample-size", type=int, default=5)
+    result.add_argument("--relieff-sample-size", type=int, default=1000)
     result.add_argument("--neighborhood-iterations", type=int, default=50)
     result.add_argument("--local-search-iterations", type=int, default=100)
     result.add_argument("--minimum-improvement", type=float, default=0.0001)

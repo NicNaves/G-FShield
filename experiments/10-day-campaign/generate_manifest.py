@@ -118,6 +118,10 @@ def main() -> int:
             "maximum_accepted_improvements": 500,
             "graceful_shutdown_seconds": 5 * 60,
         },
+        "feature_selection": {
+            "relieff_sample_size": 1000,
+            "relieff_seed_source": "run_seed",
+        },
         "seeds": SEEDS,
         "classifier": {
             "name": "Weka J48",

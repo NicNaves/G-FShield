@@ -59,6 +59,7 @@ def command_for(args: argparse.Namespace, case: dict[str, str], output: Path) ->
             "--startup-timeout-seconds", "300",
             "--max-generations", "2147483647",
             "--rcl-cutoff", "30", "--sample-size", "5",
+            "--relieff-sample-size", str(args.relieff_sample_size),
             "--neighborhood-iterations", "100",
             "--local-search-iterations", str(args.local_search_iterations),
             "--max-accepted-improvements", str(args.max_accepted_improvements),
@@ -228,6 +229,7 @@ def main() -> int:
     parser.add_argument("--duration-seconds", type=int, default=30 * 60)
     parser.add_argument("--finalization-reserve-seconds", type=int, default=5 * 60)
     parser.add_argument("--local-search-iterations", type=int, default=5)
+    parser.add_argument("--relieff-sample-size", type=int, default=1000)
     parser.add_argument("--max-accepted-improvements", type=int, default=3)
     parser.add_argument("--seed", type=int, default=104729)
     parser.add_argument("--pilot-namespace")
@@ -238,6 +240,8 @@ def main() -> int:
         parser.error("local-search iterations must be positive")
     if args.max_accepted_improvements <= 0:
         parser.error("maximum accepted improvements must be positive")
+    if args.relieff_sample_size <= 0:
+        parser.error("ReliefF sample size must be positive")
     args.output_root.mkdir(parents=True, exist_ok=True)
     state_path = args.output_root / "pilot-state.json"
     report_path = args.output_root / "pilot-report.json"
@@ -247,6 +251,7 @@ def main() -> int:
         "duration_seconds": args.duration_seconds,
         "local_search_iterations": args.local_search_iterations,
         "max_accepted_improvements": args.max_accepted_improvements,
+        "relieff_sample_size": args.relieff_sample_size,
         "seed": args.seed,
         "cases": {},
         "pilot_namespace": args.pilot_namespace
@@ -262,6 +267,8 @@ def main() -> int:
             raise RuntimeError("existing pilot state uses different local-search iterations")
         if state.get("max_accepted_improvements") != args.max_accepted_improvements:
             raise RuntimeError("existing pilot state uses a different improvement limit")
+        if state.get("relieff_sample_size") != args.relieff_sample_size:
+            raise RuntimeError("existing pilot state uses a different ReliefF sample size")
     args.pilot_namespace = state["pilot_namespace"]
     atomic_json(state_path, state)
     for case in cases():
