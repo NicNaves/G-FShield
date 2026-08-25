@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -66,6 +67,8 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
     baseline = campaign.get("baseline_maximum_seconds")
     reserve = campaign.get("reserve_seconds")
     supervisor_grace = manifest.get("stopping", {}).get("graceful_shutdown_seconds", 0)
+    storage = manifest.get("storage", {})
+    watchdog = manifest.get("watchdog", {})
 
     if maximum != 240 * 60 * 60:
         errors.append("campaign maximum must be exactly 240 hours")
@@ -78,6 +81,12 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
     if all(isinstance(value, int) for value in (algorithm, baseline, reserve, maximum)):
         if algorithm + baseline + reserve != maximum:
             errors.append("algorithm, baseline, and reserve budgets must add to 240 hours")
+    if storage.get("minimum_free_bytes", 0) < 10 * 1024**3:
+        errors.append("storage threshold must reserve at least 10 GiB")
+    if storage.get("compression") != "gzip" or storage.get("raw_results_are_preserved") is not True:
+        errors.append("raw result preservation and gzip compression must be frozen")
+    if watchdog.get("external") is not True or watchdog.get("deadline_is_immutable") is not True:
+        errors.append("external immutable-deadline watchdog must be enabled")
 
     arm_ids = [arm.get("arm_id") for arm in arms]
     if not arms:
@@ -329,6 +338,23 @@ def attach_result_artifact(
     return bool(process_result["artifact_valid"])
 
 
+def verify_free_disk(
+    state: dict[str, Any], state_path: Path, output_root: Path, minimum_bytes: int
+) -> bool:
+    free_bytes = shutil.disk_usage(output_root).free
+    check = {"timestamp_utc": iso(utc_now()), "free_bytes": free_bytes}
+    state.setdefault("storage_checks", []).append(check)
+    if free_bytes < minimum_bytes:
+        state["state"] = "CAMPAIGN_FAILED"
+        state["failure_reason"] = (
+            f"free disk {free_bytes} below required threshold {minimum_bytes}"
+        )
+        atomic_json(state_path, state)
+        return False
+    atomic_json(state_path, state)
+    return True
+
+
 def execute(manifest_path: Path, state_path: Path) -> int:
     manifest = load_json(manifest_path)
     errors = validate_manifest(manifest, require_ready=True)
@@ -382,6 +408,8 @@ def execute(manifest_path: Path, state_path: Path) -> int:
         recover_orphan(state, state_path, grace)
         seeds = manifest["seeds"]
         result_root = manifest_path.parent / "results" / "raw"
+        result_root.mkdir(parents=True, exist_ok=True)
+        minimum_free_disk = int(manifest.get("storage", {}).get("minimum_free_bytes", 0))
         baseline_arm_id = manifest["baseline"]["arm_id"]
         resuming_baseline = (
             state.get("current_arm") == baseline_arm_id
@@ -450,6 +478,8 @@ def execute(manifest_path: Path, state_path: Path) -> int:
                     command = format_command(arm["command"], context)
                     environment = os.environ.copy()
                     environment.update({key.upper(): str(value) for key, value in context.items()})
+                    if not verify_free_disk(state, state_path, result_root, minimum_free_disk):
+                        return 5
                     def register_active_run(pid: int) -> None:
                         state["active_run"] = {
                             "pid": pid,
@@ -547,6 +577,8 @@ def execute(manifest_path: Path, state_path: Path) -> int:
                 command = format_command(baseline["command"], context)
                 environment = os.environ.copy()
                 environment.update({key.upper(): str(value) for key, value in context.items()})
+                if not verify_free_disk(state, state_path, result_root, minimum_free_disk):
+                    return 5
                 def register_active_baseline(pid: int) -> None:
                     state["active_run"] = {
                         "pid": pid,

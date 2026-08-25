@@ -358,5 +358,24 @@
     "graceful_shutdown_seconds": 300,
     "maximum_accepted_improvements": 500,
     "minimum_improvement": 0.0001
+  },
+  "storage": {
+    "compression": "gzip",
+    "docker_log_rotation": {
+      "maximum_files": 5,
+      "maximum_size": "20m"
+    },
+    "minimum_free_bytes": 10737418240,
+    "raw_results_are_preserved": true,
+    "supervisor_log_rotation_bytes": 20971520
+  },
+  "watchdog": {
+    "deadline_is_immutable": true,
+    "external": true,
+    "graceful_shutdown_seconds": 300,
+    "launcher": "tmux",
+    "maximum_orchestrator_restarts": 10,
+    "poll_seconds": 15,
+    "script": "experiments/10-day-campaign/campaign_supervisor.py"
   }
 }

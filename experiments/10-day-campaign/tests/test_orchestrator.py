@@ -46,12 +46,21 @@ class OrchestratorPreflightTest(unittest.TestCase):
         self.assertEqual(8, len(manifest["seeds"]))
         self.assertEqual(8, len(set(manifest["seeds"])))
         self.assertEqual(list(range(42, 50)), manifest["seeds"])
+        self.assertEqual(10 * 1024**3, manifest["storage"]["minimum_free_bytes"])
+        self.assertTrue(manifest["watchdog"]["external"])
+        self.assertTrue(manifest["watchdog"]["deadline_is_immutable"])
 
     def test_compose_image_digests_have_sha256_length(self):
         compose = (ROOT / "docker-compose.campaign.yml").read_text(encoding="utf-8")
         digests = re.findall(r"@sha256:([0-9a-f]+)", compose)
         self.assertGreaterEqual(len(digests), 2)
         self.assertTrue(all(len(digest) == 64 for digest in digests))
+
+    def test_preflight_rejects_missing_storage_reserve(self):
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        manifest["storage"]["minimum_free_bytes"] = 0
+        errors = ORCHESTRATOR.validate_manifest(manifest, require_ready=False)
+        self.assertIn("storage threshold must reserve at least 10 GiB", errors)
 
     def test_preflight_rejects_schedule_that_cannot_attempt_eight_runs(self):
         manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))

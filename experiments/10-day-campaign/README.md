@@ -47,3 +47,21 @@ python3 experiments/10-day-campaign/generate_manifest.py \
 Generation does not make the campaign runnable. The pilot must remove every
 readiness blocker and the preflight validator must pass before an official
 start timestamp is written.
+
+## Durable launch and external watchdog
+
+The official process is launched through `campaign_supervisor.py`, not by
+invoking the orchestrator directly. The supervisor preserves the first
+deadline across restarts, stops the complete process group with SIGTERM and
+then SIGKILL, refuses low-disk execution, limits restart loops, and rotates its
+own log into checksum-addressed gzip archives. Run it inside the documented
+tmux session (or an equivalent user service):
+
+```sh
+python3 experiments/10-day-campaign/campaign_supervisor.py \
+  --manifest experiments/10-day-campaign/manifest.yaml \
+  --state experiments/10-day-campaign/state/campaign-state.json \
+  --supervisor-state experiments/10-day-campaign/state/supervisor-state.json \
+  --log experiments/10-day-campaign/logs/campaign-supervisor.log \
+  --output-root experiments/10-day-campaign/results
+```

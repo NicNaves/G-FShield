@@ -152,6 +152,22 @@ def main() -> int:
             "normalized_results": "experiments/10-day-campaign/results/normalized",
             "state": "experiments/10-day-campaign/state/campaign-state.json",
         },
+        "storage": {
+            "minimum_free_bytes": 10 * 1024**3,
+            "docker_log_rotation": {"maximum_size": "20m", "maximum_files": 5},
+            "supervisor_log_rotation_bytes": 20 * 1024**2,
+            "compression": "gzip",
+            "raw_results_are_preserved": True,
+        },
+        "watchdog": {
+            "external": True,
+            "script": "experiments/10-day-campaign/campaign_supervisor.py",
+            "launcher": "tmux",
+            "poll_seconds": 15,
+            "graceful_shutdown_seconds": 5 * 60,
+            "maximum_orchestrator_restarts": 10,
+            "deadline_is_immutable": True,
+        },
     }
     if sum(arm["window_seconds"] for arm in arms) != manifest["campaign"]["algorithm_seconds"]:
         raise RuntimeError("arm windows do not add up to the 208-hour algorithm budget")
