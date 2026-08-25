@@ -48,6 +48,18 @@ Generation does not make the campaign runnable. The pilot must remove every
 readiness blocker and the preflight validator must pass before an official
 start timestamp is written.
 
+After the seven formal 30-minute cases finish, run the destructive resilience
+checks separately so signal injection cannot contaminate scientific outputs:
+
+```sh
+python3 experiments/10-day-campaign/run_resilience_pilot.py \
+  --pilot-report /path/to/formal-pilots/pilot-report.json \
+  --output-dir /path/to/formal-pilots
+```
+
+Manifest freezing requires both the formal report and the resulting approved
+`resilience-report.json`.
+
 ## Durable launch and external watchdog
 
 The official process is launched through `campaign_supervisor.py`, not by

@@ -91,7 +91,7 @@ def main() -> int:
         "neighborhood_controller": None,
         "local_search": None,
         "classifier": "Weka J48",
-        "classifier_version": "3.8.6",
+        "classifier_version": "weka-stable 3.8.6",
         "classifier_parameters": {"confidence_factor": 0.25, "minimum_instances_per_leaf": 2, "pruned": True},
         "dataset_hash": args.dataset_hash,
         "train_hash": args.train_hash,

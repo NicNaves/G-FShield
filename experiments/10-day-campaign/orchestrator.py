@@ -131,6 +131,8 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
             errors.append("classifier version/parameters are not frozen")
         if manifest.get("pilot_evidence", {}).get("approved") is not True:
             errors.append("formal pilot evidence is not approved")
+        if manifest.get("resilience_evidence", {}).get("approved") is not True:
+            errors.append("resilience pilot evidence is not approved")
         images = manifest.get("images", {})
         local_images = [value for value in images.values() if isinstance(value, dict) and value.get("image_id")]
         if len(local_images) < 13 or any(

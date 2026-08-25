@@ -140,6 +140,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--pilot-report", type=Path, required=True)
+    parser.add_argument("--resilience-report", type=Path, required=True)
     parser.add_argument("--image-tag", required=True)
     parser.add_argument("--campaign-tag", default="experiment-10d-v1")
     args = parser.parse_args()
@@ -151,6 +152,11 @@ def main() -> int:
         raise RuntimeError("formal pilot report is not approved")
     if pilot.get("image_tag") != args.image_tag:
         raise RuntimeError("formal pilots used a different image tag")
+    resilience = json.loads(args.resilience_report.read_text(encoding="utf-8"))
+    if resilience.get("approved") is not True:
+        raise RuntimeError("resilience pilot report is not approved")
+    if resilience.get("formal_pilot_sha256") != sha256_file(args.pilot_report):
+        raise RuntimeError("resilience report does not attest this formal pilot report")
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     source_commit = checked("git", "rev-parse", "HEAD", cwd=repo_root)
     branch = checked("git", "branch", "--show-current", cwd=repo_root)
@@ -190,6 +196,13 @@ def main() -> int:
         "image_tag": args.image_tag,
         "finished_utc": pilot.get("finished_utc"),
         "case_count": len(pilot.get("cases") or {}),
+    }
+    manifest["resilience_evidence"] = {
+        "approved": True,
+        "report_sha256": sha256_file(args.resilience_report),
+        "report_path_on_target": str(args.resilience_report.resolve()),
+        "generated_utc": resilience.get("generated_utc"),
+        "checks": resilience.get("checks"),
     }
     manifest["frozen_utc"] = datetime.now(timezone.utc).isoformat()
     manifest["readiness_blockers"] = []

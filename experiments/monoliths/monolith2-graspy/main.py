@@ -925,13 +925,14 @@ def main():
         "feature_selector": best_configuration["feature_selector"],
         "neighborhood_controller": best_configuration["neighborhood_controller"],
         "local_search": ",".join(best_configuration["local_search"]),
-        "classifier": args.classifier.upper(),
+        "classifier": "Weka J48" if args.classifier == "J48" else args.classifier.upper(),
         "classifier_version": (
             "weka-stable 3.8.6" if args.classifier == "J48"
             else f"scikit-learn {sklearn.__version__}"
         ),
         "classifier_parameters": (
-            {"weka_options": "J48 defaults"} if args.classifier == "J48"
+            {"confidence_factor": 0.25, "minimum_instances_per_leaf": 2, "pruned": True}
+            if args.classifier == "J48"
             else {"random_state": 0}
         ),
         "dataset_hash": dataset_hash,

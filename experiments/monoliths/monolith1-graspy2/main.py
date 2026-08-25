@@ -565,13 +565,14 @@ def main():
         "feature_selector": a.feature_selector,
         "neighborhood_controller": None,
         "local_search": a.local_search,
-        "classifier": a.classifier.upper(),
+        "classifier": "Weka J48" if a.classifier == "j48" else a.classifier.upper(),
         "classifier_version": (
             "weka-stable 3.8.6" if a.classifier == "j48"
             else f"scikit-learn {sklearn.__version__}"
         ),
         "classifier_parameters": (
-            {"weka_options": "J48 defaults"} if a.classifier == "j48"
+            {"confidence_factor": 0.25, "minimum_instances_per_leaf": 2, "pruned": True}
+            if a.classifier == "j48"
             else {"random_state": 0}
         ),
         "dataset_hash": dataset_hash,
