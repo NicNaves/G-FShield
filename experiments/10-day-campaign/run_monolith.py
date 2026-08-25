@@ -173,11 +173,12 @@ def execute(args: argparse.Namespace) -> int:
     sampler = ContainerSampler(container, output / "resource-samples.jsonl")
     process: subprocess.Popen[str] | None = None
     started = time.monotonic()
+    absolute_deadline = started + args.run_timeout_seconds
     try:
         subprocess.run(["docker", "rm", "-f", container], capture_output=True, check=False)
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, text=True, start_new_session=True)
         sampler.start()
-        return_code = process.wait(timeout=args.run_timeout_seconds + 300)
+        return_code = process.wait(timeout=max(1.0, absolute_deadline - time.monotonic()))
         if return_code != 0:
             atomic_json(
                 output / "runner-error.json",
@@ -200,7 +201,7 @@ def execute(args: argparse.Namespace) -> int:
             return 1
         return 0
     except (KeyboardInterrupt, subprocess.TimeoutExpired):
-        subprocess.run(["docker", "stop", "--time", "300", container], check=False)
+        subprocess.run(["docker", "kill", container], capture_output=True, check=False, timeout=30)
         return 124
     finally:
         sampler.stop()

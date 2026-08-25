@@ -19,6 +19,7 @@ import math
 import os
 import random
 import select
+import signal
 import subprocess
 import threading
 import time
@@ -448,6 +449,12 @@ def main():
     if a.final_evaluation_reserve_seconds >= a.run_timeout_seconds:
         raise ValueError("final evaluation reserve must be shorter than the absolute run timeout")
     absolute_deadline = started_monotonic + a.run_timeout_seconds
+    if hasattr(signal, "SIGALRM"):
+        def hard_timeout(_signum, _frame):
+            raise TimeoutError("monolith1 exceeded the absolute run deadline")
+        signal.signal(signal.SIGALRM, hard_timeout)
+        signal.setitimer(signal.ITIMER_REAL, a.run_timeout_seconds)
+        atexit.register(lambda: signal.setitimer(signal.ITIMER_REAL, 0))
     deadline = absolute_deadline - a.final_evaluation_reserve_seconds
 
     random.seed(a.seed); np.random.seed(a.seed)

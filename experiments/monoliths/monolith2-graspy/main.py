@@ -10,6 +10,7 @@ import os
 import time
 import random
 import select
+import signal
 import subprocess
 import uuid
 from datetime import datetime, timezone
@@ -691,6 +692,12 @@ def main():
     if args.final_evaluation_reserve_seconds >= args.run_timeout_seconds:
         raise ValueError("final evaluation reserve must be shorter than the absolute run timeout")
     absolute_deadline = run_started + args.run_timeout_seconds
+    if hasattr(signal, "SIGALRM"):
+        def hard_timeout(_signum, _frame):
+            raise TimeoutError("monolith2 exceeded the absolute run deadline")
+        signal.signal(signal.SIGALRM, hard_timeout)
+        signal.setitimer(signal.ITIMER_REAL, args.run_timeout_seconds)
+        atexit.register(lambda: signal.setitimer(signal.ITIMER_REAL, 0))
     RUN_DEADLINE = absolute_deadline - args.final_evaluation_reserve_seconds
     MAX_ACCEPTED_IMPROVEMENTS = args.max_accepted_improvements
     MINIMUM_IMPROVEMENT = args.minimum_improvement
