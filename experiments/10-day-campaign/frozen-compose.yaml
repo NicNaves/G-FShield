@@ -1,0 +1,595 @@
+name: 10-day-campaign
+services:
+  grasp-fs-dls-bitflip:
+    build:
+      context: /home/idscps/nicolas/G-FShield-experiment-10d/grasp-fs-distributed-ls/Local
+        Search/BitFlip/grasp-fs-dls-bf
+      dockerfile: Dockerfile
+    cpus: 1
+    cpuset: 8-15
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      CAMPAIGN_DEADLINE_EPOCH_MS: ASSIGNED_PER_RUN
+      CAMPAIGN_RANDOM_SEED: "42"
+      CAMPAIGN_START_MONOTONIC_NS: ASSIGNED_PER_RUN
+      JAVA_OPTS: -Xms256m -Xmx1400m -XX:+UseContainerSupport -XX:+UseG1GC
+      KAFKA_LISTENER_CONCURRENCY: "1"
+      KAFKA_MAX_POLL_INTERVAL_MS: "14400000"
+    image: gfshield-campaign-dls-bitflip:pilot-b38eff3
+    logging:
+      driver: json-file
+      options:
+        max-file: "5"
+        max-size: 20m
+    mem_limit: "2147483648"
+    networks:
+      default: null
+    restart: "no"
+    volumes:
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/datasets
+      target: /datasets
+      read_only: true
+      bind:
+        create_host_path: true
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/experiments/10-day-campaign/frozen-metrics-placeholder
+      target: /metrics
+      bind:
+        create_host_path: true
+  grasp-fs-dls-iwss:
+    build:
+      context: /home/idscps/nicolas/G-FShield-experiment-10d/grasp-fs-distributed-ls/Local
+        Search/IWSS/grasp-fs-dls-iw
+      dockerfile: Dockerfile
+    cpus: 1
+    cpuset: 8-15
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      CAMPAIGN_DEADLINE_EPOCH_MS: ASSIGNED_PER_RUN
+      CAMPAIGN_RANDOM_SEED: "42"
+      CAMPAIGN_START_MONOTONIC_NS: ASSIGNED_PER_RUN
+      JAVA_OPTS: -Xms256m -Xmx1400m -XX:+UseContainerSupport -XX:+UseG1GC
+      KAFKA_LISTENER_CONCURRENCY: "1"
+      KAFKA_MAX_POLL_INTERVAL_MS: "14400000"
+    image: gfshield-campaign-dls-iwss:pilot-b38eff3
+    logging:
+      driver: json-file
+      options:
+        max-file: "5"
+        max-size: 20m
+    mem_limit: "2147483648"
+    networks:
+      default: null
+    restart: "no"
+    volumes:
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/datasets
+      target: /datasets
+      read_only: true
+      bind:
+        create_host_path: true
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/experiments/10-day-campaign/frozen-metrics-placeholder
+      target: /metrics
+      bind:
+        create_host_path: true
+  grasp-fs-dls-iwssr:
+    build:
+      context: /home/idscps/nicolas/G-FShield-experiment-10d/grasp-fs-distributed-ls/Local
+        Search/IWSSR/grasp-fs-dls-iwr
+      dockerfile: Dockerfile
+    cpus: 1
+    cpuset: 8-15
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      CAMPAIGN_DEADLINE_EPOCH_MS: ASSIGNED_PER_RUN
+      CAMPAIGN_RANDOM_SEED: "42"
+      CAMPAIGN_START_MONOTONIC_NS: ASSIGNED_PER_RUN
+      JAVA_OPTS: -Xms256m -Xmx1400m -XX:+UseContainerSupport -XX:+UseG1GC
+      KAFKA_LISTENER_CONCURRENCY: "1"
+      KAFKA_MAX_POLL_INTERVAL_MS: "14400000"
+    image: gfshield-campaign-dls-iwssr:pilot-b38eff3
+    logging:
+      driver: json-file
+      options:
+        max-file: "5"
+        max-size: 20m
+    mem_limit: "2147483648"
+    networks:
+      default: null
+    restart: "no"
+    volumes:
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/datasets
+      target: /datasets
+      read_only: true
+      bind:
+        create_host_path: true
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/experiments/10-day-campaign/frozen-metrics-placeholder
+      target: /metrics
+      bind:
+        create_host_path: true
+  grasp-fs-dls-rvnd:
+    build:
+      context: /home/idscps/nicolas/G-FShield-experiment-10d/grasp-fs-distributed-ls/Neighborhood/RVND/grasp-fs-dls-rvnd
+      dockerfile: Dockerfile
+    cpus: 1
+    cpuset: 8-15
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      CAMPAIGN_DEADLINE_EPOCH_MS: ASSIGNED_PER_RUN
+      CAMPAIGN_RANDOM_SEED: "42"
+      CAMPAIGN_START_MONOTONIC_NS: ASSIGNED_PER_RUN
+      JAVA_OPTS: -Xms256m -Xmx1536m -XX:+UseContainerSupport -XX:+UseG1GC
+      KAFKA_LISTENER_CONCURRENCY: "1"
+    image: gfshield-campaign-dls-rvnd:pilot-b38eff3
+    logging:
+      driver: json-file
+      options:
+        max-file: "5"
+        max-size: 20m
+    mem_limit: "2147483648"
+    networks:
+      default: null
+    restart: "no"
+    volumes:
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/datasets
+      target: /datasets
+      read_only: true
+      bind:
+        create_host_path: true
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/experiments/10-day-campaign/frozen-metrics-placeholder
+      target: /metrics
+      bind:
+        create_host_path: true
+  grasp-fs-dls-verify:
+    build:
+      context: /home/idscps/nicolas/G-FShield-experiment-10d/grasp-fs-distributed-ls/Verify/grasp-fs.dls.verify
+      dockerfile: Dockerfile
+    cpus: 0.5
+    cpuset: 8-15
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      CAMPAIGN_DEADLINE_EPOCH_MS: ASSIGNED_PER_RUN
+      CAMPAIGN_MAX_ACCEPTED_IMPROVEMENTS: "500"
+      CAMPAIGN_MINIMUM_IMPROVEMENT: "0.0001"
+      CAMPAIGN_START_MONOTONIC_NS: ASSIGNED_PER_RUN
+      JAVA_OPTS: -Xms128m -Xmx700m -XX:+UseContainerSupport -XX:+UseG1GC
+      KAFKA_LISTENER_CONCURRENCY: "1"
+    image: gfshield-campaign-dls-verify:pilot-b38eff3
+    logging:
+      driver: json-file
+      options:
+        max-file: "5"
+        max-size: 20m
+    mem_limit: "1073741824"
+    networks:
+      default: null
+    restart: "no"
+    volumes:
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/datasets
+      target: /datasets
+      read_only: true
+      bind:
+        create_host_path: true
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/experiments/10-day-campaign/frozen-metrics-placeholder
+      target: /metrics
+      bind:
+        create_host_path: true
+  grasp-fs-dls-vnd:
+    build:
+      context: /home/idscps/nicolas/G-FShield-experiment-10d/grasp-fs-distributed-ls/Neighborhood/VND/grasp-fs-dls-vnd
+      dockerfile: Dockerfile
+    cpus: 1
+    cpuset: 8-15
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      CAMPAIGN_DEADLINE_EPOCH_MS: ASSIGNED_PER_RUN
+      CAMPAIGN_RANDOM_SEED: "42"
+      CAMPAIGN_START_MONOTONIC_NS: ASSIGNED_PER_RUN
+      JAVA_OPTS: -Xms256m -Xmx1536m -XX:+UseContainerSupport -XX:+UseG1GC
+      KAFKA_LISTENER_CONCURRENCY: "1"
+    image: gfshield-campaign-dls-vnd:pilot-b38eff3
+    logging:
+      driver: json-file
+      options:
+        max-file: "5"
+        max-size: 20m
+    mem_limit: "2147483648"
+    networks:
+      default: null
+    restart: "no"
+    volumes:
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/datasets
+      target: /datasets
+      read_only: true
+      bind:
+        create_host_path: true
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/experiments/10-day-campaign/frozen-metrics-placeholder
+      target: /metrics
+      bind:
+        create_host_path: true
+  grasp-fs-rcl-gr:
+    build:
+      context: /home/idscps/nicolas/G-FShield-experiment-10d/grasp-fs-rcl-generator/Features
+        Selection/GainRatio/grasp-fs-rcl-gr
+      dockerfile: Dockerfile
+    cpus: 2
+    cpuset: 8-15
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      CAMPAIGN_ARM_ID: distributed-ig-vnd-bitflip
+      CAMPAIGN_DEADLINE_EPOCH_MS: ASSIGNED_PER_RUN
+      CAMPAIGN_ID: gfshield-10d-2026-v1
+      CAMPAIGN_RANDOM_SEED: "42"
+      CAMPAIGN_RELIEFF_SAMPLE_SIZE: "1000"
+      CAMPAIGN_REQUEST_ID: REQUEST_ID_ASSIGNED_BY_ORCHESTRATOR
+      CAMPAIGN_RUN_ID: RUN_ID_ASSIGNED_BY_ORCHESTRATOR
+      CAMPAIGN_START_MONOTONIC_NS: ASSIGNED_PER_RUN
+      JAVA_OPTS: -Xms512m -Xmx3072m -XX:+UseContainerSupport -XX:+UseG1GC
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "1"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "1"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "1"
+    image: gfshield-campaign-rcl-gr:pilot-b38eff3
+    logging:
+      driver: json-file
+      options:
+        max-file: "5"
+        max-size: 20m
+    mem_limit: "4294967296"
+    networks:
+      default: null
+    ports:
+    - mode: ingress
+      host_ip: 127.0.0.1
+      target: 8088
+      published: "18089"
+      protocol: tcp
+    restart: "no"
+    volumes:
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/datasets
+      target: /datasets
+      read_only: true
+      bind:
+        create_host_path: true
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/experiments/10-day-campaign/frozen-metrics-placeholder
+      target: /metrics
+      bind:
+        create_host_path: true
+  grasp-fs-rcl-ig:
+    build:
+      context: /home/idscps/nicolas/G-FShield-experiment-10d/grasp-fs-rcl-generator/Features
+        Selection/InfoGain/grasp-fs-rcl-ig
+      dockerfile: Dockerfile
+    cpus: 2
+    cpuset: 8-15
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      CAMPAIGN_ARM_ID: distributed-ig-vnd-bitflip
+      CAMPAIGN_DEADLINE_EPOCH_MS: ASSIGNED_PER_RUN
+      CAMPAIGN_ID: gfshield-10d-2026-v1
+      CAMPAIGN_RANDOM_SEED: "42"
+      CAMPAIGN_RELIEFF_SAMPLE_SIZE: "1000"
+      CAMPAIGN_REQUEST_ID: REQUEST_ID_ASSIGNED_BY_ORCHESTRATOR
+      CAMPAIGN_RUN_ID: RUN_ID_ASSIGNED_BY_ORCHESTRATOR
+      CAMPAIGN_START_MONOTONIC_NS: ASSIGNED_PER_RUN
+      JAVA_OPTS: -Xms512m -Xmx3072m -XX:+UseContainerSupport -XX:+UseG1GC
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "1"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "1"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "1"
+    image: gfshield-campaign-rcl-ig:pilot-b38eff3
+    logging:
+      driver: json-file
+      options:
+        max-file: "5"
+        max-size: 20m
+    mem_limit: "4294967296"
+    networks:
+      default: null
+    ports:
+    - mode: ingress
+      host_ip: 127.0.0.1
+      target: 8089
+      published: "18089"
+      protocol: tcp
+    restart: "no"
+    volumes:
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/datasets
+      target: /datasets
+      read_only: true
+      bind:
+        create_host_path: true
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/experiments/10-day-campaign/frozen-metrics-placeholder
+      target: /metrics
+      bind:
+        create_host_path: true
+  grasp-fs-rcl-relieff:
+    build:
+      context: /home/idscps/nicolas/G-FShield-experiment-10d/grasp-fs-rcl-generator/Features
+        Selection/RelieF/grasp-fs-rcl-rf
+      dockerfile: Dockerfile
+    cpus: 2
+    cpuset: 8-15
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      CAMPAIGN_ARM_ID: distributed-ig-vnd-bitflip
+      CAMPAIGN_DEADLINE_EPOCH_MS: ASSIGNED_PER_RUN
+      CAMPAIGN_ID: gfshield-10d-2026-v1
+      CAMPAIGN_RANDOM_SEED: "42"
+      CAMPAIGN_RELIEFF_SAMPLE_SIZE: "1000"
+      CAMPAIGN_REQUEST_ID: REQUEST_ID_ASSIGNED_BY_ORCHESTRATOR
+      CAMPAIGN_RUN_ID: RUN_ID_ASSIGNED_BY_ORCHESTRATOR
+      CAMPAIGN_START_MONOTONIC_NS: ASSIGNED_PER_RUN
+      JAVA_OPTS: -Xms512m -Xmx3072m -XX:+UseContainerSupport -XX:+UseG1GC
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "1"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "1"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "1"
+    image: gfshield-campaign-rcl-relieff:pilot-b38eff3
+    logging:
+      driver: json-file
+      options:
+        max-file: "5"
+        max-size: 20m
+    mem_limit: "4294967296"
+    networks:
+      default: null
+    ports:
+    - mode: ingress
+      host_ip: 127.0.0.1
+      target: 8086
+      published: "18089"
+      protocol: tcp
+    restart: "no"
+    volumes:
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/datasets
+      target: /datasets
+      read_only: true
+      bind:
+        create_host_path: true
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/experiments/10-day-campaign/frozen-metrics-placeholder
+      target: /metrics
+      bind:
+        create_host_path: true
+  grasp-fs-rcl-su:
+    build:
+      context: /home/idscps/nicolas/G-FShield-experiment-10d/grasp-fs-rcl-generator/Features
+        Selection/Symmetrical Uncertainty/grasp-fs-rcl-su
+      dockerfile: Dockerfile
+    cpus: 2
+    cpuset: 8-15
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      CAMPAIGN_ARM_ID: distributed-ig-vnd-bitflip
+      CAMPAIGN_DEADLINE_EPOCH_MS: ASSIGNED_PER_RUN
+      CAMPAIGN_ID: gfshield-10d-2026-v1
+      CAMPAIGN_RANDOM_SEED: "42"
+      CAMPAIGN_RELIEFF_SAMPLE_SIZE: "1000"
+      CAMPAIGN_REQUEST_ID: REQUEST_ID_ASSIGNED_BY_ORCHESTRATOR
+      CAMPAIGN_RUN_ID: RUN_ID_ASSIGNED_BY_ORCHESTRATOR
+      CAMPAIGN_START_MONOTONIC_NS: ASSIGNED_PER_RUN
+      JAVA_OPTS: -Xms512m -Xmx3072m -XX:+UseContainerSupport -XX:+UseG1GC
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "1"
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "1"
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "1"
+    image: gfshield-campaign-rcl-su:pilot-b38eff3
+    logging:
+      driver: json-file
+      options:
+        max-file: "5"
+        max-size: 20m
+    mem_limit: "4294967296"
+    networks:
+      default: null
+    ports:
+    - mode: ingress
+      host_ip: 127.0.0.1
+      target: 8087
+      published: "18089"
+      protocol: tcp
+    restart: "no"
+    volumes:
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/datasets
+      target: /datasets
+      read_only: true
+      bind:
+        create_host_path: true
+    - type: bind
+      source: /home/idscps/nicolas/G-FShield-experiment-10d/experiments/10-day-campaign/frozen-metrics-placeholder
+      target: /metrics
+      bind:
+        create_host_path: true
+  kafka:
+    cpus: 1
+    cpuset: 8-15
+    depends_on:
+      zookeeper:
+        condition: service_started
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_BROKER_ID: "1"
+      KAFKA_HEAP_OPTS: -Xms512m -Xmx1024m
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_NUM_PARTITIONS: "1"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1
+      timeout: 10s
+      interval: 10s
+      retries: 30
+      start_period: 40s
+    image: confluentinc/cp-kafka:7.4.0@sha256:187dac6627e7906c350f5f8c982f80ce735ff1a0e571a20de6000a309a12ce63
+    mem_limit: "2147483648"
+    networks:
+      default: null
+    restart: "no"
+    volumes:
+    - type: volume
+      source: kafka_data
+      target: /var/lib/kafka/data
+      volume: {}
+  zookeeper:
+    cpus: 0.5
+    cpuset: 8-15
+    environment:
+      ZOOKEEPER_CLIENT_PORT: "2181"
+      ZOOKEEPER_TICK_TIME: "2000"
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - nc -z -w 2 localhost 2181
+      timeout: 3s
+      interval: 5s
+      retries: 30
+      start_period: 10s
+    image: confluentinc/cp-zookeeper:7.4.0@sha256:90631f224b4397ecfb4e824e43d93e0e42656841c6d55ef635c49df3975260ae
+    mem_limit: "1073741824"
+    networks:
+      default: null
+    restart: "no"
+    volumes:
+    - type: volume
+      source: zookeeper_data
+      target: /var/lib/zookeeper/data
+      volume: {}
+    - type: volume
+      source: zookeeper_log
+      target: /var/lib/zookeeper/log
+      volume: {}
+networks:
+  default:
+    name: 10-day-campaign_default
+volumes:
+  kafka_data:
+    name: 10-day-campaign_kafka_data
+  zookeeper_data:
+    name: 10-day-campaign_zookeeper_data
+  zookeeper_log:
+    name: 10-day-campaign_zookeeper_log
+x-controller:
+  cpus: 1
+  cpuset: 8-15
+  depends_on:
+    kafka:
+      condition: service_healthy
+  environment:
+    CAMPAIGN_DEADLINE_EPOCH_MS: ASSIGNED_PER_RUN
+    CAMPAIGN_RANDOM_SEED: "42"
+    CAMPAIGN_START_MONOTONIC_NS: ASSIGNED_PER_RUN
+    JAVA_OPTS: -Xms256m -Xmx1536m -XX:+UseContainerSupport -XX:+UseG1GC
+    KAFKA_LISTENER_CONCURRENCY: "1"
+  logging:
+    driver: json-file
+    options:
+      max-file: "5"
+      max-size: 20m
+  mem_limit: 2g
+  restart: "no"
+  volumes:
+  - /home/idscps/nicolas/G-FShield-experiment-10d/datasets:/datasets:ro
+  - /home/idscps/nicolas/G-FShield-experiment-10d/experiments/10-day-campaign/frozen-metrics-placeholder:/metrics
+x-local-search:
+  cpus: 1
+  cpuset: 8-15
+  depends_on:
+    kafka:
+      condition: service_healthy
+  environment:
+    CAMPAIGN_DEADLINE_EPOCH_MS: ASSIGNED_PER_RUN
+    CAMPAIGN_RANDOM_SEED: "42"
+    CAMPAIGN_START_MONOTONIC_NS: ASSIGNED_PER_RUN
+    JAVA_OPTS: -Xms256m -Xmx1400m -XX:+UseContainerSupport -XX:+UseG1GC
+    KAFKA_LISTENER_CONCURRENCY: "1"
+    KAFKA_MAX_POLL_INTERVAL_MS: "14400000"
+  logging:
+    driver: json-file
+    options:
+      max-file: "5"
+      max-size: 20m
+  mem_limit: 2g
+  restart: "no"
+  volumes:
+  - /home/idscps/nicolas/G-FShield-experiment-10d/datasets:/datasets:ro
+  - /home/idscps/nicolas/G-FShield-experiment-10d/experiments/10-day-campaign/frozen-metrics-placeholder:/metrics
+x-rcl:
+  cpus: 2
+  cpuset: 8-15
+  depends_on:
+    kafka:
+      condition: service_healthy
+  environment:
+    CAMPAIGN_ARM_ID: distributed-ig-vnd-bitflip
+    CAMPAIGN_DEADLINE_EPOCH_MS: ASSIGNED_PER_RUN
+    CAMPAIGN_ID: gfshield-10d-2026-v1
+    CAMPAIGN_RANDOM_SEED: "42"
+    CAMPAIGN_RELIEFF_SAMPLE_SIZE: "1000"
+    CAMPAIGN_REQUEST_ID: REQUEST_ID_ASSIGNED_BY_ORCHESTRATOR
+    CAMPAIGN_RUN_ID: RUN_ID_ASSIGNED_BY_ORCHESTRATOR
+    CAMPAIGN_START_MONOTONIC_NS: ASSIGNED_PER_RUN
+    JAVA_OPTS: -Xms512m -Xmx3072m -XX:+UseContainerSupport -XX:+UseG1GC
+    SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "1"
+    SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "1"
+    SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "1"
+  logging:
+    driver: json-file
+    options:
+      max-file: "5"
+      max-size: 20m
+  mem_limit: 4g
+  restart: "no"
+  volumes:
+  - /home/idscps/nicolas/G-FShield-experiment-10d/datasets:/datasets:ro
+  - /home/idscps/nicolas/G-FShield-experiment-10d/experiments/10-day-campaign/frozen-metrics-placeholder:/metrics
+x-service-common:
+  cpuset: 8-15
+  logging:
+    driver: json-file
+    options:
+      max-file: "5"
+      max-size: 20m
+  restart: "no"
+  volumes:
+  - /home/idscps/nicolas/G-FShield-experiment-10d/datasets:/datasets:ro
+  - /home/idscps/nicolas/G-FShield-experiment-10d/experiments/10-day-campaign/frozen-metrics-placeholder:/metrics

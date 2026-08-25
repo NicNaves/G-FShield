@@ -1,0 +1,143 @@
+{
+  "captured_utc": "2026-08-25T08:30:11.493865+00:00",
+  "containers_present_at_freeze": [
+    "app-frontend|halow-platform-frontend|Up 22 hours",
+    "app-backend|halow-platform-backend|Up 22 hours",
+    "app-db|postgres:16-alpine|Up 22 hours (healthy)",
+    "g-fshield-redis|redis:7-alpine|Up 22 hours",
+    "g-fshield-grasp-fs-dls-vnd-1|g-fshield-grasp-fs-dls-vnd|Up 22 hours",
+    "g-fshield-grasp-fs-dls-iwr-1|g-fshield-grasp-fs-dls-iwr|Up 22 hours",
+    "g-fshield-grasp-fs-rcl-su-1|g-fshield-grasp-fs-rcl-su|Up 22 hours",
+    "g-fshield-grasp-fs-rcl-rf-1|g-fshield-grasp-fs-rcl-rf|Up 22 hours",
+    "g-fshield-grasp-fs-rcl-gr-1|g-fshield-grasp-fs-rcl-gr|Up 22 hours",
+    "g-fshield-grasp-fs.dls.verify-1|g-fshield-grasp-fs.dls.verify|Up 22 hours",
+    "g-fshield-grasp-fs-rcl-ig-1|g-fshield-grasp-fs-rcl-ig|Up 22 hours",
+    "g-fshield-grasp-fs-dls-bf-1|g-fshield-grasp-fs-dls-bf|Up 22 hours",
+    "g-fshield-kafbat-ui-1|ghcr.io/kafbat/kafka-ui:v1.4.2|Up 22 hours",
+    "g-fshield-grasp-fs-dls-iw-1|g-fshield-grasp-fs-dls-iw|Up 22 hours",
+    "g-fshield-grasp-fs-dls-rvnd-1|g-fshield-grasp-fs-dls-rvnd|Up 22 hours",
+    "g-fshield-kafka-1|confluentinc/cp-kafka:7.4.0|Up 22 hours",
+    "g-fshield-zookeeper-1|confluentinc/cp-zookeeper:7.4.0|Up 22 hours",
+    "g-fshield-postgres|postgres:14|Up 22 hours (healthy)",
+    "grafana|grafana/grafana|Up 22 hours"
+  ],
+  "docker_cgroup_driver": "cgroupfs",
+  "docker_cgroup_version": "1",
+  "docker_compose_version": "2.18.1",
+  "docker_root_dir": "/var/lib/docker",
+  "docker_runtime_cpus": 32,
+  "docker_runtime_memory_bytes": 67447271424,
+  "docker_server_version": "24.0.2",
+  "lscpu": {
+    "lscpu": [
+      {
+        "data": "x86_64",
+        "field": "Architecture:"
+      },
+      {
+        "data": "32-bit, 64-bit",
+        "field": "CPU op-mode(s):"
+      },
+      {
+        "data": "Little Endian",
+        "field": "Byte Order:"
+      },
+      {
+        "data": "32",
+        "field": "CPU(s):"
+      },
+      {
+        "data": "0-31",
+        "field": "On-line CPU(s) list:"
+      },
+      {
+        "data": "2",
+        "field": "Thread(s) per core:"
+      },
+      {
+        "data": "8",
+        "field": "Core(s) per socket:"
+      },
+      {
+        "data": "2",
+        "field": "Socket(s):"
+      },
+      {
+        "data": "2",
+        "field": "NUMA node(s):"
+      },
+      {
+        "data": "GenuineIntel",
+        "field": "Vendor ID:"
+      },
+      {
+        "data": "6",
+        "field": "CPU family:"
+      },
+      {
+        "data": "79",
+        "field": "Model:"
+      },
+      {
+        "data": "Intel(R) Xeon(R) CPU E5-2620 v4 @ 2.10GHz",
+        "field": "Model name:"
+      },
+      {
+        "data": "1",
+        "field": "Stepping:"
+      },
+      {
+        "data": "1198.262",
+        "field": "CPU MHz:"
+      },
+      {
+        "data": "3000.0000",
+        "field": "CPU max MHz:"
+      },
+      {
+        "data": "1200.0000",
+        "field": "CPU min MHz:"
+      },
+      {
+        "data": "4190.73",
+        "field": "BogoMIPS:"
+      },
+      {
+        "data": "VT-x",
+        "field": "Virtualization:"
+      },
+      {
+        "data": "32K",
+        "field": "L1d cache:"
+      },
+      {
+        "data": "32K",
+        "field": "L1i cache:"
+      },
+      {
+        "data": "256K",
+        "field": "L2 cache:"
+      },
+      {
+        "data": "20480K",
+        "field": "L3 cache:"
+      },
+      {
+        "data": "0-7,16-23",
+        "field": "NUMA node0 CPU(s):"
+      },
+      {
+        "data": "8-15,24-31",
+        "field": "NUMA node1 CPU(s):"
+      },
+      {
+        "data": "fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 invpcid_single pti intel_ppin ssbd ibrs ibpb stibp tpr_shadow vnmi flexpriority ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm cqm rdt_a rdseed adx smap intel_pt xsaveopt cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts md_clear flush_l1d",
+        "field": "Flags:"
+      }
+    ]
+  },
+  "meminfo": "MemTotal:       65866476 kB\nMemFree:        36107396 kB\nMemAvailable:   58622392 kB\nBuffers:         2140108 kB\nCached:         19514344 kB\nSwapCached:            0 kB\nActive:         16278636 kB\nInactive:       11191040 kB\nActive(anon):    5828256 kB\nInactive(anon):    16980 kB\nActive(file):   10450380 kB\nInactive(file): 11174060 kB\nUnevictable:           0 kB\nMlocked:               0 kB\nSwapTotal:       8388604 kB\nSwapFree:        8388604 kB\nDirty:              1216 kB\nWriteback:             0 kB\nAnonPages:       5814872 kB\nMapped:           404616 kB\nShmem:             29996 kB\nSlab:            2001932 kB\nSReclaimable:    1549712 kB\nSUnreclaim:       452220 kB\nKernelStack:       28032 kB\nPageTables:        34660 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    41321840 kB\nCommitted_AS:   16533412 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:           0 kB\nVmallocChunk:          0 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nCmaTotal:              0 kB\nCmaFree:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nDirectMap4k:      935696 kB\nDirectMap2M:    32520192 kB\nDirectMap1G:    35651584 kB\n",
+  "os_release": "NAME=\"Ubuntu\"\nVERSION=\"18.04.6 LTS (Bionic Beaver)\"\nID=ubuntu\nID_LIKE=debian\nPRETTY_NAME=\"Ubuntu 18.04.6 LTS\"\nVERSION_ID=\"18.04\"\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nVERSION_CODENAME=bionic\nUBUNTU_CODENAME=bionic\n",
+  "swap_accounting_limitation": "The host kernel does not expose Docker swap accounting; memory limits are enforced, but a separately verified swap limit is unavailable.",
+  "uname": "Linux mc2-server-01 4.15.0-213-generic #224-Ubuntu SMP Mon Jun 19 13:30:12 UTC 2023 x86_64 x86_64 x86_64 GNU/Linux"
+}
