@@ -37,7 +37,11 @@ CONTROLLER_SERVICES = {
     "vnd": "grasp-fs-dls-vnd",
     "rvnd": "grasp-fs-dls-rvnd",
 }
-LOCAL_SEARCH_API_NAMES = {"bitflip": "BIT_FLIP", "iwss": "IWSS", "iwssr": "IWSSR"}
+LOCAL_SEARCH_ORDERS = {
+    "bitflip": ("BIT_FLIP", "IWSS", "IWSSR"),
+    "iwss": ("IWSS", "IWSSR", "BIT_FLIP"),
+    "iwssr": ("IWSSR", "BIT_FLIP", "IWSS"),
+}
 
 
 def utc_now() -> str:
@@ -77,6 +81,53 @@ def free_loopback_port() -> int:
         return int(listener.getsockname()[1])
 
 
+def read_host_file(path: str) -> str | None:
+    try:
+        return Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+
+def host_snapshot() -> dict[str, Any]:
+    """Capture raw host counters so percentages can be derived consistently."""
+    thermal: dict[str, str] = {}
+    thermal_root = Path("/sys/class/thermal")
+    if thermal_root.exists():
+        for temperature in thermal_root.glob("thermal_zone*/temp"):
+            try:
+                thermal[str(temperature)] = temperature.read_text(encoding="ascii").strip()
+            except OSError:
+                continue
+    return {
+        "proc_stat": read_host_file("/proc/stat"),
+        "proc_meminfo": read_host_file("/proc/meminfo"),
+        "proc_loadavg": read_host_file("/proc/loadavg"),
+        "proc_diskstats": read_host_file("/proc/diskstats"),
+        "proc_net_dev": read_host_file("/proc/net/dev"),
+        "thermal_millidegrees_celsius": thermal,
+    }
+
+
+def cgroup_snapshot(container_ids: list[str]) -> dict[str, dict[str, str]]:
+    result: dict[str, dict[str, str]] = {}
+    for container_id in container_ids:
+        values: dict[str, str] = {}
+        candidates = {
+            "cpu_v1": Path("/sys/fs/cgroup/cpu/docker") / container_id / "cpu.stat",
+            "memory_v1": Path("/sys/fs/cgroup/memory/docker") / container_id / "memory.stat",
+            "oom_v1": Path("/sys/fs/cgroup/memory/docker") / container_id / "memory.oom_control",
+            "cpu_v2": Path("/sys/fs/cgroup/system.slice") / f"docker-{container_id}.scope" / "cpu.stat",
+            "memory_v2": Path("/sys/fs/cgroup/system.slice") / f"docker-{container_id}.scope" / "memory.events",
+        }
+        for name, path in candidates.items():
+            try:
+                values[name] = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+        result[container_id] = values
+    return result
+
+
 class ResourceSampler:
     def __init__(self, project: str, compose: Path, environment: dict[str, str], output: Path):
         self.project = project
@@ -99,8 +150,13 @@ class ResourceSampler:
 
     def _sample(self) -> None:
         self.output.parent.mkdir(parents=True, exist_ok=True)
+        sample_number = 0
         while not self.stop_event.is_set():
-            record: dict[str, Any] = {"timestamp_utc": utc_now(), "monotonic_ns": time.monotonic_ns()}
+            record: dict[str, Any] = {
+                "timestamp_utc": utc_now(),
+                "monotonic_ns": time.monotonic_ns(),
+                "host": host_snapshot(),
+            }
             try:
                 ids = subprocess.run(
                     self._compose_command("ps", "-q"),
@@ -127,14 +183,54 @@ class ResourceSampler:
                     )
                     record["stats"] = [json.loads(line) for line in stats.stdout.splitlines() if line]
                     record["inspect"] = json.loads(inspect.stdout) if inspect.returncode == 0 else []
+                    record["cgroups"] = cgroup_snapshot(ids)
                     record["stats_error"] = stats.stderr.strip() or None
                     record["inspect_error"] = inspect.stderr.strip() or None
+                all_stats = subprocess.run(
+                    ["docker", "stats", "--no-stream", "--format", "{{json .}}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                    check=False,
+                )
+                record["all_container_stats"] = [
+                    json.loads(line) for line in all_stats.stdout.splitlines() if line
+                ]
+                record["all_container_stats_error"] = all_stats.stderr.strip() or None
+                if sample_number % 10 == 0:
+                    lag = subprocess.run(
+                        self._compose_command(
+                            "exec", "-T", "kafka", "kafka-consumer-groups",
+                            "--bootstrap-server", "kafka:9092", "--all-groups", "--describe",
+                        ),
+                        env=self.environment,
+                        capture_output=True,
+                        text=True,
+                        timeout=20,
+                        check=False,
+                    )
+                    offsets = subprocess.run(
+                        self._compose_command(
+                            "exec", "-T", "kafka", "kafka-run-class", "kafka.tools.GetOffsetShell",
+                            "--broker-list", "kafka:9092", "--time", "-1",
+                        ),
+                        env=self.environment,
+                        capture_output=True,
+                        text=True,
+                        timeout=20,
+                        check=False,
+                    )
+                    record["kafka_consumer_lag"] = lag.stdout
+                    record["kafka_consumer_lag_error"] = lag.stderr.strip() or None
+                    record["kafka_topic_end_offsets"] = offsets.stdout
+                    record["kafka_topic_end_offsets_error"] = offsets.stderr.strip() or None
             except Exception as error:  # telemetry failure must not kill the algorithm
                 record["sampler_error"] = repr(error)
             with self.output.open("a", encoding="utf-8", newline="\n") as handle:
                 handle.write(json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n")
                 handle.flush()
                 os.fsync(handle.fileno())
+            sample_number += 1
             self.stop_event.wait(30)
 
     def _compose_command(self, *parts: str) -> list[str]:
@@ -398,9 +494,10 @@ def run_distributed(args: argparse.Namespace) -> int:
         }
     )
     rcl_service, _container_port, route = RCL_SERVICES[args.construction]
-    local_service = LOCAL_SEARCH_SERVICES[args.local_search]
+    local_services = list(LOCAL_SEARCH_SERVICES.values())
     controller_service = CONTROLLER_SERVICES[args.controller]
-    services = ["zookeeper", "kafka", rcl_service, local_service, controller_service, "grasp-fs-dls-verify"]
+    algorithm_services = [rcl_service, *local_services, controller_service, "grasp-fs-dls-verify"]
+    services = ["zookeeper", "kafka", *algorithm_services]
     stack = Stack(project, compose, environment)
     consumer: subprocess.Popen[str] | None = None
     stdout_handle = None
@@ -443,7 +540,10 @@ def run_distributed(args: argparse.Namespace) -> int:
                 "classifier": "J48",
                 "useTrainingCache": "false",
                 "neighborhoodStrategy": args.controller.upper(),
-                "localSearches": LOCAL_SEARCH_API_NAMES[args.local_search],
+                # All three services form the VND/RVND neighborhood portfolio.
+                # The arm's local-search factor defines the reproducible order
+                # (and therefore the initial VND neighborhood), not a singleton.
+                "localSearches": ",".join(LOCAL_SEARCH_ORDERS[args.local_search]),
                 "neighborhoodMaxIterations": args.neighborhood_iterations,
                 "bitFlipMaxIterations": args.local_search_iterations,
                 "iwssMaxIterations": args.local_search_iterations,
@@ -469,7 +569,7 @@ def run_distributed(args: argparse.Namespace) -> int:
         stop_reason = "runner_error"
     finally:
         sampler.stop()
-        stack.call("stop", "--timeout", "30", rcl_service, local_service, controller_service, "grasp-fs-dls-verify", check=False)
+        stack.call("stop", "--timeout", "30", *algorithm_services, check=False)
         time.sleep(3)
         if consumer is not None and consumer.poll() is None:
             consumer.terminate()

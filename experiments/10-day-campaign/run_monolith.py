@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from run_arm import cgroup_snapshot, host_snapshot
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -63,7 +65,11 @@ class ContainerSampler:
 
     def _sample(self) -> None:
         while not self.stop_event.is_set():
-            record: dict[str, Any] = {"timestamp_utc": utc_now(), "monotonic_ns": time.monotonic_ns()}
+            record: dict[str, Any] = {
+                "timestamp_utc": utc_now(),
+                "monotonic_ns": time.monotonic_ns(),
+                "host": host_snapshot(),
+            }
             stats = subprocess.run(
                 ["docker", "stats", "--no-stream", "--format", "{{json .}}", self.container],
                 capture_output=True, text=True, timeout=20, check=False,
@@ -80,8 +86,21 @@ class ContainerSampler:
                 record["inspect"] = json.loads(inspect.stdout) if inspect.returncode == 0 else []
             except json.JSONDecodeError:
                 record["inspect"] = []
+            container_ids = [item.get("Id") for item in record["inspect"] if item.get("Id")]
+            record["cgroups"] = cgroup_snapshot(container_ids)
+            all_stats = subprocess.run(
+                ["docker", "stats", "--no-stream", "--format", "{{json .}}"],
+                capture_output=True, text=True, timeout=20, check=False,
+            )
+            try:
+                record["all_container_stats"] = [
+                    json.loads(line) for line in all_stats.stdout.splitlines() if line
+                ]
+            except json.JSONDecodeError:
+                record["all_container_stats"] = []
             record["stats_error"] = stats.stderr.strip() or None
             record["inspect_error"] = inspect.stderr.strip() or None
+            record["all_container_stats_error"] = all_stats.stderr.strip() or None
             with self.output.open("a", encoding="utf-8", newline="\n") as handle:
                 handle.write(json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n")
                 handle.flush()
