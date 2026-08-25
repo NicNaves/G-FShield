@@ -18,6 +18,7 @@ import json
 import math
 import os
 import random
+import select
 import subprocess
 import threading
 import time
@@ -52,7 +53,8 @@ WEKA_SPLIT_BY_OBJECT_ID = {}
 
 
 class WekaEvaluatorClient:
-    def __init__(self, jar, training, validation, testing):
+    def __init__(self, jar, training, validation, testing, deadline):
+        self.deadline = deadline
         self.process = subprocess.Popen(
             ["java", "-jar", jar, "--train", training,
              "--validation", validation, "--test", testing],
@@ -61,7 +63,7 @@ class WekaEvaluatorClient:
             text=True,
             bufsize=1,
         )
-        ready = self.process.stdout.readline().strip()
+        ready = self._readline().strip()
         if ready != "READY\tweka-stable-3.8.6\tJ48-default":
             raise RuntimeError(f"Weka evaluator did not become ready: {ready}")
         atexit.register(self.close)
@@ -71,7 +73,7 @@ class WekaEvaluatorClient:
             f"{split}\t{','.join(str(feature) for feature in features)}\n"
         )
         self.process.stdin.flush()
-        response = self.process.stdout.readline().strip().split("\t")
+        response = self._readline().strip().split("\t")
         if not response or response[0] != "OK":
             raise RuntimeError("Weka evaluation failed: " + "\t".join(response))
         values = [float(value) for value in response[1:8]]
@@ -104,6 +106,15 @@ class WekaEvaluatorClient:
             "per_class_metrics": per_class,
             "confusion_matrix": confusion_matrix,
         }
+
+    def _readline(self):
+        remaining = self.deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("Weka evaluator exceeded the absolute run deadline")
+        readable, _, _ = select.select([self.process.stdout], [], [], remaining)
+        if not readable:
+            raise TimeoutError("Weka evaluator exceeded the absolute run deadline")
+        return self.process.stdout.readline()
 
     def close(self):
         if self.process.poll() is None:
@@ -434,11 +445,10 @@ def main():
     # The per-run budget covers the complete application lifecycle, including
     # dataset loading, feature ranking, and evaluator startup.
     started_monotonic = time.monotonic()
-    selection_seconds = max(
-        1,
-        a.run_timeout_seconds - a.final_evaluation_reserve_seconds,
-    )
-    deadline = started_monotonic + selection_seconds
+    if a.final_evaluation_reserve_seconds >= a.run_timeout_seconds:
+        raise ValueError("final evaluation reserve must be shorter than the absolute run timeout")
+    absolute_deadline = started_monotonic + a.run_timeout_seconds
+    deadline = absolute_deadline - a.final_evaluation_reserve_seconds
 
     random.seed(a.seed); np.random.seed(a.seed)
     out_dir = os.path.dirname(a.metrics_file)
@@ -451,7 +461,7 @@ def main():
     WEKA_SPLIT_BY_OBJECT_ID = {id(validation): "validation", id(test): "test"}
     if a.classifier == "j48":
         WEKA_EVALUATOR = WekaEvaluatorClient(
-            a.weka_evaluator_jar, a.training, a.validation, a.testing
+            a.weka_evaluator_jar, a.training, a.validation, a.testing, absolute_deadline
         )
     label = resolve_label_column(train, a.label_col)
 

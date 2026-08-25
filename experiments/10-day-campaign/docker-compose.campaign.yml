@@ -152,7 +152,7 @@ services:
 
   zookeeper:
     restart: "no"
-    image: confluentinc/cp-zookeeper:7.4.0
+    image: confluentinc/cp-zookeeper:7.4.0@sha256:90631f224b4397ecfb4e824e43d93e0e42656841c6d55eff635c49df3975260ae
     cpuset: ${CAMPAIGN_CPUSET:-8-15}
     cpus: 0.5
     mem_limit: 1g
@@ -171,7 +171,7 @@ services:
 
   kafka:
     restart: "no"
-    image: confluentinc/cp-kafka:7.4.0
+    image: confluentinc/cp-kafka:7.4.0@sha256:187dac6627e7906c350f5f8c982f80ce735ff1a0e571a20de60000a309a12ce63
     cpuset: ${CAMPAIGN_CPUSET:-8-15}
     cpus: 1.0
     mem_limit: 2g

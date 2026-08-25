@@ -9,6 +9,7 @@ import json
 import os
 import time
 import random
+import select
 import subprocess
 import uuid
 from datetime import datetime, timezone
@@ -47,7 +48,8 @@ WEKA_SPLIT_BY_OBJECT_ID = {}
 
 
 class WekaEvaluatorClient:
-    def __init__(self, jar, training, validation, testing):
+    def __init__(self, jar, training, validation, testing, deadline):
+        self.deadline = deadline
         self.process = subprocess.Popen(
             ["java", "-jar", jar, "--train", training,
              "--validation", validation, "--test", testing],
@@ -56,7 +58,7 @@ class WekaEvaluatorClient:
             text=True,
             bufsize=1,
         )
-        ready = self.process.stdout.readline().strip()
+        ready = self._readline().strip()
         if ready != "READY\tweka-stable-3.8.6\tJ48-default":
             raise RuntimeError(f"Weka evaluator did not become ready: {ready}")
         atexit.register(self.close)
@@ -66,7 +68,7 @@ class WekaEvaluatorClient:
             f"{split}\t{','.join(str(feature) for feature in features)}\n"
         )
         self.process.stdin.flush()
-        response = self.process.stdout.readline().strip().split("\t")
+        response = self._readline().strip().split("\t")
         if not response or response[0] != "OK":
             raise RuntimeError("Weka evaluation failed: " + "\t".join(response))
         values = [float(value) for value in response[1:8]]
@@ -99,6 +101,15 @@ class WekaEvaluatorClient:
             "per_class_metrics": per_class,
             "confusion_matrix": confusion_matrix,
         }
+
+    def _readline(self):
+        remaining = self.deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("Weka evaluator exceeded the absolute run deadline")
+        readable, _, _ = select.select([self.process.stdout], [], [], remaining)
+        if not readable:
+            raise TimeoutError("Weka evaluator exceeded the absolute run deadline")
+        return self.process.stdout.readline()
 
     def close(self):
         if self.process.poll() is None:
@@ -677,11 +688,10 @@ def main():
     random.seed(args.seed)
     np.random.seed(args.seed)
     run_started = time.monotonic()
-    selection_seconds = max(
-        1,
-        args.run_timeout_seconds - args.final_evaluation_reserve_seconds,
-    )
-    RUN_DEADLINE = run_started + selection_seconds
+    if args.final_evaluation_reserve_seconds >= args.run_timeout_seconds:
+        raise ValueError("final evaluation reserve must be shorter than the absolute run timeout")
+    absolute_deadline = run_started + args.run_timeout_seconds
+    RUN_DEADLINE = absolute_deadline - args.final_evaluation_reserve_seconds
     MAX_ACCEPTED_IMPROVEMENTS = args.max_accepted_improvements
     MINIMUM_IMPROVEMENT = args.minimum_improvement
 
@@ -735,7 +745,7 @@ def main():
     }
     if args.classifier == "J48":
         WEKA_EVALUATOR = WekaEvaluatorClient(
-            args.weka_evaluator_jar, args.train, args.validation, args.test
+            args.weka_evaluator_jar, args.train, args.validation, args.test, absolute_deadline
         )
 
     n_feats = X_train.shape[1]
