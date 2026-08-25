@@ -9,6 +9,7 @@ import br.com.graspfs.rcl.su.util.SystemMetricsUtils.MetricsCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import weka.attributeSelection.SymmetricalUncertAttributeEval;
 import weka.classifiers.AbstractClassifier;
 import weka.core.Instances;
 
@@ -28,9 +29,12 @@ public class SymmetricalUncertaintyService {
      */
     public void rankFeatures(DataSolution rcl, Instances trainingDataset, int rclCutoff) throws Exception {
         try {
+            long rankingStartedAt = System.currentTimeMillis();
             ArrayList<FeatureAvaliada> allFeatures = new ArrayList<>();
+            SymmetricalUncertAttributeEval evaluator = new SymmetricalUncertAttributeEval();
+            evaluator.buildEvaluator(trainingDataset);
             for (int i = 0; i < trainingDataset.numAttributes() - 1 && !deadlineReached(); i++) {
-                double suRatio = SelectionFeaturesUtils.calcularaSU(trainingDataset, i);
+                double suRatio = evaluator.evaluateAttribute(i);
                 allFeatures.add(new FeatureAvaliada(suRatio, i + 1));
             }
 
@@ -43,10 +47,11 @@ public class SymmetricalUncertaintyService {
 
             rcl.setRclfeatures(rclFeatures);
             logger.info(
-                    "rcl ranking ready algorithm=SU cutoff={} selectedFeatures={} datasetAttributes={}",
+                    "rcl ranking ready algorithm=SU cutoff={} selectedFeatures={} datasetAttributes={} elapsedMs={}",
                     rclCutoff,
                     rclFeatures.size(),
-                    trainingDataset.numAttributes()
+                    trainingDataset.numAttributes(),
+                    System.currentTimeMillis() - rankingStartedAt
             );
 
         } catch (RuntimeException ex) {

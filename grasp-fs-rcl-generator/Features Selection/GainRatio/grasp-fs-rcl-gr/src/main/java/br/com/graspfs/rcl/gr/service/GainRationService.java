@@ -9,6 +9,7 @@ import br.com.graspfs.rcl.gr.util.SystemMetricsUtils.MetricsCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import weka.attributeSelection.GainRatioAttributeEval;
 import weka.classifiers.AbstractClassifier;
 import weka.core.Instances;
 
@@ -28,9 +29,12 @@ public class GainRationService {
      */
     public void rankFeatures(DataSolution solution, Instances trainingDataset, int rclCutoff) throws Exception {
         try {
+            long rankingStartedAt = System.currentTimeMillis();
             ArrayList<FeatureAvaliada> allFeatures = new ArrayList<>();
+            GainRatioAttributeEval evaluator = new GainRatioAttributeEval();
+            evaluator.buildEvaluator(trainingDataset);
             for (int i = 0; i < trainingDataset.numAttributes() - 1 && !deadlineReached(); i++) {
-                double grRatio = SelectionFeaturesUtils.calcularaGainRatio(trainingDataset, i);
+                double grRatio = evaluator.evaluateAttribute(i);
                 allFeatures.add(new FeatureAvaliada(grRatio, i + 1));
             }
 
@@ -43,10 +47,11 @@ public class GainRationService {
 
             solution.setRclfeatures(rclFeatures);
             logger.info(
-                    "rcl ranking ready algorithm=GR cutoff={} selectedFeatures={} datasetAttributes={}",
+                    "rcl ranking ready algorithm=GR cutoff={} selectedFeatures={} datasetAttributes={} elapsedMs={}",
                     rclCutoff,
                     rclFeatures.size(),
-                    trainingDataset.numAttributes()
+                    trainingDataset.numAttributes(),
+                    System.currentTimeMillis() - rankingStartedAt
             );
 
         } catch (RuntimeException ex) {
