@@ -10,9 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
-import gzip
 import hashlib
-import io
 import json
 import os
 import random
@@ -136,31 +134,15 @@ def main() -> int:
             "classes": dict(sorted(Counter(row[2] for row in split_rows).items())),
         }
 
-    index_path = output / "split-indices.csv.gz"
+    index_path = output / "split-indices.csv"
     fd, temporary_name = tempfile.mkstemp(prefix=".split-indices.", dir=output)
-    os.close(fd)
     try:
-        with open(temporary_name, "wb") as binary_handle:
-            with gzip.GzipFile(
-                filename="",
-                fileobj=binary_handle,
-                mode="wb",
-                compresslevel=0,
-                mtime=0,
-            ) as compressed:
-                with io.TextIOWrapper(compressed, encoding="utf-8", newline="") as handle:
-                    # Canonical LF makes the compressed index byte-identical
-                    # on Windows and Linux.
-                    writer = csv.writer(handle, lineterminator="\n")
-                    writer.writerow(["original_data_index", "split", "class"])
-                    for split_name in ("train", "validation", "test"):
-                        for original_index, _, label in sorted(splits[split_name]):
-                            writer.writerow([original_index, split_name, label])
-        # Python/zlib writes a platform-specific gzip OS byte (offset 9).
-        # RFC 1952 reserves 255 for "unknown", giving a canonical stream.
-        with open(temporary_name, "r+b") as binary_handle:
-            binary_handle.seek(9)
-            binary_handle.write(b"\xff")
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+            writer = csv.writer(handle, lineterminator="\n")
+            writer.writerow(["original_data_index", "split", "class"])
+            for split_name in ("train", "validation", "test"):
+                for original_index, _, label in sorted(splits[split_name]):
+                    writer.writerow([original_index, split_name, label])
         os.replace(temporary_name, index_path)
     except BaseException:
         try:

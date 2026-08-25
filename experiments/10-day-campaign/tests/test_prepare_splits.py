@@ -67,8 +67,8 @@ class PrepareSplitsTest(unittest.TestCase):
                 (second / "erenoall-train.arff").read_bytes(),
             )
             self.assertEqual(
-                (first / "split-indices.csv.gz").read_bytes(),
-                (second / "split-indices.csv.gz").read_bytes(),
+                (first / "split-indices.csv").read_bytes(),
+                (second / "split-indices.csv").read_bytes(),
             )
 
 
