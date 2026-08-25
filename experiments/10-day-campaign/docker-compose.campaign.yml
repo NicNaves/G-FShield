@@ -61,8 +61,8 @@ services:
     <<: *rcl
     image: gfshield-campaign-rcl-ig:${CAMPAIGN_IMAGE_TAG:-dev}
     build:
-      context: ../..
-      dockerfile: grasp-fs-rcl-generator/Features Selection/InfoGain/grasp-fs-rcl-ig/Dockerfile
+      context: ../../grasp-fs-rcl-generator/Features Selection/InfoGain/grasp-fs-rcl-ig
+      dockerfile: Dockerfile
     ports:
       - 127.0.0.1:${CAMPAIGN_RCL_HOST_PORT:-18089}:8089
 
@@ -70,8 +70,8 @@ services:
     <<: *rcl
     image: gfshield-campaign-rcl-gr:${CAMPAIGN_IMAGE_TAG:-dev}
     build:
-      context: ../..
-      dockerfile: grasp-fs-rcl-generator/Features Selection/GainRatio/grasp-fs-rcl-gr/Dockerfile
+      context: ../../grasp-fs-rcl-generator/Features Selection/GainRatio/grasp-fs-rcl-gr
+      dockerfile: Dockerfile
     ports:
       - 127.0.0.1:${CAMPAIGN_RCL_HOST_PORT:-18088}:8088
 
@@ -79,8 +79,8 @@ services:
     <<: *rcl
     image: gfshield-campaign-rcl-su:${CAMPAIGN_IMAGE_TAG:-dev}
     build:
-      context: ../..
-      dockerfile: grasp-fs-rcl-generator/Features Selection/Symmetrical Uncertainty/grasp-fs-rcl-su/Dockerfile
+      context: ../../grasp-fs-rcl-generator/Features Selection/Symmetrical Uncertainty/grasp-fs-rcl-su
+      dockerfile: Dockerfile
     ports:
       - 127.0.0.1:${CAMPAIGN_RCL_HOST_PORT:-18087}:8087
 
@@ -88,8 +88,8 @@ services:
     <<: *rcl
     image: gfshield-campaign-rcl-relieff:${CAMPAIGN_IMAGE_TAG:-dev}
     build:
-      context: ../..
-      dockerfile: grasp-fs-rcl-generator/Features Selection/RelieF/grasp-fs-rcl-rf/Dockerfile
+      context: ../../grasp-fs-rcl-generator/Features Selection/RelieF/grasp-fs-rcl-rf
+      dockerfile: Dockerfile
     ports:
       - 127.0.0.1:${CAMPAIGN_RCL_HOST_PORT:-18086}:8086
 
@@ -97,43 +97,43 @@ services:
     <<: *local-search
     image: gfshield-campaign-dls-bitflip:${CAMPAIGN_IMAGE_TAG:-dev}
     build:
-      context: ../..
-      dockerfile: grasp-fs-distributed-ls/Local Search/BitFlip/grasp-fs-dls-bf/Dockerfile
+      context: ../../grasp-fs-distributed-ls/Local Search/BitFlip/grasp-fs-dls-bf
+      dockerfile: Dockerfile
 
   grasp-fs-dls-iwss:
     <<: *local-search
     image: gfshield-campaign-dls-iwss:${CAMPAIGN_IMAGE_TAG:-dev}
     build:
-      context: ../..
-      dockerfile: grasp-fs-distributed-ls/Local Search/IWSS/grasp-fs-dls-iw/Dockerfile
+      context: ../../grasp-fs-distributed-ls/Local Search/IWSS/grasp-fs-dls-iw
+      dockerfile: Dockerfile
 
   grasp-fs-dls-iwssr:
     <<: *local-search
     image: gfshield-campaign-dls-iwssr:${CAMPAIGN_IMAGE_TAG:-dev}
     build:
-      context: ../..
-      dockerfile: grasp-fs-distributed-ls/Local Search/IWSSR/grasp-fs-dls-iwr/Dockerfile
+      context: ../../grasp-fs-distributed-ls/Local Search/IWSSR/grasp-fs-dls-iwr
+      dockerfile: Dockerfile
 
   grasp-fs-dls-vnd:
     <<: *controller
     image: gfshield-campaign-dls-vnd:${CAMPAIGN_IMAGE_TAG:-dev}
     build:
-      context: ../..
-      dockerfile: grasp-fs-distributed-ls/Neighborhood/VND/grasp-fs-dls-vnd/Dockerfile
+      context: ../../grasp-fs-distributed-ls/Neighborhood/VND/grasp-fs-dls-vnd
+      dockerfile: Dockerfile
 
   grasp-fs-dls-rvnd:
     <<: *controller
     image: gfshield-campaign-dls-rvnd:${CAMPAIGN_IMAGE_TAG:-dev}
     build:
-      context: ../..
-      dockerfile: grasp-fs-distributed-ls/Neighborhood/RVND/grasp-fs-dls-rvnd/Dockerfile
+      context: ../../grasp-fs-distributed-ls/Neighborhood/RVND/grasp-fs-dls-rvnd
+      dockerfile: Dockerfile
 
   grasp-fs-dls-verify:
     <<: *service-common
     image: gfshield-campaign-dls-verify:${CAMPAIGN_IMAGE_TAG:-dev}
     build:
-      context: ../..
-      dockerfile: grasp-fs-distributed-ls/Verify/grasp-fs.dls.verify/Dockerfile
+      context: ../../grasp-fs-distributed-ls/Verify/grasp-fs.dls.verify
+      dockerfile: Dockerfile
     cpus: 1.0
     mem_limit: 2g
     environment:
