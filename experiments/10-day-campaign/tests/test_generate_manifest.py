@@ -39,7 +39,7 @@ class GenerateManifestTest(unittest.TestCase):
                 check=True,
             )
             manifest = json.loads(output.read_text(encoding="utf-8"))
-            self.assertEqual(26, len(manifest["arms"]))
+            self.assertEqual(10, len(manifest["arms"]))
             self.assertEqual(
                 208 * 60 * 60,
                 sum(arm["window_seconds"] for arm in manifest["arms"]),
@@ -47,6 +47,13 @@ class GenerateManifestTest(unittest.TestCase):
             self.assertEqual(240 * 60 * 60, manifest["campaign"]["maximum_seconds"])
             self.assertFalse(manifest["ready"])
             self.assertTrue(all(not arm["ready"] for arm in manifest["arms"]))
+            distributed = [
+                arm for arm in manifest["arms"] if arm["architecture"] == "distributed"
+            ]
+            self.assertEqual(8, len(distributed))
+            self.assertTrue(
+                all(arm["local_searches"] == ["bitflip", "iwss", "iwssr"] for arm in distributed)
+            )
 
 
 if __name__ == "__main__":

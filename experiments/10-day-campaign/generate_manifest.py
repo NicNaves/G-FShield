@@ -46,21 +46,20 @@ def main() -> int:
     arms = []
     for construction in CONSTRUCTIONS:
         for controller in CONTROLLERS:
-            for local_search in LOCAL_SEARCHES:
-                arm_id = f"distributed-{construction}-{controller}-{local_search}"
-                arms.append(
-                    {
-                        "arm_id": arm_id,
-                        "architecture": "distributed",
-                        "construction": construction,
-                        "controller": controller,
-                        "local_search": local_search,
-                        "window_seconds": 8 * 60 * 60,
-                        "run_timeout_seconds": 55 * 60,
-                        "command": None,
-                        "ready": False,
-                    }
-                )
+            arm_id = f"distributed-{construction}-{controller}"
+            arms.append(
+                {
+                    "arm_id": arm_id,
+                    "architecture": "distributed",
+                    "construction": construction,
+                    "controller": controller,
+                    "local_searches": list(LOCAL_SEARCHES),
+                    "window_seconds": 20 * 60 * 60 + 48 * 60,
+                    "run_timeout_seconds": 2 * 60 * 60,
+                    "command": None,
+                    "ready": False,
+                }
+            )
 
     arms.extend(
         [
@@ -70,8 +69,8 @@ def main() -> int:
                 "construction": "gr",
                 "controller": None,
                 "local_search": "bitflip",
-                "window_seconds": 8 * 60 * 60,
-                "run_timeout_seconds": 55 * 60,
+                "window_seconds": 20 * 60 * 60 + 48 * 60,
+                "run_timeout_seconds": 2 * 60 * 60,
                 "command": None,
                 "ready": False,
             },
@@ -81,8 +80,8 @@ def main() -> int:
                 "construction": "gr",
                 "controller": "vnd",
                 "local_search": "iwss",
-                "window_seconds": 8 * 60 * 60,
-                "run_timeout_seconds": 55 * 60,
+                "window_seconds": 20 * 60 * 60 + 48 * 60,
+                "run_timeout_seconds": 2 * 60 * 60,
                 "command": None,
                 "ready": False,
             },

@@ -30,7 +30,7 @@ class OrchestratorPreflightTest(unittest.TestCase):
 
     def test_manifest_is_json_and_valid_yaml_shape(self):
         manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-        self.assertEqual(26, len(manifest["arms"]))
+        self.assertEqual(10, len(manifest["arms"]))
         self.assertEqual(240 * 60 * 60, manifest["campaign"]["maximum_seconds"])
 
 

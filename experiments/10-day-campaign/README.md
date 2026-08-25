@@ -3,11 +3,14 @@
 This directory contains the reproducibility boundary for a maximum 240-hour
 campaign. Preparation and pilot runs happen before the official clock starts.
 
-The complete matrix has 24 distributed configurations and two monolithic
-comparators. Each arm receives eight hours; a run is capped at 55 minutes so
-that at least eight independent seeds fit with transition time. Eight hours are
-reserved for the all-features baseline and 24 hours for transitions and final
-consolidation.
+The audited matrix has eight valid distributed pipelines and two monolithic
+comparators. A distributed arm is one construction method plus VND or RVND,
+with Bit-Flip, IWSS, and IWSSR supplied together as the controller's
+neighborhood list. Splitting these into three separate arms would make VND and
+RVND degenerate to a single identical neighborhood and is therefore invalid.
+Each of the ten arms receives 20.8 hours; a run is capped at two hours. Eight
+hours are reserved for the all-features baseline and 24 hours for transitions
+and final consolidation.
 
 The checked-in `manifest.yaml` is JSON syntax, which is valid YAML 1.2 and can
 be parsed with Python's standard `json` module. `ready: false` is deliberate:

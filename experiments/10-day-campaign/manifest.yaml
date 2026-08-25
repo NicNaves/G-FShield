@@ -2,267 +2,123 @@
   "arms": [
     {
       "architecture": "distributed",
-      "arm_id": "distributed-ig-vnd-bitflip",
+      "arm_id": "distributed-ig-vnd",
       "command": null,
       "construction": "ig",
       "controller": "vnd",
-      "local_search": "bitflip",
+      "local_searches": [
+        "bitflip",
+        "iwss",
+        "iwssr"
+      ],
       "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
+      "run_timeout_seconds": 7200,
+      "window_seconds": 74880
     },
     {
       "architecture": "distributed",
-      "arm_id": "distributed-ig-vnd-iwss",
-      "command": null,
-      "construction": "ig",
-      "controller": "vnd",
-      "local_search": "iwss",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-ig-vnd-iwssr",
-      "command": null,
-      "construction": "ig",
-      "controller": "vnd",
-      "local_search": "iwssr",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-ig-rvnd-bitflip",
+      "arm_id": "distributed-ig-rvnd",
       "command": null,
       "construction": "ig",
       "controller": "rvnd",
-      "local_search": "bitflip",
+      "local_searches": [
+        "bitflip",
+        "iwss",
+        "iwssr"
+      ],
       "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
+      "run_timeout_seconds": 7200,
+      "window_seconds": 74880
     },
     {
       "architecture": "distributed",
-      "arm_id": "distributed-ig-rvnd-iwss",
-      "command": null,
-      "construction": "ig",
-      "controller": "rvnd",
-      "local_search": "iwss",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-ig-rvnd-iwssr",
-      "command": null,
-      "construction": "ig",
-      "controller": "rvnd",
-      "local_search": "iwssr",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-gr-vnd-bitflip",
+      "arm_id": "distributed-gr-vnd",
       "command": null,
       "construction": "gr",
       "controller": "vnd",
-      "local_search": "bitflip",
+      "local_searches": [
+        "bitflip",
+        "iwss",
+        "iwssr"
+      ],
       "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
+      "run_timeout_seconds": 7200,
+      "window_seconds": 74880
     },
     {
       "architecture": "distributed",
-      "arm_id": "distributed-gr-vnd-iwss",
-      "command": null,
-      "construction": "gr",
-      "controller": "vnd",
-      "local_search": "iwss",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-gr-vnd-iwssr",
-      "command": null,
-      "construction": "gr",
-      "controller": "vnd",
-      "local_search": "iwssr",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-gr-rvnd-bitflip",
+      "arm_id": "distributed-gr-rvnd",
       "command": null,
       "construction": "gr",
       "controller": "rvnd",
-      "local_search": "bitflip",
+      "local_searches": [
+        "bitflip",
+        "iwss",
+        "iwssr"
+      ],
       "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
+      "run_timeout_seconds": 7200,
+      "window_seconds": 74880
     },
     {
       "architecture": "distributed",
-      "arm_id": "distributed-gr-rvnd-iwss",
-      "command": null,
-      "construction": "gr",
-      "controller": "rvnd",
-      "local_search": "iwss",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-gr-rvnd-iwssr",
-      "command": null,
-      "construction": "gr",
-      "controller": "rvnd",
-      "local_search": "iwssr",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-su-vnd-bitflip",
+      "arm_id": "distributed-su-vnd",
       "command": null,
       "construction": "su",
       "controller": "vnd",
-      "local_search": "bitflip",
+      "local_searches": [
+        "bitflip",
+        "iwss",
+        "iwssr"
+      ],
       "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
+      "run_timeout_seconds": 7200,
+      "window_seconds": 74880
     },
     {
       "architecture": "distributed",
-      "arm_id": "distributed-su-vnd-iwss",
-      "command": null,
-      "construction": "su",
-      "controller": "vnd",
-      "local_search": "iwss",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-su-vnd-iwssr",
-      "command": null,
-      "construction": "su",
-      "controller": "vnd",
-      "local_search": "iwssr",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-su-rvnd-bitflip",
+      "arm_id": "distributed-su-rvnd",
       "command": null,
       "construction": "su",
       "controller": "rvnd",
-      "local_search": "bitflip",
+      "local_searches": [
+        "bitflip",
+        "iwss",
+        "iwssr"
+      ],
       "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
+      "run_timeout_seconds": 7200,
+      "window_seconds": 74880
     },
     {
       "architecture": "distributed",
-      "arm_id": "distributed-su-rvnd-iwss",
-      "command": null,
-      "construction": "su",
-      "controller": "rvnd",
-      "local_search": "iwss",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-su-rvnd-iwssr",
-      "command": null,
-      "construction": "su",
-      "controller": "rvnd",
-      "local_search": "iwssr",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-relieff-vnd-bitflip",
+      "arm_id": "distributed-relieff-vnd",
       "command": null,
       "construction": "relieff",
       "controller": "vnd",
-      "local_search": "bitflip",
+      "local_searches": [
+        "bitflip",
+        "iwss",
+        "iwssr"
+      ],
       "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
+      "run_timeout_seconds": 7200,
+      "window_seconds": 74880
     },
     {
       "architecture": "distributed",
-      "arm_id": "distributed-relieff-vnd-iwss",
-      "command": null,
-      "construction": "relieff",
-      "controller": "vnd",
-      "local_search": "iwss",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-relieff-vnd-iwssr",
-      "command": null,
-      "construction": "relieff",
-      "controller": "vnd",
-      "local_search": "iwssr",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-relieff-rvnd-bitflip",
+      "arm_id": "distributed-relieff-rvnd",
       "command": null,
       "construction": "relieff",
       "controller": "rvnd",
-      "local_search": "bitflip",
+      "local_searches": [
+        "bitflip",
+        "iwss",
+        "iwssr"
+      ],
       "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-relieff-rvnd-iwss",
-      "command": null,
-      "construction": "relieff",
-      "controller": "rvnd",
-      "local_search": "iwss",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
-    },
-    {
-      "architecture": "distributed",
-      "arm_id": "distributed-relieff-rvnd-iwssr",
-      "command": null,
-      "construction": "relieff",
-      "controller": "rvnd",
-      "local_search": "iwssr",
-      "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
+      "run_timeout_seconds": 7200,
+      "window_seconds": 74880
     },
     {
       "architecture": "monolith1-graspy2",
@@ -272,8 +128,8 @@
       "controller": null,
       "local_search": "bitflip",
       "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
+      "run_timeout_seconds": 7200,
+      "window_seconds": 74880
     },
     {
       "architecture": "monolith2-graspy",
@@ -283,8 +139,8 @@
       "controller": "vnd",
       "local_search": "iwss",
       "ready": false,
-      "run_timeout_seconds": 3300,
-      "window_seconds": 28800
+      "run_timeout_seconds": 7200,
+      "window_seconds": 74880
     }
   ],
   "baseline": {
@@ -317,7 +173,7 @@
     "train_sha256": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
     "validation_sha256": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a"
   },
-  "generated_utc": "2026-08-25T01:44:18.245606+00:00",
+  "generated_utc": "2026-08-25T01:47:40.486391+00:00",
   "git": {
     "commit": "TO_BE_FROZEN_AFTER_PILOT",
     "tag": "experiment-10d-v1"
