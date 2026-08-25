@@ -389,14 +389,14 @@ def bitflip_search(data, train, validation, label, clf, iters, writer,
         new = sol.copy()
         new[outx] = rcl[inx]
 
-        start = time.time()
+        start = time.perf_counter()
         mc = MetricsCollector(); mc.start()
         try:
             m = evaluate_solution(new, train, validation, label, clf)
         finally:
             mc.stop(); mc.join()
         data['candidate_count'] += 1
-        elapsed = int((time.time() - start) * 1000)
+        elapsed = int((time.perf_counter() - start) * 1000)
 
         write_metrics(writer, new, m, elapsed, mc,
                       clf, feature_selector, local_search, "search", generation, it,
