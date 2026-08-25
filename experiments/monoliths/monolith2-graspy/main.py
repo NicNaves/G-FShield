@@ -3,6 +3,7 @@
 
 import argparse
 import atexit
+import base64
 import hashlib
 import json
 import os
@@ -69,11 +70,34 @@ class WekaEvaluatorClient:
         if not response or response[0] != "OK":
             raise RuntimeError("Weka evaluation failed: " + "\t".join(response))
         values = [float(value) for value in response[1:8]]
+        labels = []
+        per_class = {}
+        confusion_matrix = []
+        if len(response) >= 12:
+            labels = [
+                base64.urlsafe_b64decode(value + "=" * (-len(value) % 4)).decode("utf-8")
+                for value in response[9].split(",") if value
+            ]
+            per_class_rows = [
+                [float(value) for value in row.split(",")]
+                for row in response[10].split(";") if row
+            ]
+            confusion_matrix = [
+                [float(value) for value in row.split(",")]
+                for row in response[11].split(";") if row
+            ]
+            per_class = {
+                label: {"f1": row[0], "precision": row[1], "recall": row[2]}
+                for label, row in zip(labels, per_class_rows)
+            }
         return {
             "f1": values[0], "f1_weighted": values[1],
             "prec": values[2], "prec_weighted": values[3],
             "rec": values[4], "rec_weighted": values[5],
             "acc": values[6],
+            "class_labels": labels,
+            "per_class_metrics": per_class,
+            "confusion_matrix": confusion_matrix,
         }
 
     def close(self):
@@ -863,20 +887,23 @@ def main():
     if ACCEPTED_IMPROVEMENTS >= MAX_ACCEPTED_IMPROVEMENTS:
         stop_reason = "accepted_improvement_limit"
     elif time.monotonic() >= RUN_DEADLINE:
-        stop_reason = "time_limit"
+        stop_reason = "run_timeout"
     else:
         stop_reason = "configured_search_exhausted"
 
     process = psutil.Process(os.getpid())
+    candidate_id = hashlib.sha256(
+        f"{args.run_id}:{','.join(map(str, best_solution))}".encode("utf-8")
+    ).hexdigest()
     result = {
         "campaign_id": args.campaign_id,
         "arm_id": args.arm_id,
         "run_id": args.run_id,
         "seed": args.seed,
-        "candidate_id": None,
+        "candidate_id": candidate_id,
         "parent_id": None,
-        "request_id": None,
-        "stage": "final_holdout",
+        "request_id": f"{args.run_id}-monolith",
+        "stage": "end_to_end",
         "algorithm": "GRASP-FS monolith2-graspy",
         "feature_selector": best_configuration["feature_selector"],
         "neighborhood_controller": best_configuration["neighborhood_controller"],
@@ -908,6 +935,11 @@ def main():
         "test_precision_macro": float(holdout_metrics["prec"]),
         "test_recall_macro": float(holdout_metrics["rec"]),
         "accuracy": float(holdout_metrics["acc"]),
+        "class_labels": holdout_metrics.get("class_labels", []),
+        "validation_per_class_metrics": best_validation.get("per_class_metrics", {}),
+        "validation_confusion_matrix": best_validation.get("confusion_matrix", []),
+        "test_per_class_metrics": holdout_metrics.get("per_class_metrics", {}),
+        "test_confusion_matrix": holdout_metrics.get("confusion_matrix", []),
         "candidate_time_ms": None,
         "classifier_time_ms": classifier_time_ms,
         "run_elapsed_ms": elapsed_ms,
@@ -930,7 +962,7 @@ def main():
         "kafka_lag": None,
         "restart_count": None,
         "stop_reason": stop_reason,
-        "status": "completed",
+        "status": "timeout" if stop_reason == "run_timeout" else "completed",
         "error_code": None,
     }
     output_path = os.path.abspath(args.final_metrics_file)

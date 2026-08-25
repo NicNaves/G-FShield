@@ -12,6 +12,7 @@ solutionFeatures;f1Score;accuracy;precision;recall;runningTime(ms);cpuUsage(%);m
 
 import argparse
 import atexit
+import base64
 import hashlib
 import json
 import math
@@ -74,11 +75,34 @@ class WekaEvaluatorClient:
         if not response or response[0] != "OK":
             raise RuntimeError("Weka evaluation failed: " + "\t".join(response))
         values = [float(value) for value in response[1:8]]
+        labels = []
+        per_class = {}
+        confusion_matrix = []
+        if len(response) >= 12:
+            labels = [
+                base64.urlsafe_b64decode(value + "=" * (-len(value) % 4)).decode("utf-8")
+                for value in response[9].split(",") if value
+            ]
+            per_class_rows = [
+                [float(value) for value in row.split(",")]
+                for row in response[10].split(";") if row
+            ]
+            confusion_matrix = [
+                [float(value) for value in row.split(",")]
+                for row in response[11].split(";") if row
+            ]
+            per_class = {
+                label: {"f1": row[0], "precision": row[1], "recall": row[2]}
+                for label, row in zip(labels, per_class_rows)
+            }
         return {
             "f1": values[0], "f1_weighted": values[1],
             "precision": values[2], "precision_weighted": values[3],
             "recall": values[4], "recall_weighted": values[5],
             "accuracy": values[6],
+            "class_labels": labels,
+            "per_class_metrics": per_class,
+            "confusion_matrix": confusion_matrix,
         }
 
     def close(self):
@@ -478,7 +502,7 @@ def main():
         stop_reason = "max_generations"
         for g in range(1, a.max_generations + 1):
             if time.monotonic() >= deadline:
-                stop_reason = "time_limit"
+                stop_reason = "run_timeout"
                 break
             if data['accepted_improvements'] >= data['max_accepted_improvements']:
                 stop_reason = "accepted_improvement_limit"
@@ -507,16 +531,19 @@ def main():
     if data['accepted_improvements'] >= data['max_accepted_improvements']:
         stop_reason = "accepted_improvement_limit"
     elif time.monotonic() >= deadline:
-        stop_reason = "time_limit"
+        stop_reason = "run_timeout"
+    candidate_id = hashlib.sha256(
+        f"{a.run_id}:{','.join(map(str, best))}".encode("utf-8")
+    ).hexdigest()
     result = {
         "campaign_id": a.campaign_id,
         "arm_id": a.arm_id,
         "run_id": a.run_id,
         "seed": a.seed,
-        "candidate_id": None,
+        "candidate_id": candidate_id,
         "parent_id": None,
-        "request_id": None,
-        "stage": "final_holdout",
+        "request_id": f"{a.run_id}-monolith",
+        "stage": "end_to_end",
         "algorithm": "GRASP-FS monolith1-graspy2",
         "feature_selector": a.feature_selector,
         "neighborhood_controller": None,
@@ -548,6 +575,11 @@ def main():
         "test_precision_macro": test_metrics["precision"],
         "test_recall_macro": test_metrics["recall"],
         "accuracy": test_metrics["accuracy"],
+        "class_labels": test_metrics.get("class_labels", []),
+        "validation_per_class_metrics": bm.get("per_class_metrics", {}),
+        "validation_confusion_matrix": bm.get("confusion_matrix", []),
+        "test_per_class_metrics": test_metrics.get("per_class_metrics", {}),
+        "test_confusion_matrix": test_metrics.get("confusion_matrix", []),
         "candidate_time_ms": None,
         "classifier_time_ms": test_elapsed_ms,
         "run_elapsed_ms": elapsed_ms,
@@ -570,7 +602,7 @@ def main():
         "kafka_lag": None,
         "restart_count": None,
         "stop_reason": stop_reason,
-        "status": "completed",
+        "status": "timeout" if stop_reason == "run_timeout" else "completed",
         "error_code": None,
     }
     final_path = os.path.abspath(a.final_metrics_file)

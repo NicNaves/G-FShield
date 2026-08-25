@@ -3,8 +3,11 @@ package org.gfshield.experiments;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.IntStream;
 import weka.classifiers.Evaluation;
@@ -46,11 +49,15 @@ public final class WekaEvaluator {
                 Metrics metrics = evaluate(training, evaluationSets.get(fields[0]), features);
                 long elapsedMs = (System.nanoTime() - started) / 1_000_000L;
                 output.printf(
-                        "OK\t%.12f\t%.12f\t%.12f\t%.12f\t%.12f\t%.12f\t%.12f\t%d%n",
+                        Locale.ROOT,
+                        "OK\t%.12f\t%.12f\t%.12f\t%.12f\t%.12f\t%.12f\t%.12f\t%d\t%s\t%s\t%s%n",
                         metrics.f1Macro, metrics.f1Weighted,
                         metrics.precisionMacro, metrics.precisionWeighted,
                         metrics.recallMacro, metrics.recallWeighted,
-                        metrics.accuracy, elapsedMs);
+                        metrics.accuracy, elapsedMs,
+                        encodeLabels(metrics.classLabels),
+                        encodeRows(metrics.perClass),
+                        encodeRows(metrics.confusionMatrix));
             } catch (Exception error) {
                 String message = error.getMessage() == null ? error.getClass().getName() : error.getMessage();
                 output.println("ERROR\t" + message.replace('\t', ' ').replace('\n', ' '));
@@ -111,10 +118,17 @@ public final class WekaEvaluator {
         double f1 = 0.0;
         double precision = 0.0;
         double recall = 0.0;
+        double[][] perClass = new double[classes][3];
+        String[] classLabels = new String[classes];
         for (int classIndex = 0; classIndex < classes; classIndex++) {
-            f1 += finiteOrZero(evaluation.fMeasure(classIndex));
-            precision += finiteOrZero(evaluation.precision(classIndex));
-            recall += finiteOrZero(evaluation.recall(classIndex));
+            double classF1 = finiteOrZero(evaluation.fMeasure(classIndex));
+            double classPrecision = finiteOrZero(evaluation.precision(classIndex));
+            double classRecall = finiteOrZero(evaluation.recall(classIndex));
+            f1 += classF1;
+            precision += classPrecision;
+            recall += classRecall;
+            classLabels[classIndex] = reducedEvaluation.classAttribute().value(classIndex);
+            perClass[classIndex] = new double[] {classF1, classPrecision, classRecall};
         }
         return new Metrics(
                 f1 / classes,
@@ -123,7 +137,28 @@ public final class WekaEvaluator {
                 finiteOrZero(evaluation.weightedPrecision()),
                 recall / classes,
                 finiteOrZero(evaluation.weightedRecall()),
-                evaluation.pctCorrect() / 100.0);
+                evaluation.pctCorrect() / 100.0,
+                classLabels,
+                perClass,
+                evaluation.confusionMatrix());
+    }
+
+    private static String encodeLabels(String[] labels) {
+        return Arrays.stream(labels)
+                .map(label -> Base64.getUrlEncoder().withoutPadding().encodeToString(
+                        label.getBytes(StandardCharsets.UTF_8)))
+                .reduce((left, right) -> left + "," + right)
+                .orElse("");
+    }
+
+    private static String encodeRows(double[][] rows) {
+        return Arrays.stream(rows)
+                .map(row -> Arrays.stream(row)
+                        .mapToObj(value -> String.format(Locale.ROOT, "%.12f", value))
+                        .reduce((left, right) -> left + "," + right)
+                        .orElse(""))
+                .reduce((left, right) -> left + ";" + right)
+                .orElse("");
     }
 
     private static double finiteOrZero(double value) {
@@ -137,5 +172,8 @@ public final class WekaEvaluator {
             double precisionWeighted,
             double recallMacro,
             double recallWeighted,
-            double accuracy) {}
+            double accuracy,
+            String[] classLabels,
+            double[][] perClass,
+            double[][] confusionMatrix) {}
 }

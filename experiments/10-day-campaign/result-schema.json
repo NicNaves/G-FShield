@@ -42,6 +42,41 @@
     "test_precision_macro": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
     "test_recall_macro": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
     "accuracy": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "class_labels": {"type": "array", "items": {"type": "string"}},
+    "validation_per_class_metrics": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["f1", "precision", "recall"],
+        "properties": {
+          "f1": {"type": "number", "minimum": 0, "maximum": 1},
+          "precision": {"type": "number", "minimum": 0, "maximum": 1},
+          "recall": {"type": "number", "minimum": 0, "maximum": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "test_per_class_metrics": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["f1", "precision", "recall"],
+        "properties": {
+          "f1": {"type": "number", "minimum": 0, "maximum": 1},
+          "precision": {"type": "number", "minimum": 0, "maximum": 1},
+          "recall": {"type": "number", "minimum": 0, "maximum": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "validation_confusion_matrix": {
+      "type": "array",
+      "items": {"type": "array", "items": {"type": "number", "minimum": 0}}
+    },
+    "test_confusion_matrix": {
+      "type": "array",
+      "items": {"type": "array", "items": {"type": "number", "minimum": 0}}
+    },
     "candidate_time_ms": {"type": ["integer", "null"], "minimum": 0},
     "classifier_time_ms": {"type": ["integer", "null"], "minimum": 0},
     "run_elapsed_ms": {"type": ["integer", "null"], "minimum": 0},

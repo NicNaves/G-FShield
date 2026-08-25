@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import re
@@ -216,7 +217,7 @@ def best_message(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 def parse_evaluator_line(line: str) -> dict[str, Any]:
     fields = line.strip().split("\t")
-    if len(fields) != 9 or fields[0] != "OK":
+    if len(fields) not in (9, 12) or fields[0] != "OK":
         raise RuntimeError(f"invalid evaluator output: {line.strip()}")
     names = (
         "f1_macro", "f1_weighted", "precision_macro", "precision_weighted",
@@ -224,6 +225,24 @@ def parse_evaluator_line(line: str) -> dict[str, Any]:
     )
     result = {name: float(value) for name, value in zip(names, fields[1:8])}
     result["elapsed_ms"] = int(fields[8])
+    if len(fields) == 12:
+        labels = [
+            base64.urlsafe_b64decode(value + "=" * (-len(value) % 4)).decode("utf-8")
+            for value in fields[9].split(",") if value
+        ]
+        per_class_rows = [
+            [float(value) for value in row.split(",")]
+            for row in fields[10].split(";") if row
+        ]
+        result["class_labels"] = labels
+        result["per_class_metrics"] = {
+            label: {"f1": row[0], "precision": row[1], "recall": row[2]}
+            for label, row in zip(labels, per_class_rows)
+        }
+        result["confusion_matrix"] = [
+            [float(value) for value in row.split(",")]
+            for row in fields[11].split(";") if row
+        ]
     return result
 
 
@@ -313,6 +332,11 @@ def normalized_result(
         "test_precision_macro": (test or {}).get("precision_macro"),
         "test_recall_macro": (test or {}).get("recall_macro"),
         "accuracy": (test or {}).get("accuracy"),
+        "class_labels": (test or {}).get("class_labels", []),
+        "validation_per_class_metrics": (validation or {}).get("per_class_metrics", {}),
+        "validation_confusion_matrix": (validation or {}).get("confusion_matrix", []),
+        "test_per_class_metrics": (test or {}).get("per_class_metrics", {}),
+        "test_confusion_matrix": (test or {}).get("confusion_matrix", []),
         "candidate_time_ms": (best or {}).get("runnigTime"),
         "classifier_time_ms": (test or {}).get("elapsed_ms"),
         "run_elapsed_ms": elapsed_ms,
