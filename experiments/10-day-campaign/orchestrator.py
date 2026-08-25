@@ -53,6 +53,7 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
     errors: list[str] = []
     campaign = manifest.get("campaign", {})
     arms = manifest.get("arms", [])
+    seeds = manifest.get("seeds", [])
     maximum = campaign.get("maximum_seconds")
     algorithm = campaign.get("algorithm_seconds")
     baseline = campaign.get("baseline_maximum_seconds")
@@ -78,6 +79,8 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
         errors.append("arm identifiers must be unique")
     if any(not arm_id for arm_id in arm_ids):
         errors.append("every arm needs an arm_id")
+    if len(seeds) != 8 or len(seeds) != len(set(seeds)) or not all(isinstance(seed, int) for seed in seeds):
+        errors.append("campaign must define exactly eight unique integer seeds")
     if algorithm is not None and sum(arm.get("window_seconds", 0) for arm in arms) != algorithm:
         errors.append("arm windows do not match the algorithm budget")
 

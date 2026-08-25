@@ -14,7 +14,7 @@ from pathlib import Path
 CONSTRUCTIONS = ("ig", "gr", "su", "relieff")
 CONTROLLERS = ("vnd", "rvnd")
 LOCAL_SEARCHES = ("bitflip", "iwss", "iwssr")
-SEEDS = list(range(42, 68))
+SEEDS = [42, 104729, 130363, 169087, 196613, 262147, 314159, 524287]
 RUN_TIMEOUT_SECONDS = 50 * 60
 
 
