@@ -256,7 +256,10 @@ class Stack:
         )
 
     def down(self) -> None:
-        self.call("down", "--volumes", "--remove-orphans", "--timeout", "30", check=False)
+        self.call(
+            "down", "--volumes", "--remove-orphans", "--timeout", "30",
+            check=False, capture_output=True,
+        )
 
 
 def wait_for_port(port: int, deadline: float) -> None:
@@ -508,7 +511,11 @@ def run_distributed(args: argparse.Namespace) -> int:
     stop_reason = "run_timeout"
     try:
         stack.down()
-        stack.call("up", "-d", "--no-build", *services)
+        with (result_dir / "compose-up.log").open("w", encoding="utf-8", newline="\n") as startup_log:
+            stack.call(
+                "up", "-d", "--no-build", *services,
+                stdout=startup_log, stderr=subprocess.STDOUT,
+            )
         container_ids = stack.call("ps", "-q", capture_output=True).stdout.split()
         if not container_ids:
             raise RuntimeError("campaign stack started without container identifiers")
@@ -569,7 +576,7 @@ def run_distributed(args: argparse.Namespace) -> int:
         stop_reason = "runner_error"
     finally:
         sampler.stop()
-        stack.call("stop", "--timeout", "30", *algorithm_services, check=False)
+        stack.call("stop", "--timeout", "30", *algorithm_services, check=False, capture_output=True)
         time.sleep(3)
         if consumer is not None and consumer.poll() is None:
             consumer.terminate()
