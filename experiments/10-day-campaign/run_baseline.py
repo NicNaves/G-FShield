@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -13,7 +14,13 @@ from run_arm import atomic_json, parse_evaluator_line, utc_now
 from run_monolith import ContainerSampler, safe_id
 
 
+def handle_termination(_signum: int, _frame: object) -> None:
+    raise KeyboardInterrupt
+
+
 def main() -> int:
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, handle_termination)
     parser = argparse.ArgumentParser()
     parser.add_argument("--campaign-id", required=True)
     parser.add_argument("--arm-id", required=True)
@@ -75,6 +82,7 @@ def main() -> int:
         if process.poll() is None:
             process.kill()
             process.wait()
+        subprocess.run(["docker", "rm", "-f", container], capture_output=True, check=False)
 
     elapsed_ms = int((time.monotonic() - started) * 1000)
     result = {

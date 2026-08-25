@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from orchestrator import CampaignLock, atomic_json, iso, load_json, utc_now
+from orchestrator import CampaignLock, atomic_json, iso, load_json, recover_orphan, utc_now
 
 
 FINAL_STATES = {
@@ -66,6 +66,26 @@ def terminate_group(process: subprocess.Popen[Any], grace_seconds: int) -> str:
             process.kill()
         process.wait()
         return "sigkill"
+
+
+def terminate_campaign(
+    child: subprocess.Popen[Any] | None, state_path: Path, grace_seconds: int
+) -> tuple[str, str]:
+    """Stop the orchestrator and its separately supervised active run."""
+    started = time.monotonic()
+    orchestrator_action = terminate_group(child, grace_seconds) if child else "no_child"
+    active_run_action = "no_active_run"
+    if state_path.exists():
+        state = load_json(state_path)
+        if isinstance(state.get("active_run"), dict):
+            remaining = max(0, int(grace_seconds - (time.monotonic() - started)))
+            previous_events = len(state.get("recovery_events") or [])
+            recover_orphan(state, state_path, remaining)
+            persisted = load_json(state_path)
+            events = persisted.get("recovery_events") or []
+            if len(events) > previous_events:
+                active_run_action = str(events[-1].get("action") or "unknown")
+    return orchestrator_action, active_run_action
 
 
 def update_campaign_failure(state_path: Path, reason: str) -> None:
@@ -137,17 +157,22 @@ def supervise(args: argparse.Namespace) -> int:
         while True:
             now = utc_now()
             if stop_requested:
-                action = terminate_group(child, args.grace_seconds) if child else "no_child"
+                action, active_action = terminate_campaign(
+                    child, args.state, args.grace_seconds
+                )
                 supervisor.update({
                     "state": "WATCHDOG_INTERRUPTED",
                     "finished_utc": iso(utc_now()),
                     "termination_action": action,
+                    "active_run_termination_action": active_action,
                 })
                 atomic_json(args.supervisor_state, supervisor)
                 return 130
             if now >= termination_start or time.monotonic() >= termination_start_monotonic:
                 grace_remaining = max(0, int(hard_deadline_monotonic - time.monotonic()))
-                action = terminate_group(child, grace_remaining) if child else "no_child"
+                action, active_action = terminate_campaign(
+                    child, args.state, grace_remaining
+                )
                 if args.state.exists():
                     campaign_state = load_json(args.state)
                     campaign_state["state"] = "GLOBAL_TIMEOUT"
@@ -158,6 +183,7 @@ def supervise(args: argparse.Namespace) -> int:
                     "state": "GLOBAL_TIMEOUT",
                     "finished_utc": iso(utc_now()),
                     "termination_action": action,
+                    "active_run_termination_action": active_action,
                 })
                 atomic_json(args.supervisor_state, supervisor)
                 return 3
@@ -166,13 +192,16 @@ def supervise(args: argparse.Namespace) -> int:
             supervisor["last_check_utc"] = iso(now)
             supervisor["last_free_disk_bytes"] = free_bytes
             if free_bytes < args.minimum_free_disk_bytes:
-                action = terminate_group(child, args.grace_seconds) if child else "no_child"
+                action, active_action = terminate_campaign(
+                    child, args.state, args.grace_seconds
+                )
                 reason = f"free disk {free_bytes} below threshold {args.minimum_free_disk_bytes}"
                 update_campaign_failure(args.state, reason)
                 supervisor.update({
                     "state": "CAMPAIGN_FAILED",
                     "failure_reason": reason,
                     "termination_action": action,
+                    "active_run_termination_action": active_action,
                     "finished_utc": iso(utc_now()),
                 })
                 atomic_json(args.supervisor_state, supervisor)
@@ -186,12 +215,15 @@ def supervise(args: argparse.Namespace) -> int:
                     expected_campaign_deadline = recorded_deadline_text
                     supervisor["campaign_recorded_deadline_utc"] = recorded_deadline_text
                 elif recorded_deadline_text != expected_campaign_deadline:
-                    action = terminate_group(child, args.grace_seconds) if child else "no_child"
+                    action, active_action = terminate_campaign(
+                        child, args.state, args.grace_seconds
+                    )
                     update_campaign_failure(args.state, "campaign deadline changed after attestation")
                     supervisor.update({
                         "state": "CAMPAIGN_FAILED",
                         "failure_reason": "campaign deadline changed after attestation",
                         "termination_action": action,
+                        "active_run_termination_action": active_action,
                         "finished_utc": iso(utc_now()),
                     })
                     atomic_json(args.supervisor_state, supervisor)
@@ -203,10 +235,14 @@ def supervise(args: argparse.Namespace) -> int:
 
             if child is None or child.poll() is not None:
                 if child is not None:
+                    _orchestrator_action, active_action = terminate_campaign(
+                        child, args.state, args.grace_seconds
+                    )
                     event = {
                         "timestamp_utc": iso(now),
                         "event": "orchestrator_exit",
                         "return_code": child.returncode,
+                        "active_run_termination_action": active_action,
                     }
                     supervisor["events"].append(event)
                     restarts += 1

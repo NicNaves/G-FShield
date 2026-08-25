@@ -196,10 +196,7 @@ def operational_checks(repo_root: Path) -> tuple[list[str], dict[str, Any]]:
                     repo_root
                     / "experiments/10-day-campaign/tests/test_campaign_supervisor.py"
                 ),
-                (
-                    "CampaignSupervisorTest."
-                    "test_exited_orchestrator_is_replaced_before_restart_limit"
-                ),
+                "CampaignSupervisorTest",
             ],
             cwd=repo_root,
             capture_output=True,
@@ -210,10 +207,7 @@ def operational_checks(repo_root: Path) -> tuple[list[str], dict[str, Any]]:
         evidence["orchestrator_restart"] = {
             "passed": restart_test.returncode == 0,
             "return_code": restart_test.returncode,
-            "test": (
-                "CampaignSupervisorTest."
-                "test_exited_orchestrator_is_replaced_before_restart_limit"
-            ),
+            "test": "CampaignSupervisorTest",
         }
     return issues, evidence
 

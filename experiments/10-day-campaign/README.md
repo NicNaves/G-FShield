@@ -88,8 +88,9 @@ python3 experiments/10-day-campaign/freeze_manifest.py \
 The official process is launched through `campaign_supervisor.py`, not by
 invoking the orchestrator directly. The supervisor preserves the first
 deadline across restarts, stops the complete process group with SIGTERM and
-then SIGKILL, refuses low-disk execution, limits restart loops, and rotates its
-own log into checksum-addressed gzip archives. Run it inside the documented
+then SIGKILL, explicitly reaches the active run's separate process group,
+refuses low-disk execution, limits restart loops, and rotates its own log into
+checksum-addressed gzip archives. Run it inside the documented
 tmux session (or an equivalent user service):
 
 ```sh

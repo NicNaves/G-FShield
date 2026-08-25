@@ -40,6 +40,15 @@ class MonolithContractTest(unittest.TestCase):
                             f"{path}:{number}",
                         )
 
+    def test_baseline_handles_sigterm_and_removes_its_container(self):
+        baseline = (
+            REPO / "experiments/10-day-campaign/run_baseline.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("signal.signal(signal.SIGTERM, handle_termination)", baseline)
+        self.assertIn(
+            'subprocess.run(["docker", "rm", "-f", container]', baseline
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

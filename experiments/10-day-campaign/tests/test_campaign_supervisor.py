@@ -107,6 +107,36 @@ class CampaignSupervisorTest(unittest.TestCase):
             self.assertEqual(1, persisted["restart_count"])
             self.assertEqual("CAMPAIGN_COMPLETED", persisted["state"])
 
+    def test_termination_reaches_the_separate_active_run_group(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "campaign-state.json"
+            SUPERVISOR.atomic_json(
+                state_path,
+                {
+                    "campaign_id": "termination-test",
+                    "active_run": {"pid": 4321, "run_id": "active-run"},
+                },
+            )
+
+            def fake_recover(state, path, _grace_seconds):
+                state.pop("active_run")
+                state.setdefault("recovery_events", []).append(
+                    {"action": "sigterm_orphan"}
+                )
+                SUPERVISOR.atomic_json(path, state)
+
+            child = mock.Mock()
+            with mock.patch.object(
+                SUPERVISOR, "terminate_group", return_value="sigterm"
+            ), mock.patch.object(
+                SUPERVISOR, "recover_orphan", side_effect=fake_recover
+            ):
+                actions = SUPERVISOR.terminate_campaign(child, state_path, 300)
+
+            self.assertEqual(("sigterm", "sigterm_orphan"), actions)
+            persisted = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertNotIn("active_run", persisted)
+
 
 if __name__ == "__main__":
     unittest.main()
