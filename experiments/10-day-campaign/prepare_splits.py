@@ -145,7 +145,9 @@ def main() -> int:
                 filename="", fileobj=binary_handle, mode="wb", mtime=0
             ) as compressed:
                 with io.TextIOWrapper(compressed, encoding="utf-8", newline="") as handle:
-                    writer = csv.writer(handle)
+                    # Canonical LF makes the compressed index byte-identical
+                    # on Windows and Linux.
+                    writer = csv.writer(handle, lineterminator="\n")
                     writer.writerow(["original_data_index", "split", "class"])
                     for split_name in ("train", "validation", "test"):
                         for original_index, _, label in sorted(splits[split_name]):
