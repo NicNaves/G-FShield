@@ -8,7 +8,7 @@
       "controller": "vnd",
       "local_search": "bitflip",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -19,7 +19,7 @@
       "controller": "vnd",
       "local_search": "iwss",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -30,7 +30,7 @@
       "controller": "vnd",
       "local_search": "iwssr",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -41,7 +41,7 @@
       "controller": "rvnd",
       "local_search": "bitflip",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -52,7 +52,7 @@
       "controller": "rvnd",
       "local_search": "iwss",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -63,7 +63,7 @@
       "controller": "rvnd",
       "local_search": "iwssr",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -74,7 +74,7 @@
       "controller": "vnd",
       "local_search": "bitflip",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -85,7 +85,7 @@
       "controller": "vnd",
       "local_search": "iwss",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -96,7 +96,7 @@
       "controller": "vnd",
       "local_search": "iwssr",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -107,7 +107,7 @@
       "controller": "rvnd",
       "local_search": "bitflip",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -118,7 +118,7 @@
       "controller": "rvnd",
       "local_search": "iwss",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -129,7 +129,7 @@
       "controller": "rvnd",
       "local_search": "iwssr",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -140,7 +140,7 @@
       "controller": "vnd",
       "local_search": "bitflip",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -151,7 +151,7 @@
       "controller": "vnd",
       "local_search": "iwss",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -162,7 +162,7 @@
       "controller": "vnd",
       "local_search": "iwssr",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -173,7 +173,7 @@
       "controller": "rvnd",
       "local_search": "bitflip",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -184,7 +184,7 @@
       "controller": "rvnd",
       "local_search": "iwss",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -195,7 +195,7 @@
       "controller": "rvnd",
       "local_search": "iwssr",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -206,7 +206,7 @@
       "controller": "vnd",
       "local_search": "bitflip",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -217,7 +217,7 @@
       "controller": "vnd",
       "local_search": "iwss",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -228,7 +228,7 @@
       "controller": "vnd",
       "local_search": "iwssr",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -239,7 +239,7 @@
       "controller": "rvnd",
       "local_search": "bitflip",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -250,7 +250,7 @@
       "controller": "rvnd",
       "local_search": "iwss",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -261,7 +261,7 @@
       "controller": "rvnd",
       "local_search": "iwssr",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -272,7 +272,7 @@
       "controller": null,
       "local_search": "bitflip",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     },
     {
@@ -283,7 +283,7 @@
       "controller": "vnd",
       "local_search": "iwss",
       "ready": false,
-      "run_timeout_seconds": 3600,
+      "run_timeout_seconds": 3000,
       "window_seconds": 28800
     }
   ],
@@ -292,7 +292,7 @@
     "command": null,
     "maximum_seconds": 28800,
     "ready": false,
-    "run_timeout_seconds": 3600
+    "run_timeout_seconds": 3000
   },
   "campaign": {
     "algorithm_seconds": 748800,
@@ -318,7 +318,7 @@
     "train_sha256": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
     "validation_sha256": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a"
   },
-  "generated_utc": "2026-08-25T03:15:54.895687+00:00",
+  "generated_utc": "2026-08-25T03:51:32.627516+00:00",
   "git": {
     "commit": "TO_BE_FROZEN_AFTER_PILOT",
     "tag": "experiment-10d-v1"

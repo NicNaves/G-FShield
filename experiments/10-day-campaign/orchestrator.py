@@ -14,7 +14,7 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 def utc_now() -> datetime:
@@ -85,6 +85,8 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
         timeout = arm.get("run_timeout_seconds", 0)
         if timeout <= 0 or window <= 0 or timeout + 10 * 60 > window:
             errors.append(f"invalid time budget for arm {arm_id}")
+        if 8 * timeout + 10 * 60 > window:
+            errors.append(f"arm {arm_id} cannot attempt eight runs within its window")
         command = arm.get("command")
         if require_ready and (not arm.get("ready") or not isinstance(command, list) or not command):
             errors.append(f"arm {arm_id} is not frozen and runnable")
@@ -116,10 +118,35 @@ class CampaignLock:
 
     def __enter__(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            descriptor = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError as error:
-            raise RuntimeError(f"campaign lock already exists: {self.path}") from error
+        while True:
+            try:
+                descriptor = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                break
+            except FileExistsError as error:
+                try:
+                    age_seconds = time.time() - self.path.stat().st_mtime
+                    contents = self.path.read_text(encoding="ascii").strip()
+                    owner_pid = int(contents)
+                except (OSError, ValueError):
+                    age_seconds = 0.0
+                    owner_pid = -1
+                owner_running = False
+                if owner_pid > 0:
+                    try:
+                        os.kill(owner_pid, 0)
+                        owner_running = True
+                    except ProcessLookupError:
+                        owner_running = False
+                    except PermissionError:
+                        owner_running = True
+                    except OSError:
+                        owner_running = False
+                if owner_running or age_seconds < 60:
+                    raise RuntimeError(f"campaign lock already exists: {self.path}") from error
+                try:
+                    self.path.unlink()
+                except FileNotFoundError:
+                    continue
         with os.fdopen(descriptor, "w", encoding="ascii") as handle:
             handle.write(f"{os.getpid()}\n")
         self.acquired = True
@@ -154,12 +181,53 @@ def terminate_process(process: subprocess.Popen, grace_seconds: int) -> tuple[st
         return "timeout_forced", process.wait()
 
 
+def recover_orphan(state: dict[str, Any], state_path: Path, grace_seconds: int) -> None:
+    active = state.get("active_run")
+    if not isinstance(active, dict):
+        return
+    pid = active.get("pid")
+    run_id = str(active.get("run_id") or "")
+    recovery = {
+        "timestamp_utc": iso(utc_now()),
+        "run_id": run_id,
+        "pid": pid,
+        "action": "no_live_process",
+    }
+    if isinstance(pid, int) and pid > 0 and os.name == "posix":
+        cmdline_path = Path(f"/proc/{pid}/cmdline")
+        try:
+            cmdline = cmdline_path.read_bytes().replace(b"\0", b" ").decode("utf-8", errors="replace")
+        except OSError:
+            cmdline = ""
+        if run_id and run_id in cmdline:
+            try:
+                os.killpg(pid, signal.SIGTERM)
+                deadline = time.monotonic() + grace_seconds
+                while cmdline_path.exists() and time.monotonic() < deadline:
+                    time.sleep(1)
+                if cmdline_path.exists():
+                    os.killpg(pid, signal.SIGKILL)
+                    recovery["action"] = "sigkill_orphan"
+                else:
+                    recovery["action"] = "sigterm_orphan"
+            except ProcessLookupError:
+                recovery["action"] = "process_already_exited"
+            except PermissionError:
+                recovery["action"] = "permission_denied"
+        elif cmdline:
+            recovery["action"] = "pid_identity_mismatch"
+    state.setdefault("recovery_events", []).append(recovery)
+    state.pop("active_run", None)
+    atomic_json(state_path, state)
+
+
 def run_once(
     command: list[str],
     timeout_seconds: int,
     grace_seconds: int,
     log_path: Path,
     environment: dict[str, str],
+    on_start: Callable[[int], None] | None = None,
 ) -> dict[str, object]:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     started_utc = utc_now()
@@ -172,6 +240,8 @@ def run_once(
             env=environment,
             start_new_session=(os.name == "posix"),
         )
+        if on_start is not None:
+            on_start(process.pid)
         try:
             return_code = process.wait(timeout=timeout_seconds)
             status = "completed" if return_code == 0 else "failed"
@@ -223,8 +293,15 @@ def execute(manifest_path: Path, state_path: Path) -> int:
             seconds=manifest["campaign"]["algorithm_seconds"]
         )
         grace = manifest["stopping"]["graceful_shutdown_seconds"]
+        recover_orphan(state, state_path, grace)
         seeds = manifest["seeds"]
         result_root = manifest_path.parent / "results" / "raw"
+        baseline_arm_id = manifest["baseline"]["arm_id"]
+        resuming_baseline = (
+            state.get("current_arm") == baseline_arm_id
+            and state.get("state") in {"RUNNING_ARM", "FINALIZING_ARM"}
+            and state.get("arm_deadline_utc")
+        )
 
         for arm_index in range(state["next_arm_index"], len(manifest["arms"])):
             arm = manifest["arms"][arm_index]
@@ -233,19 +310,32 @@ def execute(manifest_path: Path, state_path: Path) -> int:
                 state["state"] = "GLOBAL_TIMEOUT"
                 atomic_json(state_path, state)
                 return 3
-            arm_deadline = min(
-                now + timedelta(seconds=arm["window_seconds"]),
-                algorithm_deadline,
+            resuming_arm = (
+                state.get("current_arm") == arm["arm_id"]
+                and state.get("state") in {"RUNNING_ARM", "FINALIZING_ARM"}
+                and state.get("arm_deadline_utc")
             )
-            state.update(
-                {
-                    "state": "RUNNING_ARM",
-                    "current_arm": arm["arm_id"],
-                    "arm_start_utc": iso(now),
-                    "arm_deadline_utc": iso(arm_deadline),
-                }
-            )
-            atomic_json(state_path, state)
+            if resuming_arm:
+                arm_deadline = datetime.fromisoformat(state["arm_deadline_utc"])
+            else:
+                arm_deadline = min(
+                    now + timedelta(seconds=arm["window_seconds"]),
+                    algorithm_deadline,
+                )
+                state.update(
+                    {
+                        "state": "RUNNING_ARM",
+                        "current_arm": arm["arm_id"],
+                        "arm_start_utc": iso(now),
+                        "arm_deadline_utc": iso(arm_deadline),
+                    }
+                )
+                atomic_json(state_path, state)
+            if utc_now() >= arm_deadline:
+                state["state"] = "ARM_COMPLETED"
+                state["next_arm_index"] = arm_index + 1
+                atomic_json(state_path, state)
+                continue
 
             completed_for_arm = {
                 run["seed"]
@@ -269,44 +359,62 @@ def execute(manifest_path: Path, state_path: Path) -> int:
                 command = format_command(arm["command"], context)
                 environment = os.environ.copy()
                 environment.update({key.upper(): str(value) for key, value in context.items()})
+                def register_active_run(pid: int) -> None:
+                    state["active_run"] = {
+                        "pid": pid,
+                        "arm_id": arm["arm_id"],
+                        "run_id": run_id,
+                        "seed": seed,
+                        "started_utc": iso(utc_now()),
+                    }
+                    atomic_json(state_path, state)
+
                 result = run_once(
                     command,
                     arm["run_timeout_seconds"],
                     grace,
                     result_root / arm["arm_id"] / f"{run_id}.log",
                     environment,
+                    register_active_run,
                 )
+                state.pop("active_run", None)
                 result.update({"arm_id": arm["arm_id"], "run_id": run_id, "seed": seed})
                 state["completed_runs"].append(result)
                 atomic_json(state_path, state)
 
+            state["state"] = "FINALIZING_ARM"
+            atomic_json(state_path, state)
             state["state"] = "ARM_COMPLETED"
             state["next_arm_index"] = arm_index + 1
             atomic_json(state_path, state)
 
-        state["state"] = "CAMPAIGN_ALGORITHMS_COMPLETED"
-        state["current_arm"] = None
-        atomic_json(state_path, state)
+        if not resuming_baseline:
+            state["state"] = "CAMPAIGN_ALGORITHMS_COMPLETED"
+            state["current_arm"] = None
+            atomic_json(state_path, state)
 
         baseline = manifest["baseline"]
         baseline_start = utc_now()
-        baseline_deadline = min(
-            baseline_start + timedelta(seconds=baseline["maximum_seconds"]),
-            datetime.fromisoformat(state["campaign_start_utc"])
-            + timedelta(
-                seconds=manifest["campaign"]["maximum_seconds"]
-                - manifest["campaign"]["reserve_seconds"]
-            ),
-        )
-        state.update(
-            {
-                "state": "RUNNING_ARM",
-                "current_arm": baseline["arm_id"],
-                "arm_start_utc": iso(baseline_start),
-                "arm_deadline_utc": iso(baseline_deadline),
-            }
-        )
-        atomic_json(state_path, state)
+        if resuming_baseline:
+            baseline_deadline = datetime.fromisoformat(state["arm_deadline_utc"])
+        else:
+            baseline_deadline = min(
+                baseline_start + timedelta(seconds=baseline["maximum_seconds"]),
+                datetime.fromisoformat(state["campaign_start_utc"])
+                + timedelta(
+                    seconds=manifest["campaign"]["maximum_seconds"]
+                    - manifest["campaign"]["reserve_seconds"]
+                ),
+            )
+            state.update(
+                {
+                    "state": "RUNNING_ARM",
+                    "current_arm": baseline["arm_id"],
+                    "arm_start_utc": iso(baseline_start),
+                    "arm_deadline_utc": iso(baseline_deadline),
+                }
+            )
+            atomic_json(state_path, state)
         completed_baseline_seeds = {
             run["seed"]
             for run in state["completed_runs"]
@@ -330,18 +438,32 @@ def execute(manifest_path: Path, state_path: Path) -> int:
             command = format_command(baseline["command"], context)
             environment = os.environ.copy()
             environment.update({key.upper(): str(value) for key, value in context.items()})
+            def register_active_baseline(pid: int) -> None:
+                state["active_run"] = {
+                    "pid": pid,
+                    "arm_id": baseline["arm_id"],
+                    "run_id": run_id,
+                    "seed": seed,
+                    "started_utc": iso(utc_now()),
+                }
+                atomic_json(state_path, state)
+
             result = run_once(
                 command,
                 timeout_seconds,
                 grace,
                 result_root / baseline["arm_id"] / f"{run_id}.log",
                 environment,
+                register_active_baseline,
             )
+            state.pop("active_run", None)
             result.update({"arm_id": baseline["arm_id"], "run_id": run_id, "seed": seed})
             state["completed_runs"].append(result)
             atomic_json(state_path, state)
 
-        state["state"] = "CAMPAIGN_EXPERIMENTS_COMPLETED"
+        state["state"] = "FINALIZING_ARM"
+        atomic_json(state_path, state)
+        state["state"] = "CAMPAIGN_COMPLETED"
         state["current_arm"] = None
         atomic_json(state_path, state)
     return 0

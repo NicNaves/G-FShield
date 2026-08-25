@@ -56,7 +56,7 @@ class GenerateManifestTest(unittest.TestCase):
                 {arm["local_search"] for arm in distributed},
             )
             self.assertTrue(all(arm["window_seconds"] == 8 * 60 * 60 for arm in distributed))
-            self.assertTrue(all(arm["run_timeout_seconds"] == 60 * 60 for arm in distributed))
+            self.assertTrue(all(arm["run_timeout_seconds"] == 50 * 60 for arm in distributed))
 
 
 if __name__ == "__main__":

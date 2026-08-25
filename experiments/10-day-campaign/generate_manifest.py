@@ -15,6 +15,7 @@ CONSTRUCTIONS = ("ig", "gr", "su", "relieff")
 CONTROLLERS = ("vnd", "rvnd")
 LOCAL_SEARCHES = ("bitflip", "iwss", "iwssr")
 SEEDS = list(range(42, 68))
+RUN_TIMEOUT_SECONDS = 50 * 60
 
 
 def atomic_json(path: Path, value: object) -> None:
@@ -56,7 +57,7 @@ def main() -> int:
                         "controller": controller,
                         "local_search": local_search,
                         "window_seconds": 8 * 60 * 60,
-                        "run_timeout_seconds": 60 * 60,
+                        "run_timeout_seconds": RUN_TIMEOUT_SECONDS,
                         "command": None,
                         "ready": False,
                     }
@@ -71,7 +72,7 @@ def main() -> int:
                 "controller": None,
                 "local_search": "bitflip",
                 "window_seconds": 8 * 60 * 60,
-                "run_timeout_seconds": 60 * 60,
+                "run_timeout_seconds": RUN_TIMEOUT_SECONDS,
                 "command": None,
                 "ready": False,
             },
@@ -82,7 +83,7 @@ def main() -> int:
                 "controller": "vnd",
                 "local_search": "iwss",
                 "window_seconds": 8 * 60 * 60,
-                "run_timeout_seconds": 60 * 60,
+                "run_timeout_seconds": RUN_TIMEOUT_SECONDS,
                 "command": None,
                 "ready": False,
             },
@@ -141,7 +142,7 @@ def main() -> int:
         "baseline": {
             "arm_id": "baseline-all-features",
             "maximum_seconds": 8 * 60 * 60,
-            "run_timeout_seconds": 60 * 60,
+            "run_timeout_seconds": RUN_TIMEOUT_SECONDS,
             "command": None,
             "ready": False,
         },
