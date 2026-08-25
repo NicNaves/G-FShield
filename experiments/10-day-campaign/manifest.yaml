@@ -7,6 +7,8 @@
       "construction": "ig",
       "controller": "vnd",
       "local_search": "bitflip",
+      "planned_end_offset_seconds": 28800,
+      "planned_start_offset_seconds": 0,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -18,6 +20,8 @@
       "construction": "ig",
       "controller": "vnd",
       "local_search": "iwss",
+      "planned_end_offset_seconds": 57600,
+      "planned_start_offset_seconds": 28800,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -29,6 +33,8 @@
       "construction": "ig",
       "controller": "vnd",
       "local_search": "iwssr",
+      "planned_end_offset_seconds": 86400,
+      "planned_start_offset_seconds": 57600,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -40,6 +46,8 @@
       "construction": "ig",
       "controller": "rvnd",
       "local_search": "bitflip",
+      "planned_end_offset_seconds": 115200,
+      "planned_start_offset_seconds": 86400,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -51,6 +59,8 @@
       "construction": "ig",
       "controller": "rvnd",
       "local_search": "iwss",
+      "planned_end_offset_seconds": 144000,
+      "planned_start_offset_seconds": 115200,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -62,6 +72,8 @@
       "construction": "ig",
       "controller": "rvnd",
       "local_search": "iwssr",
+      "planned_end_offset_seconds": 172800,
+      "planned_start_offset_seconds": 144000,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -73,6 +85,8 @@
       "construction": "gr",
       "controller": "vnd",
       "local_search": "bitflip",
+      "planned_end_offset_seconds": 201600,
+      "planned_start_offset_seconds": 172800,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -84,6 +98,8 @@
       "construction": "gr",
       "controller": "vnd",
       "local_search": "iwss",
+      "planned_end_offset_seconds": 230400,
+      "planned_start_offset_seconds": 201600,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -95,6 +111,8 @@
       "construction": "gr",
       "controller": "vnd",
       "local_search": "iwssr",
+      "planned_end_offset_seconds": 259200,
+      "planned_start_offset_seconds": 230400,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -106,6 +124,8 @@
       "construction": "gr",
       "controller": "rvnd",
       "local_search": "bitflip",
+      "planned_end_offset_seconds": 288000,
+      "planned_start_offset_seconds": 259200,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -117,6 +137,8 @@
       "construction": "gr",
       "controller": "rvnd",
       "local_search": "iwss",
+      "planned_end_offset_seconds": 316800,
+      "planned_start_offset_seconds": 288000,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -128,6 +150,8 @@
       "construction": "gr",
       "controller": "rvnd",
       "local_search": "iwssr",
+      "planned_end_offset_seconds": 345600,
+      "planned_start_offset_seconds": 316800,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -139,6 +163,8 @@
       "construction": "su",
       "controller": "vnd",
       "local_search": "bitflip",
+      "planned_end_offset_seconds": 374400,
+      "planned_start_offset_seconds": 345600,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -150,6 +176,8 @@
       "construction": "su",
       "controller": "vnd",
       "local_search": "iwss",
+      "planned_end_offset_seconds": 403200,
+      "planned_start_offset_seconds": 374400,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -161,6 +189,8 @@
       "construction": "su",
       "controller": "vnd",
       "local_search": "iwssr",
+      "planned_end_offset_seconds": 432000,
+      "planned_start_offset_seconds": 403200,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -172,6 +202,8 @@
       "construction": "su",
       "controller": "rvnd",
       "local_search": "bitflip",
+      "planned_end_offset_seconds": 460800,
+      "planned_start_offset_seconds": 432000,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -183,6 +215,8 @@
       "construction": "su",
       "controller": "rvnd",
       "local_search": "iwss",
+      "planned_end_offset_seconds": 489600,
+      "planned_start_offset_seconds": 460800,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -194,6 +228,8 @@
       "construction": "su",
       "controller": "rvnd",
       "local_search": "iwssr",
+      "planned_end_offset_seconds": 518400,
+      "planned_start_offset_seconds": 489600,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -205,6 +241,8 @@
       "construction": "relieff",
       "controller": "vnd",
       "local_search": "bitflip",
+      "planned_end_offset_seconds": 547200,
+      "planned_start_offset_seconds": 518400,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -216,6 +254,8 @@
       "construction": "relieff",
       "controller": "vnd",
       "local_search": "iwss",
+      "planned_end_offset_seconds": 576000,
+      "planned_start_offset_seconds": 547200,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -227,6 +267,8 @@
       "construction": "relieff",
       "controller": "vnd",
       "local_search": "iwssr",
+      "planned_end_offset_seconds": 604800,
+      "planned_start_offset_seconds": 576000,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -238,6 +280,8 @@
       "construction": "relieff",
       "controller": "rvnd",
       "local_search": "bitflip",
+      "planned_end_offset_seconds": 633600,
+      "planned_start_offset_seconds": 604800,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -249,6 +293,8 @@
       "construction": "relieff",
       "controller": "rvnd",
       "local_search": "iwss",
+      "planned_end_offset_seconds": 662400,
+      "planned_start_offset_seconds": 633600,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -260,6 +306,8 @@
       "construction": "relieff",
       "controller": "rvnd",
       "local_search": "iwssr",
+      "planned_end_offset_seconds": 691200,
+      "planned_start_offset_seconds": 662400,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -271,6 +319,8 @@
       "construction": "gr",
       "controller": null,
       "local_search": "bitflip",
+      "planned_end_offset_seconds": 720000,
+      "planned_start_offset_seconds": 691200,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -282,6 +332,8 @@
       "construction": "gr",
       "controller": "vnd",
       "local_search": "iwss",
+      "planned_end_offset_seconds": 748800,
+      "planned_start_offset_seconds": 720000,
       "ready": false,
       "run_timeout_seconds": 3000,
       "window_seconds": 28800
@@ -291,6 +343,8 @@
     "arm_id": "baseline-all-features",
     "command": null,
     "maximum_seconds": 28800,
+    "planned_end_offset_seconds": 777600,
+    "planned_start_offset_seconds": 748800,
     "ready": false,
     "run_timeout_seconds": 3000
   },
@@ -318,7 +372,7 @@
     "train_sha256": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
     "validation_sha256": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a"
   },
-  "generated_utc": "2026-08-25T03:51:32.627516+00:00",
+  "generated_utc": "2026-08-25T05:16:45.583417+00:00",
   "git": {
     "commit": "TO_BE_FROZEN_AFTER_PILOT",
     "tag": "experiment-10d-v1"

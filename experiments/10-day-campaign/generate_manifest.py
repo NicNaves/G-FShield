@@ -89,6 +89,9 @@ def main() -> int:
             },
         ]
     )
+    for index, arm in enumerate(arms):
+        arm["planned_start_offset_seconds"] = index * 8 * 60 * 60
+        arm["planned_end_offset_seconds"] = (index + 1) * 8 * 60 * 60
 
     manifest = {
         "schema_version": 1,
@@ -145,6 +148,8 @@ def main() -> int:
             "run_timeout_seconds": RUN_TIMEOUT_SECONDS,
             "command": None,
             "ready": False,
+            "planned_start_offset_seconds": 208 * 60 * 60,
+            "planned_end_offset_seconds": 216 * 60 * 60,
         },
         "paths": {
             "result_schema": "experiments/10-day-campaign/result-schema.json",

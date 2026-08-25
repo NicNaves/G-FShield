@@ -57,6 +57,9 @@ class GenerateManifestTest(unittest.TestCase):
             )
             self.assertTrue(all(arm["window_seconds"] == 8 * 60 * 60 for arm in distributed))
             self.assertTrue(all(arm["run_timeout_seconds"] == 50 * 60 for arm in distributed))
+            for index, arm in enumerate(manifest["arms"]):
+                self.assertEqual(index * 8 * 60 * 60, arm["planned_start_offset_seconds"])
+                self.assertEqual((index + 1) * 8 * 60 * 60, arm["planned_end_offset_seconds"])
 
 
 if __name__ == "__main__":

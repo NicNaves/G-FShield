@@ -8,6 +8,7 @@ import sys
 import tempfile
 import time
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -68,6 +69,22 @@ class OrchestratorPreflightTest(unittest.TestCase):
         manifest["arms"][0]["run_timeout_seconds"] = 60 * 60
         errors = ORCHESTRATOR.validate_manifest(manifest, require_ready=False)
         self.assertTrue(any("cannot attempt eight runs" in error for error in errors))
+
+    def test_planned_schedule_has_all_arms_baseline_and_absolute_boundaries(self):
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "campaign-state.json"
+            start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+            ORCHESTRATOR.write_planned_schedule(manifest, state_path, start)
+            schedule = json.loads(
+                state_path.with_name("planned-schedule.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(27, len(schedule["rows"]))
+            self.assertEqual(start.isoformat(), schedule["rows"][0]["planned_start_utc"])
+            self.assertEqual(216 * 60 * 60, schedule["rows"][-1]["planned_end_offset_seconds"])
+            table = state_path.with_name("planned-schedule.md").read_text(encoding="utf-8")
+            self.assertIn("distributed-ig-vnd-bitflip", table)
+            self.assertIn("baseline-all-features", table)
 
     def test_stale_lock_is_recovered_but_live_lock_is_preserved(self):
         with tempfile.TemporaryDirectory() as temporary:

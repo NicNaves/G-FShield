@@ -100,7 +100,7 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
     if algorithm is not None and sum(arm.get("window_seconds", 0) for arm in arms) != algorithm:
         errors.append("arm windows do not match the algorithm budget")
 
-    for arm in arms:
+    for index, arm in enumerate(arms):
         arm_id = arm.get("arm_id", "<missing>")
         window = arm.get("window_seconds", 0)
         timeout = arm.get("run_timeout_seconds", 0)
@@ -108,6 +108,10 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
             errors.append(f"invalid time budget for arm {arm_id}")
         if 8 * (timeout + supervisor_grace) + 10 * 60 > window:
             errors.append(f"arm {arm_id} cannot attempt eight runs within its window")
+        if arm.get("planned_start_offset_seconds") != index * 8 * 60 * 60:
+            errors.append(f"invalid planned start offset for arm {arm_id}")
+        if arm.get("planned_end_offset_seconds") != (index + 1) * 8 * 60 * 60:
+            errors.append(f"invalid planned end offset for arm {arm_id}")
         command = arm.get("command")
         if require_ready and (not arm.get("ready") or not isinstance(command, list) or not command):
             errors.append(f"arm {arm_id} is not frozen and runnable")
@@ -122,6 +126,10 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
             errors.append("baseline is not frozen and runnable")
         if baseline_config.get("run_timeout_seconds", 0) <= 0:
             errors.append("baseline run timeout is invalid")
+        if baseline_config.get("planned_start_offset_seconds") != 208 * 60 * 60:
+            errors.append("baseline planned start offset is invalid")
+        if baseline_config.get("planned_end_offset_seconds") != 216 * 60 * 60:
+            errors.append("baseline planned end offset is invalid")
         git_config = manifest.get("git", {})
         if "TO_BE_FROZEN" in json.dumps(git_config):
             errors.append("git commit/tag are not frozen")
@@ -448,6 +456,93 @@ def verify_free_disk(
     return True
 
 
+def write_planned_schedule(
+    manifest: dict[str, Any], state_path: Path, campaign_start: datetime
+) -> None:
+    rows: list[dict[str, Any]] = []
+    seed_count = len(manifest["seeds"])
+    for arm in manifest["arms"]:
+        start_offset = int(arm["planned_start_offset_seconds"])
+        end_offset = int(arm["planned_end_offset_seconds"])
+        rows.append(
+            {
+                "arm_id": arm["arm_id"],
+                "architecture": arm["architecture"],
+                "construction": arm.get("construction"),
+                "controller": arm.get("controller"),
+                "local_search": arm.get("local_search"),
+                "window_seconds": arm["window_seconds"],
+                "run_timeout_seconds": arm["run_timeout_seconds"],
+                "planned_seed_count": seed_count,
+                "planned_start_utc": iso(campaign_start + timedelta(seconds=start_offset)),
+                "planned_end_utc": iso(campaign_start + timedelta(seconds=end_offset)),
+                "planned_start_offset_seconds": start_offset,
+                "planned_end_offset_seconds": end_offset,
+            }
+        )
+    baseline = manifest["baseline"]
+    rows.append(
+        {
+            "arm_id": baseline["arm_id"],
+            "architecture": "all-features baseline",
+            "construction": None,
+            "controller": None,
+            "local_search": None,
+            "window_seconds": baseline["maximum_seconds"],
+            "run_timeout_seconds": baseline["run_timeout_seconds"],
+            "planned_seed_count": seed_count,
+            "planned_start_utc": iso(
+                campaign_start + timedelta(seconds=baseline["planned_start_offset_seconds"])
+            ),
+            "planned_end_utc": iso(
+                campaign_start + timedelta(seconds=baseline["planned_end_offset_seconds"])
+            ),
+            "planned_start_offset_seconds": baseline["planned_start_offset_seconds"],
+            "planned_end_offset_seconds": baseline["planned_end_offset_seconds"],
+        }
+    )
+    schedule_path = state_path.with_name("planned-schedule.json")
+    atomic_json(
+        schedule_path,
+        {
+            "campaign_id": manifest["campaign_id"],
+            "campaign_start_utc": iso(campaign_start),
+            "campaign_deadline_utc": iso(
+                campaign_start + timedelta(seconds=manifest["campaign"]["maximum_seconds"])
+            ),
+            "reserve_start_utc": iso(
+                campaign_start
+                + timedelta(
+                    seconds=manifest["campaign"]["algorithm_seconds"]
+                    + manifest["campaign"]["baseline_maximum_seconds"]
+                )
+            ),
+            "rows": rows,
+        },
+    )
+    markdown = [
+        "# Planned campaign schedule",
+        "",
+        "Times are maximum-window planning boundaries; arms execute sequentially and may finish earlier.",
+        "",
+        "| arm_id | architecture | construction | controller | local search | window (h) | timeout (min) | seeds | planned start (UTC) | planned end (UTC) |",
+        "|---|---|---|---|---|---:|---:|---:|---|---|",
+    ]
+    for row in rows:
+        markdown.append(
+            "| {arm_id} | {architecture} | {construction} | {controller} | {local_search} | {window:.0f} | {timeout:.0f} | {seeds} | {start} | {end} |".format(
+                arm_id=row["arm_id"], architecture=row["architecture"],
+                construction=row["construction"] or "—", controller=row["controller"] or "—",
+                local_search=row["local_search"] or "—", window=row["window_seconds"] / 3600,
+                timeout=row["run_timeout_seconds"] / 60, seeds=row["planned_seed_count"],
+                start=row["planned_start_utc"], end=row["planned_end_utc"],
+            )
+        )
+    state_path.with_name("planned-schedule.md").write_text(
+        "\n".join(markdown) + "\n", encoding="utf-8", newline="\n"
+    )
+
+
 def execute(manifest_path: Path, state_path: Path) -> int:
     manifest = load_json(manifest_path)
     errors = validate_manifest(manifest, require_ready=True)
@@ -493,6 +588,9 @@ def execute(manifest_path: Path, state_path: Path) -> int:
             }
             atomic_json(state_path, state)
 
+        write_planned_schedule(
+            manifest, state_path, datetime.fromisoformat(state["campaign_start_utc"])
+        )
         global_deadline = datetime.fromisoformat(state["campaign_deadline_utc"])
         algorithm_deadline = datetime.fromisoformat(state["campaign_start_utc"]) + timedelta(
             seconds=manifest["campaign"]["algorithm_seconds"]
