@@ -407,6 +407,15 @@ def main():
     p.add_argument('--weka-evaluator-jar', default='/app/common-weka-evaluator.jar')
     a = p.parse_args()
 
+    # The per-run budget covers the complete application lifecycle, including
+    # dataset loading, feature ranking, and evaluator startup.
+    started_monotonic = time.monotonic()
+    selection_seconds = max(
+        1,
+        a.run_timeout_seconds - a.final_evaluation_reserve_seconds,
+    )
+    deadline = started_monotonic + selection_seconds
+
     random.seed(a.seed); np.random.seed(a.seed)
     out_dir = os.path.dirname(a.metrics_file)
     if out_dir: os.makedirs(out_dir, exist_ok=True)
@@ -441,12 +450,6 @@ def main():
         'max_accepted_improvements': a.max_accepted_improvements,
     }
     rng = random.Random(a.seed)
-    started_monotonic = time.monotonic()
-    selection_seconds = max(
-        1,
-        a.run_timeout_seconds - a.final_evaluation_reserve_seconds,
-    )
-    deadline = started_monotonic + selection_seconds
 
     first_write = not os.path.exists(a.metrics_file) or os.path.getsize(a.metrics_file) == 0
     with open(a.metrics_file, 'a', encoding='utf-8', newline='') as mf:
