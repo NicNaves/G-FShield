@@ -51,7 +51,7 @@ public class IwssrService {
     private boolean firstTime = true;
 
     public void doIwssr(DataSolution seed) throws Exception {
-        long startedAt = System.currentTimeMillis();
+        long startedAt = System.nanoTime();
         DataSolution data = updateSolution(seed);
         normalizeFeaturePartition(data);
         data.setLocalSearch(LocalSearch.IWSSR);
@@ -92,7 +92,7 @@ public class IwssrService {
                     bestSolution.getSeedId(),
                     bestSolution.getF1Score(),
                     bestSolution.getIterationLocalSearch(),
-                    System.currentTimeMillis() - startedAt
+                    (System.nanoTime() - startedAt) / 1_000_000L
             );
             kafkaSolutionsProducer.send(bestSolution);
         }
@@ -151,7 +151,7 @@ public class IwssrService {
         MetricsCollector collector = new MetricsCollector();
         collector.startCollecting();
 
-        long startTime = System.currentTimeMillis();
+        long startTime = System.nanoTime();
 
         if (solution.getRclfeatures().isEmpty()) {
             throw new IllegalStateException("IWSSR cannot add a feature from an empty RCL");
@@ -163,13 +163,13 @@ public class IwssrService {
 
         EvaluationResult scores = evaluateWithDataset(solution, trainingDataset, testingDataset, classifier);
 
-        long endTime = System.currentTimeMillis();
+        long endTime = System.nanoTime();
 
         solution.setF1Score(scores.getF1Score());
         solution.setAccuracy(scores.getAccuracy());
         solution.setPrecision(scores.getPrecision());
         solution.setRecall(scores.getRecall());
-        solution.setRunnigTime(endTime - startTime);
+        solution.setRunnigTime((endTime - startTime) / 1_000_000L);
         stampCandidate(solution, "iwssr-add");
 
         collector.stopCollectingAndAwait();
@@ -190,20 +190,20 @@ public class IwssrService {
             MetricsCollector collector = new MetricsCollector();
             collector.startCollecting();
 
-            long startTime = System.currentTimeMillis();
+            long startTime = System.nanoTime();
 
             DataSolution replaced = updateSolution(solution);
             replaced.getSolutionFeatures().remove(i);
 
             EvaluationResult scores = evaluateWithDataset(replaced, trainingDataset, testingDataset, classifier);
 
-            long endTime = System.currentTimeMillis();
+            long endTime = System.nanoTime();
 
             replaced.setF1Score(scores.getF1Score());
             replaced.setAccuracy(scores.getAccuracy());
             replaced.setPrecision(scores.getPrecision());
             replaced.setRecall(scores.getRecall());
-            replaced.setRunnigTime(endTime - startTime);
+            replaced.setRunnigTime((endTime - startTime) / 1_000_000L);
             stampCandidate(replaced, "iwssr-replace-" + i);
 
             collector.stopCollectingAndAwait();

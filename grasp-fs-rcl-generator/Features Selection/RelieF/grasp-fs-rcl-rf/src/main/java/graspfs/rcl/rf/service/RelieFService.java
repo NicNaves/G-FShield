@@ -29,7 +29,7 @@ public class RelieFService {
      */
     public void rankFeatures(DataSolution solution, Instances trainingDataset, int rclCutoff) throws Exception {
         try {
-            long rankingStartedAt = System.currentTimeMillis();
+            long rankingStartedAt = System.nanoTime();
             ArrayList<FeatureAvaliada> allFeatures = new ArrayList<>();
             ReliefFAttributeEval evaluator = new ReliefFAttributeEval();
             evaluator.buildEvaluator(trainingDataset);
@@ -37,7 +37,7 @@ public class RelieFService {
                     "rcl evaluator ready algorithm=RF rows={} attributes={} elapsedMs={}",
                     trainingDataset.numInstances(),
                     trainingDataset.numAttributes(),
-                    System.currentTimeMillis() - rankingStartedAt
+                    (System.nanoTime() - rankingStartedAt) / 1_000_000L
             );
 
             for (int i = 0; i < trainingDataset.numAttributes() - 1 && !deadlineReached(); i++) {
@@ -49,7 +49,7 @@ public class RelieFService {
                             "rcl ranking progress algorithm=RF evaluatedAttributes={}/{} elapsedMs={}",
                             i + 1,
                             trainingDataset.numAttributes(),
-                            System.currentTimeMillis() - rankingStartedAt
+                            (System.nanoTime() - rankingStartedAt) / 1_000_000L
                     );
                 }
             }
@@ -67,7 +67,7 @@ public class RelieFService {
                     rclCutoff,
                     rclFeatures.size(),
                     trainingDataset.numAttributes(),
-                    System.currentTimeMillis() - rankingStartedAt
+                    (System.nanoTime() - rankingStartedAt) / 1_000_000L
             );
 
         } catch (RuntimeException ex) {
@@ -135,7 +135,7 @@ public class RelieFService {
                 .useTrainingCache(rcl.getUseTrainingCache())
                 .build();
 
-        long startTime = System.currentTimeMillis();
+        long startTime = System.nanoTime();
 
         ArrayList<Integer> rclFeatures = new ArrayList<>(candidate.getRclfeatures());
         ArrayList<Integer> solutionFeatures = new ArrayList<>();
@@ -165,7 +165,7 @@ public class RelieFService {
         candidate.setAccuracy(result.getAccuracy());
         candidate.setPrecision(result.getPrecision());
         candidate.setRecall(result.getRecall());
-        candidate.setRunnigTime(System.currentTimeMillis() - startTime);
+        candidate.setRunnigTime((System.nanoTime() - startTime) / 1_000_000L);
 
         logger.info(
                 "rcl candidate evaluated algorithm=RF seedId={} sampleSize={} featureCount={} rclSize={} f1={} elapsedMs={}",

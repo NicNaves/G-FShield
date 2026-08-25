@@ -51,7 +51,7 @@ public class BitFlipService {
     private int progressEveryN;
 
     public void doBitFlip(DataSolution data) throws Exception {
-        long startedAt = System.currentTimeMillis();
+        long startedAt = System.nanoTime();
         data = updateSolution(data);
         normalizeFeaturePartition(data);
         data.setLocalSearch(LocalSearch.BIT_FLIP);
@@ -87,7 +87,7 @@ public class BitFlipService {
                     bestSolution.getSeedId(),
                     bestSolution.getF1Score(),
                     bestSolution.getIterationLocalSearch(),
-                    System.currentTimeMillis() - startedAt
+                    (System.nanoTime() - startedAt) / 1_000_000L
             );
 
             kafkaSolutionsProducer.send(bestSolution);
@@ -131,7 +131,7 @@ public class BitFlipService {
             solution.getRclfeatures().add(solution.getSolutionFeatures().remove(positionReplace));
             solution.setIterationLocalSearch(solution.getIterationLocalSearch() + 1);
 
-            long startTime = System.currentTimeMillis();
+            long startTime = System.nanoTime();
 
             MetricsCollector collector = new MetricsCollector();
             collector.startCollecting();
@@ -149,7 +149,7 @@ public class BitFlipService {
             solution.setPrecision(scores.getPrecision());
             solution.setAccuracy(scores.getAccuracy());
             solution.setRecall(scores.getRecall());
-            solution.setRunnigTime(System.currentTimeMillis() - startTime);
+            solution.setRunnigTime((System.nanoTime() - startTime) / 1_000_000L);
             stampCandidate(solution, "bitflip-swap");
 
             log.info(

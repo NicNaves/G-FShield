@@ -21,7 +21,7 @@ public class KafkaSolutionsConsumer {
         containerFactory = "solutionListenerContainerFactory"
     )
     public void consume(ConsumerRecord<String, DataSolution> record) {
-        long start = System.currentTimeMillis();
+        long start = System.nanoTime();
         DataSolution data = record.value();
 
         if (data == null) {
@@ -50,7 +50,7 @@ public class KafkaSolutionsConsumer {
                     "verify finished seedId={} localSearch={} elapsedMs={}",
                     data.getSeedId(),
                     data.getLocalSearch(),
-                    System.currentTimeMillis() - start
+                    (System.nanoTime() - start) / 1_000_000L
             );
         } catch (IllegalArgumentException ex) {
             log.error(

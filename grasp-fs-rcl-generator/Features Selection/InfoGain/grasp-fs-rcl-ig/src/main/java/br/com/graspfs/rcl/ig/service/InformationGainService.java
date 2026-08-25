@@ -29,7 +29,7 @@ public class InformationGainService {
      */
     public void rankFeatures(DataSolution solution, Instances trainingDataset, int rclCutoff) throws Exception {
         try {
-            long rankingStartedAt = System.currentTimeMillis();
+            long rankingStartedAt = System.nanoTime();
             ArrayList<FeatureAvaliada> allFeatures = new ArrayList<>();
             InfoGainAttributeEval evaluator = new InfoGainAttributeEval();
             evaluator.buildEvaluator(trainingDataset);
@@ -51,7 +51,7 @@ public class InformationGainService {
                     rclCutoff,
                     rclFeatures.size(),
                     trainingDataset.numAttributes(),
-                    System.currentTimeMillis() - rankingStartedAt
+                    (System.nanoTime() - rankingStartedAt) / 1_000_000L
             );
 
         } catch (RuntimeException ex) {
@@ -119,7 +119,7 @@ public class InformationGainService {
                 .useTrainingCache(rcl.getUseTrainingCache())
                 .build();
 
-        long startTime = System.currentTimeMillis();
+        long startTime = System.nanoTime();
 
         ArrayList<Integer> rclFeatures = new ArrayList<>(candidate.getRclfeatures());
         ArrayList<Integer> solutionFeatures = new ArrayList<>();
@@ -149,7 +149,7 @@ public class InformationGainService {
         candidate.setAccuracy(result.getAccuracy());
         candidate.setPrecision(result.getPrecision());
         candidate.setRecall(result.getRecall());
-        candidate.setRunnigTime(System.currentTimeMillis() - startTime);
+        candidate.setRunnigTime((System.nanoTime() - startTime) / 1_000_000L);
 
         logger.info(
                 "rcl candidate evaluated algorithm=IG seedId={} sampleSize={} featureCount={} rclSize={} f1={} elapsedMs={}",

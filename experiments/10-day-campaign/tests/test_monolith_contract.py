@@ -24,6 +24,22 @@ class MonolithContractTest(unittest.TestCase):
             self.assertIn('"confidence_factor": 0.25', source, path)
             self.assertIn('"minimum_instances_per_leaf": 2', source, path)
 
+    def test_java_wall_clock_is_used_only_for_cross_process_utc_deadlines(self):
+        roots = (
+            REPO / "grasp-fs-rcl-generator/Features Selection",
+            REPO / "grasp-fs-distributed-ls/Local Search",
+            REPO / "grasp-fs-distributed-ls/Neighborhood",
+            REPO / "grasp-fs-distributed-ls/Verify",
+        )
+        for root in roots:
+            for path in root.rglob("*.java"):
+                for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                    if "System.currentTimeMillis()" in line:
+                        self.assertTrue(
+                            "deadline" in line.lower() or "configured" in line.lower(),
+                            f"{path}:{number}",
+                        )
+
 
 if __name__ == "__main__":
     unittest.main()

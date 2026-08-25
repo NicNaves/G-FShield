@@ -29,7 +29,7 @@ public class SymmetricalUncertaintyService {
      */
     public void rankFeatures(DataSolution rcl, Instances trainingDataset, int rclCutoff) throws Exception {
         try {
-            long rankingStartedAt = System.currentTimeMillis();
+            long rankingStartedAt = System.nanoTime();
             ArrayList<FeatureAvaliada> allFeatures = new ArrayList<>();
             SymmetricalUncertAttributeEval evaluator = new SymmetricalUncertAttributeEval();
             evaluator.buildEvaluator(trainingDataset);
@@ -51,7 +51,7 @@ public class SymmetricalUncertaintyService {
                     rclCutoff,
                     rclFeatures.size(),
                     trainingDataset.numAttributes(),
-                    System.currentTimeMillis() - rankingStartedAt
+                    (System.nanoTime() - rankingStartedAt) / 1_000_000L
             );
 
         } catch (RuntimeException ex) {
@@ -119,7 +119,7 @@ public class SymmetricalUncertaintyService {
                 .useTrainingCache(rcl.getUseTrainingCache())
                 .build();
 
-        long startTime = System.currentTimeMillis();
+        long startTime = System.nanoTime();
 
         ArrayList<Integer> rclFeatures = new ArrayList<>(candidate.getRclfeatures());
         ArrayList<Integer> solutionFeatures = new ArrayList<>();
@@ -149,7 +149,7 @@ public class SymmetricalUncertaintyService {
         candidate.setAccuracy(result.getAccuracy());
         candidate.setPrecision(result.getPrecision());
         candidate.setRecall(result.getRecall());
-        candidate.setRunnigTime(System.currentTimeMillis() - startTime);
+        candidate.setRunnigTime((System.nanoTime() - startTime) / 1_000_000L);
 
         logger.info(
                 "rcl candidate evaluated algorithm=SU seedId={} sampleSize={} featureCount={} rclSize={} f1={} elapsedMs={}",

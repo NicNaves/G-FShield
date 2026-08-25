@@ -50,7 +50,7 @@ public class IwssService {
     private boolean firstTime = true;
 
     public void doIwss(DataSolution seed) throws Exception {
-        long startedAt = System.currentTimeMillis();
+        long startedAt = System.nanoTime();
         DataSolution data = updateSolution(seed);
         normalizeFeaturePartition(data);
         data.setLocalSearch(LocalSearch.IWSS);
@@ -89,7 +89,7 @@ public class IwssService {
                     bestSolution.getSeedId(),
                     bestSolution.getF1Score(),
                     bestSolution.getIterationLocalSearch(),
-                    System.currentTimeMillis() - startedAt
+                    (System.nanoTime() - startedAt) / 1_000_000L
             );
             kafkaSolutionsProducer.send(bestSolution);
         }
@@ -143,7 +143,7 @@ public class IwssService {
             Instances testingDataset,
             AbstractClassifier classifier
     ) throws Exception {
-        long startTime = System.currentTimeMillis();
+        long startTime = System.nanoTime();
 
         MetricsCollector collector = new MetricsCollector();
         collector.startCollecting();
@@ -169,7 +169,7 @@ public class IwssService {
         solution.setAccuracy(scores.getAccuracy());
         solution.setRecall(scores.getRecall());
         solution.setPrecision(scores.getPrecision());
-        solution.setRunnigTime(System.currentTimeMillis() - startTime);
+        solution.setRunnigTime((System.nanoTime() - startTime) / 1_000_000L);
         stampCandidate(solution, "iwss-add");
 
         log.info(

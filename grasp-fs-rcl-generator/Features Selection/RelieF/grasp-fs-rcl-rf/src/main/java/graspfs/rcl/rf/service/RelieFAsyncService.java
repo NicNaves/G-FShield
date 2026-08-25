@@ -57,7 +57,7 @@ public class RelieFAsyncService {
             boolean isFirstTime,
             String requestId
     ) {
-        long requestStartedAt = System.currentTimeMillis();
+        long requestStartedAt = System.nanoTime();
         long requestStartedMonotonic = System.nanoTime();
         long campaignStartedMonotonic = environmentLong("CAMPAIGN_START_MONOTONIC_NS", requestStartedMonotonic);
         long deadlineEpochMs = environmentLong("CAMPAIGN_DEADLINE_EPOCH_MS", Long.MAX_VALUE);
@@ -106,7 +106,7 @@ public class RelieFAsyncService {
                 for (int generation = 0;
                      generation < maxGenerations && System.currentTimeMillis() < deadlineEpochMs;
                      generation++) {
-                    long generationStartedAt = System.currentTimeMillis();
+                    long generationStartedAt = System.nanoTime();
                     DataSolution generatedSolution = relieFService.GenerationSolutions(
                             dataSolution,
                             sampleSize,
@@ -141,7 +141,7 @@ public class RelieFAsyncService {
                             requestId,
                             generation + 1,
                             generatedSolution.getSeedId(),
-                            System.currentTimeMillis() - generationStartedAt
+                            (System.nanoTime() - generationStartedAt) / 1_000_000L
                     );
                 }
             }
@@ -150,7 +150,7 @@ public class RelieFAsyncService {
                     "rcl async completed algorithm={} requestId={} elapsedMs={}",
                     ALGORITHM_NAME,
                     requestId,
-                    System.currentTimeMillis() - requestStartedAt
+                    (System.nanoTime() - requestStartedAt) / 1_000_000L
             );
         } catch (Exception ex) {
             logger.error("rcl async failed algorithm={} requestId={}", ALGORITHM_NAME, requestId, ex);
@@ -182,7 +182,7 @@ public class RelieFAsyncService {
                 useTrainingCache
         );
 
-        long startedAt = System.currentTimeMillis();
+        long startedAt = System.nanoTime();
         if (useTrainingCache) {
             Instances dataset = MachineLearningUtils.lerDataset(datasetFile.toPath(), true);
             logger.info(
@@ -192,7 +192,7 @@ public class RelieFAsyncService {
                     datasetType,
                     dataset.numInstances(),
                     dataset.numAttributes(),
-                    System.currentTimeMillis() - startedAt
+                    (System.nanoTime() - startedAt) / 1_000_000L
             );
             return dataset;
         }
@@ -206,7 +206,7 @@ public class RelieFAsyncService {
                     datasetType,
                     dataset.numInstances(),
                     dataset.numAttributes(),
-                    System.currentTimeMillis() - startedAt
+                    (System.nanoTime() - startedAt) / 1_000_000L
             );
             return dataset;
         }
