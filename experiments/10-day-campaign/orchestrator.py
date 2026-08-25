@@ -324,20 +324,63 @@ def attach_result_artifact(
     )
     experimental_status = result.get("status")
     valid_status = experimental_status in {"completed", "timeout"}
+    contract_issues = result_contract_issues(result)
     process_result.update(
         {
-            "artifact_valid": bool(identities_match and valid_status),
+            "artifact_valid": bool(identities_match and valid_status and not contract_issues),
             "result_sha256": hashlib.sha256(raw).hexdigest(),
             "experimental_status": experimental_status,
             "experimental_stop_reason": result.get("stop_reason"),
             "experimental_error_code": result.get("error_code"),
+            "contract_issues": contract_issues,
         }
     )
     if not identities_match:
         process_result["artifact_error"] = "result identity mismatch"
     elif not valid_status:
         process_result["artifact_error"] = f"invalid experimental status: {experimental_status!r}"
+    elif contract_issues:
+        process_result["artifact_error"] = "; ".join(contract_issues)
     return bool(process_result["artifact_valid"])
+
+
+def result_contract_issues(result: dict[str, Any]) -> list[str]:
+    schema = load_json(Path(__file__).with_name("result-schema.json"))
+    issues: list[str] = []
+    missing = [field for field in schema["required"] if field not in result]
+    if missing:
+        issues.append(f"missing required result fields: {missing}")
+    if result.get("stage") != "end_to_end":
+        issues.append("result stage is not end_to_end")
+    features = result.get("selected_features")
+    if not isinstance(features, list) or not features or len(features) != len(set(features)):
+        issues.append("selected feature subset is empty, invalid, or duplicated")
+    for field in (
+        "validation_f1_macro", "validation_f1_weighted",
+        "validation_precision_macro", "validation_precision_weighted",
+        "validation_recall_macro", "validation_recall_weighted",
+        "test_f1_macro", "test_f1_weighted", "test_precision_macro",
+        "test_recall_macro", "accuracy",
+    ):
+        value = result.get(field)
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or not 0 <= value <= 1:
+            issues.append(f"{field} is not a 0-1 numeric metric")
+    for field in ("dataset_hash", "train_hash", "validation_hash", "test_hash"):
+        value = result.get(field)
+        if not isinstance(value, str) or len(value) != 64:
+            issues.append(f"{field} is not a SHA-256 value")
+    expected_parameters = {
+        "confidence_factor": 0.25,
+        "minimum_instances_per_leaf": 2,
+        "pruned": True,
+    }
+    if result.get("classifier") != "Weka J48":
+        issues.append("classifier is not the common Weka J48")
+    if result.get("classifier_version") != "weka-stable 3.8.6":
+        issues.append("classifier version is not weka-stable 3.8.6")
+    if result.get("classifier_parameters") != expected_parameters:
+        issues.append("classifier parameters differ from the frozen J48 contract")
+    return issues
 
 
 def verify_free_disk(

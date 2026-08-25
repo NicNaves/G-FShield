@@ -94,11 +94,42 @@ class OrchestratorPreflightTest(unittest.TestCase):
                         "run_id": "run",
                         "status": "timeout",
                         "stop_reason": "run_timeout",
+                        **{
+                            field: None
+                            for field in json.loads(
+                                (ROOT / "result-schema.json").read_text(encoding="utf-8")
+                            )["required"]
+                        },
                     }
                 ),
                 encoding="utf-8",
             )
             record = {}
+            complete = json.loads(result_path.read_text(encoding="utf-8"))
+            complete.update(
+                {
+                    "campaign_id": "campaign", "arm_id": "arm", "run_id": "run",
+                    "status": "timeout", "stop_reason": "run_timeout", "stage": "end_to_end",
+                    "selected_features": [0], "classifier": "Weka J48",
+                    "classifier_version": "weka-stable 3.8.6",
+                    "classifier_parameters": {
+                        "confidence_factor": 0.25,
+                        "minimum_instances_per_leaf": 2,
+                        "pruned": True,
+                    },
+                }
+            )
+            for field in (
+                "validation_f1_macro", "validation_f1_weighted",
+                "validation_precision_macro", "validation_precision_weighted",
+                "validation_recall_macro", "validation_recall_weighted",
+                "test_f1_macro", "test_f1_weighted", "test_precision_macro",
+                "test_recall_macro", "accuracy",
+            ):
+                complete[field] = 0.9
+            for field in ("dataset_hash", "train_hash", "validation_hash", "test_hash"):
+                complete[field] = "a" * 64
+            result_path.write_text(json.dumps(complete), encoding="utf-8")
             self.assertTrue(
                 ORCHESTRATOR.attach_result_artifact(
                     record, result_path, "campaign", "arm", "run"
