@@ -141,6 +141,7 @@ def main() -> int:
         "baseline": {
             "arm_id": "baseline-all-features",
             "maximum_seconds": 8 * 60 * 60,
+            "run_timeout_seconds": 60 * 60,
             "command": None,
             "ready": False,
         },

@@ -97,6 +97,8 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
         baseline_config = manifest.get("baseline", {})
         if not baseline_config.get("ready") or not baseline_config.get("command"):
             errors.append("baseline is not frozen and runnable")
+        if baseline_config.get("run_timeout_seconds", 0) <= 0:
+            errors.append("baseline run timeout is invalid")
         git_config = manifest.get("git", {})
         if "TO_BE_FROZEN" in json.dumps(git_config):
             errors.append("git commit/tag are not frozen")
@@ -283,6 +285,63 @@ def execute(manifest_path: Path, state_path: Path) -> int:
             atomic_json(state_path, state)
 
         state["state"] = "CAMPAIGN_ALGORITHMS_COMPLETED"
+        state["current_arm"] = None
+        atomic_json(state_path, state)
+
+        baseline = manifest["baseline"]
+        baseline_start = utc_now()
+        baseline_deadline = min(
+            baseline_start + timedelta(seconds=baseline["maximum_seconds"]),
+            datetime.fromisoformat(state["campaign_start_utc"])
+            + timedelta(
+                seconds=manifest["campaign"]["maximum_seconds"]
+                - manifest["campaign"]["reserve_seconds"]
+            ),
+        )
+        state.update(
+            {
+                "state": "RUNNING_ARM",
+                "current_arm": baseline["arm_id"],
+                "arm_start_utc": iso(baseline_start),
+                "arm_deadline_utc": iso(baseline_deadline),
+            }
+        )
+        atomic_json(state_path, state)
+        completed_baseline_seeds = {
+            run["seed"]
+            for run in state["completed_runs"]
+            if run["arm_id"] == baseline["arm_id"]
+        }
+        for seed in seeds:
+            if seed in completed_baseline_seeds:
+                continue
+            remaining = (baseline_deadline - utc_now()).total_seconds()
+            timeout_seconds = baseline["run_timeout_seconds"]
+            if remaining < timeout_seconds + 10 * 60:
+                break
+            run_id = f"{baseline['arm_id']}-s{seed}-{uuid.uuid4().hex[:12]}"
+            context = {
+                "campaign_id": manifest["campaign_id"],
+                "arm_id": baseline["arm_id"],
+                "run_id": run_id,
+                "seed": seed,
+                "run_timeout_seconds": timeout_seconds,
+            }
+            command = format_command(baseline["command"], context)
+            environment = os.environ.copy()
+            environment.update({key.upper(): str(value) for key, value in context.items()})
+            result = run_once(
+                command,
+                timeout_seconds,
+                grace,
+                result_root / baseline["arm_id"] / f"{run_id}.log",
+                environment,
+            )
+            result.update({"arm_id": baseline["arm_id"], "run_id": run_id, "seed": seed})
+            state["completed_runs"].append(result)
+            atomic_json(state_path, state)
+
+        state["state"] = "CAMPAIGN_EXPERIMENTS_COMPLETED"
         state["current_arm"] = None
         atomic_json(state_path, state)
     return 0

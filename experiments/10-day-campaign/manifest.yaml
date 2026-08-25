@@ -291,7 +291,8 @@
     "arm_id": "baseline-all-features",
     "command": null,
     "maximum_seconds": 28800,
-    "ready": false
+    "ready": false,
+    "run_timeout_seconds": 3600
   },
   "campaign": {
     "algorithm_seconds": 748800,
@@ -317,7 +318,7 @@
     "train_sha256": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
     "validation_sha256": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a"
   },
-  "generated_utc": "2026-08-25T02:51:47.573958+00:00",
+  "generated_utc": "2026-08-25T03:15:54.895687+00:00",
   "git": {
     "commit": "TO_BE_FROZEN_AFTER_PILOT",
     "tag": "experiment-10d-v1"
