@@ -69,6 +69,20 @@ The freeze step also writes tracked `frozen-compose.yaml` and
 The host record deliberately excludes credentials and captures Docker/cgroup,
 CPU, memory, operating-system, and concurrent-container context.
 
+If campaign-control code was committed after the pilot images were built, pass
+the exact pilot build commit separately so image and launcher provenance remain
+truthful:
+
+```sh
+python3 experiments/10-day-campaign/freeze_manifest.py \
+  --manifest experiments/10-day-campaign/manifest.yaml \
+  --pilot-report /path/to/formal-pilots/pilot-report.json \
+  --resilience-report /path/to/formal-pilots/resilience-report.json \
+  --image-tag pilot-IMAGE_BUILD_COMMIT \
+  --image-source-commit IMAGE_BUILD_COMMIT \
+  --campaign-tag experiment-10d-v1
+```
+
 ## Durable launch and external watchdog
 
 The official process is launched through `campaign_supervisor.py`, not by

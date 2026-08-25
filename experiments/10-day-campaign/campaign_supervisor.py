@@ -222,6 +222,7 @@ def supervise(args: argparse.Namespace) -> int:
                         return 7
                     remaining = hard_deadline_monotonic - time.monotonic()
                     time.sleep(min(args.restart_delay_seconds, max(0.0, remaining)))
+                    child = None
                     continue
                 rotate_log(args.log, args.log_rotation_bytes)
                 command = [

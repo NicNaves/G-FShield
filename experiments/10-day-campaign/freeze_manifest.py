@@ -198,6 +198,13 @@ def main() -> int:
     parser.add_argument("--pilot-report", type=Path, required=True)
     parser.add_argument("--resilience-report", type=Path, required=True)
     parser.add_argument("--image-tag", required=True)
+    parser.add_argument(
+        "--image-source-commit",
+        help=(
+            "Git commit used to build the local images. Defaults to HEAD; pass the "
+            "pilot build commit when campaign-only code changed after image creation."
+        ),
+    )
     parser.add_argument("--campaign-tag", default="experiment-10d-v1")
     parser.add_argument("--resolved-compose", type=Path)
     parser.add_argument("--host-provenance", type=Path)
@@ -220,7 +227,9 @@ def main() -> int:
     if resilience.get("formal_pilot_sha256") != sha256_file(args.pilot_report):
         raise RuntimeError("resilience report does not attest this formal pilot report")
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
-    source_commit = checked("git", "rev-parse", "HEAD", cwd=repo_root)
+    source_commit = checked(
+        "git", "rev-parse", args.image_source_commit or "HEAD", cwd=repo_root
+    )
     branch = checked("git", "branch", "--show-current", cwd=repo_root)
     images = image_metadata(args.image_tag)
     compose_text = resolved_compose(repo_root, args.image_tag)

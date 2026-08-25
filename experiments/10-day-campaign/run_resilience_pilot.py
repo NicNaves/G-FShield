@@ -108,7 +108,7 @@ def source_audit(repo_root: Path) -> tuple[list[str], dict[str, str]]:
     return issues, hashes
 
 
-def operational_checks() -> tuple[list[str], dict[str, Any]]:
+def operational_checks(repo_root: Path) -> tuple[list[str], dict[str, Any]]:
     issues: list[str] = []
     evidence: dict[str, Any] = {}
     if os.name != "posix":
@@ -189,6 +189,32 @@ def operational_checks() -> tuple[list[str], dict[str, Any]]:
             "checksum_created": bool(sidecar and sidecar.exists()),
             "source_bytes": len(original),
         }
+        restart_test = subprocess.run(
+            [
+                sys.executable,
+                str(
+                    repo_root
+                    / "experiments/10-day-campaign/tests/test_campaign_supervisor.py"
+                ),
+                (
+                    "CampaignSupervisorTest."
+                    "test_exited_orchestrator_is_replaced_before_restart_limit"
+                ),
+            ],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+        if restart_test.returncode != 0:
+            issues.append("the external supervisor did not restart an exited orchestrator")
+        evidence["orchestrator_restart"] = {
+            "passed": restart_test.returncode == 0,
+            "return_code": restart_test.returncode,
+            "test": (
+                "CampaignSupervisorTest."
+                "test_exited_orchestrator_is_replaced_before_restart_limit"
+            ),
+        }
     return issues, evidence
 
 
@@ -225,7 +251,7 @@ def main() -> int:
     pilot = json.loads(args.pilot_report.read_text(encoding="utf-8"))
     scientific_issues = validate_scientific_evidence(pilot)
     source_issues, source_hashes = source_audit(repo_root)
-    operational_issues, operations = operational_checks()
+    operational_issues, operations = operational_checks(repo_root)
     elapsed = sum(
         max(1, int(((case.get("result") or {}).get("run_elapsed_ms") or 0) / 1000))
         for case in (pilot.get("cases") or {}).values()
@@ -245,7 +271,7 @@ def main() -> int:
         "checks": {
             "scientific_result_contract": not scientific_issues,
             "holdout_source_audit": not source_issues,
-            "sigterm_sigkill_checkpoint_resume_orphan_rotation": not operational_issues,
+            "sigterm_sigkill_checkpoint_resume_orphan_rotation_restart": not operational_issues,
             "storage_projection": not storage_issues,
         },
         "issues": issues,
