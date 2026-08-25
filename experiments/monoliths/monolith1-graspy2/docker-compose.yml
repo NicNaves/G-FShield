@@ -1,0 +1,37 @@
+version: "3.9"
+
+services:
+  graspys-fs:
+    build: .
+    image: graspys-fs:latest
+    container_name: graspys-fs
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/data:ro          # datasets (somente leitura)
+      - ./logs:/logs             # métricas/saída
+    # Apenas os argumentos (ENTRYPOINT já é "python /app/main.py")
+    command: >
+      --training /data/erenoall.arff
+      --testing  /data/erenoall.arff
+      --label-col class
+      --max-generations 3000
+      --rcl-cutoff 30
+      --sample-size 5
+      --feature-selector gainratio
+      --local-search bitflip
+      --classifier j48
+      --metrics-file /logs/GainRatio_METRICS.csv
+      --seed 42
+      --max-iterations-local 100
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,sys; sys.exit(0 if os.path.isdir('/logs') and os.path.isdir('/data') else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
