@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 import os
 import re
@@ -145,6 +146,27 @@ class OrchestratorPreflightTest(unittest.TestCase):
                 )
             )
             self.assertEqual("result identity mismatch", invalid["artifact_error"])
+
+    def test_checksum_manifest_and_resume_revalidation_detect_tampering(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "raw.log").write_text("raw evidence\n", encoding="utf-8")
+            checksum_path = ORCHESTRATOR.write_checksum_manifest(root)
+            self.assertIn("raw.log", checksum_path.read_text(encoding="utf-8"))
+
+            result_path = root / "final-result.json"
+            result_path.write_text("{}", encoding="utf-8")
+            state_path = root / "state.json"
+            state = {
+                "campaign_id": "campaign",
+                "completed_runs": [{
+                    "arm_id": "arm", "run_id": "run", "artifact_valid": True,
+                    "result_path": str(result_path),
+                    "result_sha256": hashlib.sha256(result_path.read_bytes()).hexdigest(),
+                }],
+            }
+            ORCHESTRATOR.revalidate_completed_runs(state, state_path)
+            self.assertFalse(state["completed_runs"][0]["artifact_valid"])
 
 
 if __name__ == "__main__":

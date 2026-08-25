@@ -556,6 +556,8 @@ def run_distributed(args: argparse.Namespace) -> int:
     stop_reason = "run_timeout"
     try:
         stack.down()
+        with (result_dir / "resolved-compose.yaml").open("w", encoding="utf-8", newline="\n") as resolved:
+            stack.call("config", stdout=resolved)
         with (result_dir / "compose-up.log").open("w", encoding="utf-8", newline="\n") as startup_log:
             stack.call(
                 "up", "-d", "--no-build", *services,

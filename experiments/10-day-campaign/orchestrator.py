@@ -344,6 +344,54 @@ def attach_result_artifact(
     return bool(process_result["artifact_valid"])
 
 
+def write_checksum_manifest(root: Path) -> Path:
+    destination = root / "checksums.sha256"
+    entries: list[str] = []
+    for path in sorted(item for item in root.rglob("*") if item.is_file()):
+        if path == destination or path.name.startswith(f".{destination.name}."):
+            continue
+        entries.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(root).as_posix()}")
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{destination.name}.", dir=root)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write("\n".join(entries) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_name, destination)
+    except BaseException:
+        try:
+            os.unlink(temporary_name)
+        except FileNotFoundError:
+            pass
+        raise
+    return destination
+
+
+def revalidate_completed_runs(state: dict[str, Any], state_path: Path) -> None:
+    changed = False
+    for run in state.get("completed_runs", []):
+        if run.get("artifact_valid") is not True:
+            continue
+        original_sha = run.get("result_sha256")
+        result_path = Path(str(run.get("result_path") or ""))
+        valid = attach_result_artifact(
+            run,
+            result_path,
+            str(state.get("campaign_id") or ""),
+            str(run.get("arm_id") or ""),
+            str(run.get("run_id") or ""),
+        )
+        if original_sha and run.get("result_sha256") != original_sha:
+            run["artifact_valid"] = False
+            run["artifact_error"] = "final-result.json checksum changed after completion"
+            valid = False
+        if not valid:
+            run["revalidated_utc"] = iso(utc_now())
+            changed = True
+    if changed:
+        atomic_json(state_path, state)
+
+
 def result_contract_issues(result: dict[str, Any]) -> list[str]:
     schema = load_json(Path(__file__).with_name("result-schema.json"))
     issues: list[str] = []
@@ -451,6 +499,7 @@ def execute(manifest_path: Path, state_path: Path) -> int:
         )
         grace = manifest["stopping"]["graceful_shutdown_seconds"]
         recover_orphan(state, state_path, grace)
+        revalidate_completed_runs(state, state_path)
         seeds = manifest["seeds"]
         result_root = manifest_path.parent / "results" / "raw"
         result_root.mkdir(parents=True, exist_ok=True)
@@ -552,6 +601,11 @@ def execute(manifest_path: Path, state_path: Path) -> int:
                         arm["arm_id"],
                         run_id,
                     )
+                    checksum_path = write_checksum_manifest(run_output)
+                    result["checksum_manifest_path"] = str(checksum_path)
+                    result["checksum_manifest_sha256"] = hashlib.sha256(
+                        checksum_path.read_bytes()
+                    ).hexdigest()
                     state["completed_runs"].append(result)
                     atomic_json(state_path, state)
                     if artifact_valid:
@@ -651,6 +705,11 @@ def execute(manifest_path: Path, state_path: Path) -> int:
                     baseline["arm_id"],
                     run_id,
                 )
+                checksum_path = write_checksum_manifest(run_output)
+                result["checksum_manifest_path"] = str(checksum_path)
+                result["checksum_manifest_sha256"] = hashlib.sha256(
+                    checksum_path.read_bytes()
+                ).hexdigest()
                 state["completed_runs"].append(result)
                 atomic_json(state_path, state)
                 if artifact_valid:
