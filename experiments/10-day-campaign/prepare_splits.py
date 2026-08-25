@@ -152,6 +152,11 @@ def main() -> int:
                     for split_name in ("train", "validation", "test"):
                         for original_index, _, label in sorted(splits[split_name]):
                             writer.writerow([original_index, split_name, label])
+        # Python/zlib writes a platform-specific gzip OS byte (offset 9).
+        # RFC 1952 reserves 255 for "unknown", giving a canonical stream.
+        with open(temporary_name, "r+b") as binary_handle:
+            binary_handle.seek(9)
+            binary_handle.write(b"\xff")
         os.replace(temporary_name, index_path)
     except BaseException:
         try:
