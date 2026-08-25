@@ -1,0 +1,379 @@
+{
+  "arms": [
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-ig-vnd-bitflip",
+      "command": null,
+      "construction": "ig",
+      "controller": "vnd",
+      "local_search": "bitflip",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-ig-vnd-iwss",
+      "command": null,
+      "construction": "ig",
+      "controller": "vnd",
+      "local_search": "iwss",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-ig-vnd-iwssr",
+      "command": null,
+      "construction": "ig",
+      "controller": "vnd",
+      "local_search": "iwssr",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-ig-rvnd-bitflip",
+      "command": null,
+      "construction": "ig",
+      "controller": "rvnd",
+      "local_search": "bitflip",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-ig-rvnd-iwss",
+      "command": null,
+      "construction": "ig",
+      "controller": "rvnd",
+      "local_search": "iwss",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-ig-rvnd-iwssr",
+      "command": null,
+      "construction": "ig",
+      "controller": "rvnd",
+      "local_search": "iwssr",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-gr-vnd-bitflip",
+      "command": null,
+      "construction": "gr",
+      "controller": "vnd",
+      "local_search": "bitflip",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-gr-vnd-iwss",
+      "command": null,
+      "construction": "gr",
+      "controller": "vnd",
+      "local_search": "iwss",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-gr-vnd-iwssr",
+      "command": null,
+      "construction": "gr",
+      "controller": "vnd",
+      "local_search": "iwssr",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-gr-rvnd-bitflip",
+      "command": null,
+      "construction": "gr",
+      "controller": "rvnd",
+      "local_search": "bitflip",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-gr-rvnd-iwss",
+      "command": null,
+      "construction": "gr",
+      "controller": "rvnd",
+      "local_search": "iwss",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-gr-rvnd-iwssr",
+      "command": null,
+      "construction": "gr",
+      "controller": "rvnd",
+      "local_search": "iwssr",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-su-vnd-bitflip",
+      "command": null,
+      "construction": "su",
+      "controller": "vnd",
+      "local_search": "bitflip",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-su-vnd-iwss",
+      "command": null,
+      "construction": "su",
+      "controller": "vnd",
+      "local_search": "iwss",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-su-vnd-iwssr",
+      "command": null,
+      "construction": "su",
+      "controller": "vnd",
+      "local_search": "iwssr",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-su-rvnd-bitflip",
+      "command": null,
+      "construction": "su",
+      "controller": "rvnd",
+      "local_search": "bitflip",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-su-rvnd-iwss",
+      "command": null,
+      "construction": "su",
+      "controller": "rvnd",
+      "local_search": "iwss",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-su-rvnd-iwssr",
+      "command": null,
+      "construction": "su",
+      "controller": "rvnd",
+      "local_search": "iwssr",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-relieff-vnd-bitflip",
+      "command": null,
+      "construction": "relieff",
+      "controller": "vnd",
+      "local_search": "bitflip",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-relieff-vnd-iwss",
+      "command": null,
+      "construction": "relieff",
+      "controller": "vnd",
+      "local_search": "iwss",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-relieff-vnd-iwssr",
+      "command": null,
+      "construction": "relieff",
+      "controller": "vnd",
+      "local_search": "iwssr",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-relieff-rvnd-bitflip",
+      "command": null,
+      "construction": "relieff",
+      "controller": "rvnd",
+      "local_search": "bitflip",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-relieff-rvnd-iwss",
+      "command": null,
+      "construction": "relieff",
+      "controller": "rvnd",
+      "local_search": "iwss",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "distributed",
+      "arm_id": "distributed-relieff-rvnd-iwssr",
+      "command": null,
+      "construction": "relieff",
+      "controller": "rvnd",
+      "local_search": "iwssr",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "monolith1-graspy2",
+      "arm_id": "monolith1-gr-bitflip",
+      "command": null,
+      "construction": "gr",
+      "controller": null,
+      "local_search": "bitflip",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    },
+    {
+      "architecture": "monolith2-graspy",
+      "arm_id": "monolith2-gr-iwss",
+      "command": null,
+      "construction": "gr",
+      "controller": "vnd",
+      "local_search": "iwss",
+      "ready": false,
+      "run_timeout_seconds": 3300,
+      "window_seconds": 28800
+    }
+  ],
+  "baseline": {
+    "arm_id": "baseline-all-features",
+    "command": null,
+    "maximum_seconds": 28800,
+    "ready": false
+  },
+  "campaign": {
+    "algorithm_seconds": 748800,
+    "baseline_maximum_seconds": 28800,
+    "deadline_utc": null,
+    "maximum_seconds": 864000,
+    "reserve_seconds": 86400,
+    "start_utc": null
+  },
+  "campaign_id": "gfshield-10d-2026-v1",
+  "classifier": {
+    "metric_scale": "0_to_1",
+    "name": "Weka J48",
+    "parameters": {},
+    "primary_metric": "macro_f1",
+    "version": "TO_BE_FROZEN"
+  },
+  "dataset": {
+    "index_sha256": "3e1be320d5746e7523b413b92f358c942a7db280f81bb8a36e443d80628f1ef4",
+    "source_sha256": "60ebfcdc9c209e5c760e2bdbf5be75dfe4d931b81442597b0ef32e2f5fe6c1f6",
+    "split_seed": 20260825,
+    "test_sha256": "05d393c5881aec032664ef4a84e18337988e819edc74664fe1255757961cfab4",
+    "train_sha256": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
+    "validation_sha256": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a"
+  },
+  "generated_utc": "2026-08-25T01:44:18.245606+00:00",
+  "git": {
+    "commit": "TO_BE_FROZEN_AFTER_PILOT",
+    "tag": "experiment-10d-v1"
+  },
+  "paths": {
+    "normalized_results": "experiments/10-day-campaign/results/normalized",
+    "raw_results": "experiments/10-day-campaign/results/raw",
+    "result_schema": "experiments/10-day-campaign/result-schema.json",
+    "state": "experiments/10-day-campaign/state/campaign-state.json"
+  },
+  "readiness_blockers": [
+    "commands_not_frozen",
+    "common_weka_j48_evaluator_not_validated",
+    "resource_budget_not_verified_on_target",
+    "pilot_not_approved",
+    "git_commit_and_image_digests_not_frozen"
+  ],
+  "ready": false,
+  "resources": {
+    "aggregate_cpus": "TO_BE_FROZEN_AFTER_SERVER_PILOT",
+    "aggregate_memory": "TO_BE_FROZEN_AFTER_SERVER_PILOT",
+    "cpuset": "TO_BE_FROZEN_AFTER_SERVER_PILOT",
+    "numa_node": "TO_BE_FROZEN_AFTER_SERVER_PILOT"
+  },
+  "schema_version": 1,
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67
+  ],
+  "stopping": {
+    "graceful_shutdown_seconds": 300,
+    "maximum_accepted_improvements": 500,
+    "minimum_improvement": 0.0001
+  }
+}
