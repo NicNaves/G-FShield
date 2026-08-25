@@ -59,6 +59,10 @@ python3 experiments/10-day-campaign/run_resilience_pilot.py \
 
 Manifest freezing requires both the formal report and the resulting approved
 `resilience-report.json`.
+The freeze step also writes tracked `frozen-compose.yaml` and
+`host-provenance.json` artifacts; their hashes are embedded in the manifest.
+The host record deliberately excludes credentials and captures Docker/cgroup,
+CPU, memory, operating-system, and concurrent-container context.
 
 ## Durable launch and external watchdog
 

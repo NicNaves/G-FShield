@@ -141,6 +141,15 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
             errors.append("formal pilot evidence is not approved")
         if manifest.get("resilience_evidence", {}).get("approved") is not True:
             errors.append("resilience pilot evidence is not approved")
+        for evidence_name in ("compose_evidence", "host_evidence"):
+            evidence = manifest.get(evidence_name, {})
+            evidence_hashes = [
+                value for key, value in evidence.items() if key.endswith("sha256")
+            ]
+            if not evidence_hashes or any(
+                not isinstance(value, str) or len(value) != 64 for value in evidence_hashes
+            ):
+                errors.append(f"{evidence_name} is incomplete or unhashed")
         images = manifest.get("images", {})
         local_images = [value for value in images.values() if isinstance(value, dict) and value.get("image_id")]
         if len(local_images) < 13 or any(

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,10 +40,65 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def checked(*command: str, cwd: Path | None = None) -> str:
+def checked(
+    *command: str, cwd: Path | None = None, environment: dict[str, str] | None = None
+) -> str:
     return subprocess.run(
-        list(command), cwd=cwd, check=True, capture_output=True, text=True
+        list(command), cwd=cwd, env=environment, check=True, capture_output=True, text=True
     ).stdout.strip()
+
+
+def host_provenance() -> dict[str, Any]:
+    return {
+        "captured_utc": datetime.now(timezone.utc).isoformat(),
+        "uname": checked("uname", "-a"),
+        "os_release": Path("/etc/os-release").read_text(encoding="utf-8", errors="replace"),
+        "lscpu": json.loads(checked("lscpu", "--json")),
+        "meminfo": Path("/proc/meminfo").read_text(encoding="utf-8", errors="replace"),
+        "docker_server_version": checked("docker", "version", "--format", "{{.Server.Version}}"),
+        "docker_compose_version": checked("docker", "compose", "version", "--short"),
+        "docker_cgroup_driver": checked("docker", "info", "--format", "{{.CgroupDriver}}"),
+        "docker_cgroup_version": checked("docker", "info", "--format", "{{.CgroupVersion}}"),
+        "docker_root_dir": checked("docker", "info", "--format", "{{.DockerRootDir}}"),
+        "docker_runtime_cpus": int(checked("docker", "info", "--format", "{{.NCPU}}")),
+        "docker_runtime_memory_bytes": int(checked("docker", "info", "--format", "{{.MemTotal}}")),
+        "containers_present_at_freeze": checked(
+            "docker", "ps", "--format", "{{.Names}}|{{.Image}}|{{.Status}}"
+        ).splitlines(),
+        "swap_accounting_limitation": (
+            "The host kernel does not expose Docker swap accounting; memory limits are enforced, "
+            "but a separately verified swap limit is unavailable."
+        ),
+    }
+
+
+def resolved_compose(repo_root: Path, image_tag: str) -> str:
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "CAMPAIGN_DATASET_DIR": str((repo_root / "datasets").resolve()),
+            "CAMPAIGN_METRICS_DIR": str(
+                (repo_root / "experiments/10-day-campaign/frozen-metrics-placeholder").resolve()
+            ),
+            "CAMPAIGN_ID": "gfshield-10d-2026-v1",
+            "CAMPAIGN_ARM_ID": "distributed-ig-vnd-bitflip",
+            "CAMPAIGN_RUN_ID": "RUN_ID_ASSIGNED_BY_ORCHESTRATOR",
+            "CAMPAIGN_REQUEST_ID": "REQUEST_ID_ASSIGNED_BY_ORCHESTRATOR",
+            "CAMPAIGN_RANDOM_SEED": "42",
+            "CAMPAIGN_DEADLINE_EPOCH_MS": "ASSIGNED_PER_RUN",
+            "CAMPAIGN_START_MONOTONIC_NS": "ASSIGNED_PER_RUN",
+            "CAMPAIGN_RCL_HOST_PORT": "18089",
+            "CAMPAIGN_CPUSET": "8-15",
+            "CAMPAIGN_IMAGE_TAG": image_tag,
+            "CAMPAIGN_MINIMUM_IMPROVEMENT": "0.0001",
+            "CAMPAIGN_MAX_ACCEPTED_IMPROVEMENTS": "500",
+        }
+    )
+    compose = repo_root / "experiments/10-day-campaign/docker-compose.campaign.yml"
+    return checked(
+        "docker", "compose", "-f", str(compose), "config",
+        cwd=repo_root, environment=environment,
+    ) + "\n"
 
 
 def image_metadata(image_tag: str) -> dict[str, dict[str, Any]]:
@@ -143,8 +199,14 @@ def main() -> int:
     parser.add_argument("--resilience-report", type=Path, required=True)
     parser.add_argument("--image-tag", required=True)
     parser.add_argument("--campaign-tag", default="experiment-10d-v1")
+    parser.add_argument("--resolved-compose", type=Path)
+    parser.add_argument("--host-provenance", type=Path)
     args = parser.parse_args()
     repo_root = Path(__file__).resolve().parents[2]
+    if args.resolved_compose is None:
+        args.resolved_compose = args.manifest.with_name("frozen-compose.yaml")
+    if args.host_provenance is None:
+        args.host_provenance = args.manifest.with_name("host-provenance.json")
     if checked("git", "status", "--porcelain", cwd=repo_root):
         raise RuntimeError("refusing to freeze a manifest from a dirty worktree")
     pilot = json.loads(args.pilot_report.read_text(encoding="utf-8"))
@@ -161,6 +223,10 @@ def main() -> int:
     source_commit = checked("git", "rev-parse", "HEAD", cwd=repo_root)
     branch = checked("git", "branch", "--show-current", cwd=repo_root)
     images = image_metadata(args.image_tag)
+    compose_text = resolved_compose(repo_root, args.image_tag)
+    args.resolved_compose.write_text(compose_text, encoding="utf-8", newline="\n")
+    provenance = host_provenance()
+    atomic_json(args.host_provenance, provenance)
     for arm in manifest["arms"]:
         arm["command"] = (
             distributed_command(manifest, arm, args.image_tag)
@@ -189,6 +255,20 @@ def main() -> int:
         "campaign_tag_commit_recorded_at_launch": True,
     }
     manifest["images"] = images
+    manifest["compose_evidence"] = {
+        "source_path": "experiments/10-day-campaign/docker-compose.campaign.yml",
+        "source_sha256": sha256_file(
+            repo_root / "experiments/10-day-campaign/docker-compose.campaign.yml"
+        ),
+        "resolved_path": str(args.resolved_compose.resolve()),
+        "resolved_sha256": sha256_file(args.resolved_compose),
+        "per_run_resolved_compose": "resolved-compose.yaml in every distributed run directory",
+    }
+    manifest["host_evidence"] = {
+        "path": str(args.host_provenance.resolve()),
+        "sha256": sha256_file(args.host_provenance),
+        "captured_utc": provenance["captured_utc"],
+    }
     manifest["pilot_evidence"] = {
         "approved": True,
         "report_sha256": sha256_file(args.pilot_report),
