@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -42,6 +43,12 @@ class OrchestratorPreflightTest(unittest.TestCase):
         self.assertTrue(all(8 * 60 * 60 == arm["window_seconds"] for arm in manifest["arms"]))
         self.assertTrue(all(50 * 60 == arm["run_timeout_seconds"] for arm in manifest["arms"]))
         self.assertEqual(240 * 60 * 60, manifest["campaign"]["maximum_seconds"])
+
+    def test_compose_image_digests_have_sha256_length(self):
+        compose = (ROOT / "docker-compose.campaign.yml").read_text(encoding="utf-8")
+        digests = re.findall(r"@sha256:([0-9a-f]+)", compose)
+        self.assertGreaterEqual(len(digests), 2)
+        self.assertTrue(all(len(digest) == 64 for digest in digests))
 
     def test_preflight_rejects_schedule_that_cannot_attempt_eight_runs(self):
         manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
