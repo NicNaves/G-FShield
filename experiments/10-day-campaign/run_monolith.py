@@ -142,6 +142,7 @@ def execute(args: argparse.Namespace) -> int:
     command = [
         "docker", "run", "--rm", "--name", container,
         "--stop-timeout", "300", "--cpuset-cpus", args.cpuset,
+        "--cpuset-mems", args.numa_node,
         "--cpus", str(args.aggregate_cpus), "--memory", args.aggregate_memory,
         "--memory-swap", args.aggregate_memory,
         "--volume", f"{args.dataset_dir.resolve()}:/data:ro",
@@ -214,6 +215,7 @@ def main() -> int:
     parser.add_argument("--max-accepted-improvements", type=int, default=500)
     parser.add_argument("--minimum-improvement", type=float, default=0.0001)
     parser.add_argument("--cpuset", default="8-15")
+    parser.add_argument("--numa-node", default="1")
     parser.add_argument("--aggregate-cpus", type=float, default=8.0)
     parser.add_argument("--aggregate-memory", default="16g")
     parser.add_argument("--dataset-hash", required=True)

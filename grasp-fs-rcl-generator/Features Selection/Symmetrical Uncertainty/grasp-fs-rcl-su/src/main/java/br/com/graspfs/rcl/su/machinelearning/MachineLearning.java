@@ -29,6 +29,9 @@ public class MachineLearning {
         Evaluation evaluation = new Evaluation(trainingDataset);
         evaluation.evaluateModel(classificadorTreinado, testingDataset);
 
+        /* Disabled: this legacy binary-only pass classified every validation
+           instance a second time, but its counters and timing were not used.
+
         // Resultados
         float VP = 0; // quando o IDS diz que está acontecendo um ataque, e realmente está
         float VN = 0; // quando o IDS diz que NÃO está acontecendo um ataque, e realmente NÃO está
@@ -68,6 +71,7 @@ public class MachineLearning {
         long endNano = System.nanoTime();
         float totalNano = (endNano - beginNano) / 1000f; // converte para microssegundos
 
+        */
         EvaluationResult scores = calculateMacroScore(evaluation, testingDataset.numClasses());
 
         //MachineLearningUtils.printResults(testingDataset, totalNano, VP, VN, FP, FN);

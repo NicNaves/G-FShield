@@ -24,6 +24,7 @@ def main() -> int:
     parser.add_argument("--evaluator-image", required=True)
     parser.add_argument("--feature-count", type=int, required=True)
     parser.add_argument("--cpuset", default="8-15")
+    parser.add_argument("--numa-node", default="1")
     parser.add_argument("--aggregate-cpus", type=float, default=8.0)
     parser.add_argument("--aggregate-memory", default="16g")
     parser.add_argument("--dataset-hash", required=True)
@@ -38,6 +39,7 @@ def main() -> int:
     command = [
         "docker", "run", "--rm", "-i", "--name", container,
         "--cpuset-cpus", args.cpuset, "--cpus", str(args.aggregate_cpus),
+        "--cpuset-mems", args.numa_node,
         "--memory", args.aggregate_memory, "--memory-swap", args.aggregate_memory,
         "--volume", f"{args.dataset_dir.resolve()}:/datasets:ro",
         args.evaluator_image,

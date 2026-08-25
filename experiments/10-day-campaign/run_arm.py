@@ -253,6 +253,7 @@ def evaluate_selected_features(args: argparse.Namespace, features: list[int]) ->
     command = [
         "docker", "run", "--rm", "-i",
         "--cpuset-cpus", args.cpuset,
+        "--cpuset-mems", args.numa_node,
         "--cpus", str(args.aggregate_cpus),
         "--memory", args.aggregate_memory,
         "--memory-swap", args.aggregate_memory,
@@ -291,7 +292,7 @@ def normalized_result(
     started_monotonic: float,
     stop_reason: str,
     status: str,
-    candidate_count: int,
+    accepted_improvement_count: int,
     error_code: str | None = None,
 ) -> dict[str, Any]:
     raw_features = list(best.get("solutionFeatures") or []) if best else []
@@ -344,8 +345,10 @@ def normalized_result(
         "end_to_end_time_ms": elapsed_ms,
         "timestamp_utc": utc_now(),
         "monotonic_elapsed_ms": elapsed_ms,
-        "candidate_count": candidate_count,
-        "accepted_improvement_count": candidate_count,
+        # BEST_SOLUTION_TOPIC contains accepted best-so-far improvements, not
+        # every candidate evaluated inside the construction/local-search services.
+        "candidate_count": None,
+        "accepted_improvement_count": accepted_improvement_count,
         "process_cpu_percent": None,
         "container_cpu_percent": None,
         "host_cpu_percent": None,
@@ -409,6 +412,10 @@ def run_distributed(args: argparse.Namespace) -> int:
     try:
         stack.down()
         stack.call("up", "-d", "--no-build", *services)
+        container_ids = stack.call("ps", "-q", capture_output=True).stdout.split()
+        if not container_ids:
+            raise RuntimeError("campaign stack started without container identifiers")
+        run(["docker", "update", "--cpuset-mems", args.numa_node, *container_ids], capture_output=True)
         wait_for_port(port, time.monotonic() + args.startup_timeout_seconds)
         sampler.start()
         stdout_handle = raw_messages.open("w", encoding="utf-8", newline="\n")
@@ -475,7 +482,8 @@ def run_distributed(args: argparse.Namespace) -> int:
             stdout_handle.close()
         if stderr_handle is not None:
             stderr_handle.close()
-        stack.call("logs", "--no-color", stdout=(result_dir / "compose.log").open("w", encoding="utf-8"), check=False)
+        with (result_dir / "compose.log").open("w", encoding="utf-8", newline="\n") as compose_log:
+            stack.call("logs", "--no-color", stdout=compose_log, check=False)
         stack.down()
 
     messages = parse_best_messages(raw_messages, args.run_id)
@@ -525,6 +533,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--minimum-improvement", type=float, default=0.0001)
     result.add_argument("--max-accepted-improvements", type=int, default=500)
     result.add_argument("--cpuset", default="8-15")
+    result.add_argument("--numa-node", default="1")
     result.add_argument("--aggregate-cpus", type=float, default=8.0)
     result.add_argument("--aggregate-memory", default="16g")
     result.add_argument("--image-tag", required=True)
