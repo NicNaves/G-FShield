@@ -15,6 +15,8 @@ metrics/*
 *.swp
 *.bak
 *.class
+**/__pycache__/
+**/.pytest_cache/
 
 # IntelliJ IDEA
 .idea/
@@ -45,6 +47,10 @@ output/
 Mestrado/
 artifacts/
 tmp/
+experiments/10-day-campaign/results/
+experiments/10-day-campaign/state/
+experiments/10-day-campaign/checkpoints/
+experiments/10-day-campaign/logs/
 
 # Cache local de npm em container (scripts dev)
 **/.docker-home/
