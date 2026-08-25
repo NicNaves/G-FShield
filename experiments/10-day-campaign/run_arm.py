@@ -17,6 +17,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -272,6 +273,21 @@ def wait_for_port(port: int, deadline: float) -> None:
     raise TimeoutError(f"RCL service did not open loopback port {port}")
 
 
+def wait_for_http_service(port: int, route: str, deadline: float) -> None:
+    """Wait for the Spring HTTP dispatcher, not only for the TCP accept socket."""
+    probe = urllib.request.Request(f"http://127.0.0.1:{port}{route}", method="GET")
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(probe, timeout=3):
+                return
+        except urllib.error.HTTPError:
+            # A 4xx response proves that Tomcat and the dispatcher are ready.
+            return
+        except Exception:
+            time.sleep(2)
+    raise TimeoutError(f"RCL HTTP service did not become ready on loopback port {port}")
+
+
 def parse_best_messages(path: Path, run_id: str) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
     if not path.exists():
@@ -520,7 +536,9 @@ def run_distributed(args: argparse.Namespace) -> int:
         if not container_ids:
             raise RuntimeError("campaign stack started without container identifiers")
         run(["docker", "update", "--cpuset-mems", args.numa_node, *container_ids], capture_output=True)
-        wait_for_port(port, time.monotonic() + args.startup_timeout_seconds)
+        startup_deadline = time.monotonic() + args.startup_timeout_seconds
+        wait_for_port(port, startup_deadline)
+        wait_for_http_service(port, route, startup_deadline)
         sampler.start()
         stdout_handle = raw_messages.open("w", encoding="utf-8", newline="\n")
         stderr_handle = raw_consumer_log.open("w", encoding="utf-8", newline="\n")
