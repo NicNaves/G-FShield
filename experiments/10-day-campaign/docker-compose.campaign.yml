@@ -1,0 +1,200 @@
+x-service-common: &service-common
+  restart: "no"
+  cpuset: ${CAMPAIGN_CPUSET:-8-15}
+  volumes:
+    - ${CAMPAIGN_DATASET_DIR:?CAMPAIGN_DATASET_DIR is required}:/datasets:ro
+    - ${CAMPAIGN_METRICS_DIR:?CAMPAIGN_METRICS_DIR is required}:/metrics
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
+x-rcl: &rcl
+  <<: *service-common
+  cpus: 2.0
+  mem_limit: 4g
+  environment:
+    JAVA_OPTS: "-Xms512m -Xmx3072m -XX:+UseContainerSupport -XX:+UseG1GC"
+    CAMPAIGN_ID: ${CAMPAIGN_ID:?CAMPAIGN_ID is required}
+    CAMPAIGN_ARM_ID: ${CAMPAIGN_ARM_ID:?CAMPAIGN_ARM_ID is required}
+    CAMPAIGN_RUN_ID: ${CAMPAIGN_RUN_ID:?CAMPAIGN_RUN_ID is required}
+    CAMPAIGN_REQUEST_ID: ${CAMPAIGN_REQUEST_ID:?CAMPAIGN_REQUEST_ID is required}
+    CAMPAIGN_RANDOM_SEED: ${CAMPAIGN_RANDOM_SEED:?CAMPAIGN_RANDOM_SEED is required}
+    CAMPAIGN_DEADLINE_EPOCH_MS: ${CAMPAIGN_DEADLINE_EPOCH_MS:?CAMPAIGN_DEADLINE_EPOCH_MS is required}
+    SPRING_TASK_EXECUTION_POOL_CORE_SIZE: "1"
+    SPRING_TASK_EXECUTION_POOL_MAX_SIZE: "1"
+    SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: "1"
+  depends_on:
+    kafka:
+      condition: service_healthy
+
+x-local-search: &local-search
+  <<: *service-common
+  cpus: 2.0
+  mem_limit: 4g
+  environment:
+    JAVA_OPTS: "-Xms512m -Xmx3072m -XX:+UseContainerSupport -XX:+UseG1GC"
+    KAFKA_LISTENER_CONCURRENCY: "1"
+    KAFKA_MAX_POLL_INTERVAL_MS: "14400000"
+    CAMPAIGN_DEADLINE_EPOCH_MS: ${CAMPAIGN_DEADLINE_EPOCH_MS:?CAMPAIGN_DEADLINE_EPOCH_MS is required}
+    CAMPAIGN_RANDOM_SEED: ${CAMPAIGN_RANDOM_SEED:?CAMPAIGN_RANDOM_SEED is required}
+  depends_on:
+    kafka:
+      condition: service_healthy
+
+x-controller: &controller
+  <<: *service-common
+  cpus: 1.0
+  mem_limit: 2g
+  environment:
+    JAVA_OPTS: "-Xms256m -Xmx1536m -XX:+UseContainerSupport -XX:+UseG1GC"
+    KAFKA_LISTENER_CONCURRENCY: "1"
+    CAMPAIGN_DEADLINE_EPOCH_MS: ${CAMPAIGN_DEADLINE_EPOCH_MS:?CAMPAIGN_DEADLINE_EPOCH_MS is required}
+    CAMPAIGN_RANDOM_SEED: ${CAMPAIGN_RANDOM_SEED:?CAMPAIGN_RANDOM_SEED is required}
+  depends_on:
+    kafka:
+      condition: service_healthy
+
+services:
+  grasp-fs-rcl-ig:
+    <<: *rcl
+    image: gfshield-campaign-rcl-ig:${CAMPAIGN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: grasp-fs-rcl-generator/Features Selection/InfoGain/grasp-fs-rcl-ig/Dockerfile
+    ports:
+      - 127.0.0.1:${CAMPAIGN_RCL_HOST_PORT:-18089}:8089
+
+  grasp-fs-rcl-gr:
+    <<: *rcl
+    image: gfshield-campaign-rcl-gr:${CAMPAIGN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: grasp-fs-rcl-generator/Features Selection/GainRatio/grasp-fs-rcl-gr/Dockerfile
+    ports:
+      - 127.0.0.1:${CAMPAIGN_RCL_HOST_PORT:-18088}:8088
+
+  grasp-fs-rcl-su:
+    <<: *rcl
+    image: gfshield-campaign-rcl-su:${CAMPAIGN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: grasp-fs-rcl-generator/Features Selection/Symmetrical Uncertainty/grasp-fs-rcl-su/Dockerfile
+    ports:
+      - 127.0.0.1:${CAMPAIGN_RCL_HOST_PORT:-18087}:8087
+
+  grasp-fs-rcl-relieff:
+    <<: *rcl
+    image: gfshield-campaign-rcl-relieff:${CAMPAIGN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: grasp-fs-rcl-generator/Features Selection/RelieF/grasp-fs-rcl-rf/Dockerfile
+    ports:
+      - 127.0.0.1:${CAMPAIGN_RCL_HOST_PORT:-18086}:8086
+
+  grasp-fs-dls-bitflip:
+    <<: *local-search
+    image: gfshield-campaign-dls-bitflip:${CAMPAIGN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: grasp-fs-distributed-ls/Local Search/BitFlip/grasp-fs-dls-bf/Dockerfile
+
+  grasp-fs-dls-iwss:
+    <<: *local-search
+    image: gfshield-campaign-dls-iwss:${CAMPAIGN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: grasp-fs-distributed-ls/Local Search/IWSS/grasp-fs-dls-iw/Dockerfile
+
+  grasp-fs-dls-iwssr:
+    <<: *local-search
+    image: gfshield-campaign-dls-iwssr:${CAMPAIGN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: grasp-fs-distributed-ls/Local Search/IWSSR/grasp-fs-dls-iwr/Dockerfile
+
+  grasp-fs-dls-vnd:
+    <<: *controller
+    image: gfshield-campaign-dls-vnd:${CAMPAIGN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: grasp-fs-distributed-ls/Neighborhood/VND/grasp-fs-dls-vnd/Dockerfile
+
+  grasp-fs-dls-rvnd:
+    <<: *controller
+    image: gfshield-campaign-dls-rvnd:${CAMPAIGN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: grasp-fs-distributed-ls/Neighborhood/RVND/grasp-fs-dls-rvnd/Dockerfile
+
+  grasp-fs-dls-verify:
+    <<: *service-common
+    image: gfshield-campaign-dls-verify:${CAMPAIGN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: grasp-fs-distributed-ls/Verify/grasp-fs.dls.verify/Dockerfile
+    cpus: 1.0
+    mem_limit: 2g
+    environment:
+      JAVA_OPTS: "-Xms256m -Xmx1536m -XX:+UseContainerSupport -XX:+UseG1GC"
+      KAFKA_LISTENER_CONCURRENCY: "1"
+      CAMPAIGN_MINIMUM_IMPROVEMENT: ${CAMPAIGN_MINIMUM_IMPROVEMENT:-0.0001}
+      CAMPAIGN_MAX_ACCEPTED_IMPROVEMENTS: ${CAMPAIGN_MAX_ACCEPTED_IMPROVEMENTS:-500}
+      CAMPAIGN_DEADLINE_EPOCH_MS: ${CAMPAIGN_DEADLINE_EPOCH_MS:?CAMPAIGN_DEADLINE_EPOCH_MS is required}
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  zookeeper:
+    restart: "no"
+    image: confluentinc/cp-zookeeper:7.4.0
+    cpuset: ${CAMPAIGN_CPUSET:-8-15}
+    cpus: 0.5
+    mem_limit: 1g
+    environment:
+      ZOOKEEPER_CLIENT_PORT: "2181"
+      ZOOKEEPER_TICK_TIME: "2000"
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc -w 2 localhost 2181 | grep imok"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+
+  kafka:
+    restart: "no"
+    image: confluentinc/cp-kafka:7.4.0
+    cpuset: ${CAMPAIGN_CPUSET:-8-15}
+    cpus: 1.5
+    mem_limit: 3g
+    environment:
+      KAFKA_BROKER_ID: "1"
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_NUM_PARTITIONS: "1"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+      start_period: 20s
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+volumes:
+  kafka_data:
+  zookeeper_data:
+  zookeeper_log:

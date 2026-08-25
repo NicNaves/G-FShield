@@ -1,0 +1,527 @@
+#!/usr/bin/env python3
+"""Run one isolated campaign arm and emit one normalized end-to-end result."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import urllib.parse
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+RCL_SERVICES = {
+    "ig": ("grasp-fs-rcl-ig", 8089, "/ig"),
+    "gr": ("grasp-fs-rcl-gr", 8088, "/gr"),
+    "su": ("grasp-fs-rcl-su", 8087, "/su"),
+    "relieff": ("grasp-fs-rcl-relieff", 8086, "/rf"),
+}
+LOCAL_SEARCH_SERVICES = {
+    "bitflip": "grasp-fs-dls-bitflip",
+    "iwss": "grasp-fs-dls-iwss",
+    "iwssr": "grasp-fs-dls-iwssr",
+}
+CONTROLLER_SERVICES = {
+    "vnd": "grasp-fs-dls-vnd",
+    "rvnd": "grasp-fs-dls-rvnd",
+}
+LOCAL_SEARCH_API_NAMES = {"bitflip": "BIT_FLIP", "iwss": "IWSS", "iwssr": "IWSSR"}
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def atomic_json(path: Path, value: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(value, handle, indent=2, sort_keys=True, ensure_ascii=False)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(command, text=True, check=True, **kwargs)
+
+
+def safe_id(value: str, maximum: int = 48) -> str:
+    normalized = re.sub(r"[^a-z0-9_-]+", "-", value.lower()).strip("-")
+    return (normalized or "campaign")[:maximum]
+
+
+def free_loopback_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        return int(listener.getsockname()[1])
+
+
+class ResourceSampler:
+    def __init__(self, project: str, compose: Path, environment: dict[str, str], output: Path):
+        self.project = project
+        self.compose = compose
+        self.environment = environment
+        self.output = output
+        self.stop_event = threading.Event()
+        self.thread = threading.Thread(target=self._sample, daemon=True)
+        self.started = False
+
+    def start(self) -> None:
+        self.thread.start()
+        self.started = True
+
+    def stop(self) -> None:
+        if not self.started:
+            return
+        self.stop_event.set()
+        self.thread.join(timeout=35)
+
+    def _sample(self) -> None:
+        self.output.parent.mkdir(parents=True, exist_ok=True)
+        while not self.stop_event.is_set():
+            record: dict[str, Any] = {"timestamp_utc": utc_now(), "monotonic_ns": time.monotonic_ns()}
+            try:
+                ids = subprocess.run(
+                    self._compose_command("ps", "-q"),
+                    env=self.environment,
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                    check=False,
+                ).stdout.split()
+                if ids:
+                    stats = subprocess.run(
+                        ["docker", "stats", "--no-stream", "--format", "{{json .}}", *ids],
+                        capture_output=True,
+                        text=True,
+                        timeout=20,
+                        check=False,
+                    )
+                    inspect = subprocess.run(
+                        ["docker", "inspect", *ids],
+                        capture_output=True,
+                        text=True,
+                        timeout=20,
+                        check=False,
+                    )
+                    record["stats"] = [json.loads(line) for line in stats.stdout.splitlines() if line]
+                    record["inspect"] = json.loads(inspect.stdout) if inspect.returncode == 0 else []
+                    record["stats_error"] = stats.stderr.strip() or None
+                    record["inspect_error"] = inspect.stderr.strip() or None
+            except Exception as error:  # telemetry failure must not kill the algorithm
+                record["sampler_error"] = repr(error)
+            with self.output.open("a", encoding="utf-8", newline="\n") as handle:
+                handle.write(json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            self.stop_event.wait(30)
+
+    def _compose_command(self, *parts: str) -> list[str]:
+        return ["docker", "compose", "-p", self.project, "-f", str(self.compose), *parts]
+
+
+class Stack:
+    def __init__(self, project: str, compose: Path, environment: dict[str, str]):
+        self.project = project
+        self.compose = compose
+        self.environment = environment
+
+    def command(self, *parts: str) -> list[str]:
+        return ["docker", "compose", "-p", self.project, "-f", str(self.compose), *parts]
+
+    def call(self, *parts: str, check: bool = True, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            self.command(*parts),
+            env=self.environment,
+            text=True,
+            check=check,
+            **kwargs,
+        )
+
+    def down(self) -> None:
+        self.call("down", "--volumes", "--remove-orphans", "--timeout", "30", check=False)
+
+
+def wait_for_port(port: int, deadline: float) -> None:
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=2):
+                return
+        except OSError:
+            time.sleep(2)
+    raise TimeoutError(f"RCL service did not open loopback port {port}")
+
+
+def parse_best_messages(path: Path, run_id: str) -> list[dict[str, Any]]:
+    messages: list[dict[str, Any]] = []
+    if not path.exists():
+        return messages
+    for line_number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            message = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        message_run_id = message.get("runId") or message.get("run_id")
+        if message_run_id not in (None, run_id):
+            continue
+        message["_raw_line"] = line_number
+        messages.append(message)
+    return messages
+
+
+def score_of(message: dict[str, Any]) -> float:
+    try:
+        return float(message.get("f1Score"))
+    except (TypeError, ValueError):
+        return float("-inf")
+
+
+def best_message(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
+    eligible = [item for item in messages if item.get("solutionFeatures") and 0.0 <= score_of(item) <= 1.0]
+    if not eligible:
+        return None
+    return min(
+        eligible,
+        key=lambda item: (
+            -score_of(item),
+            len(item.get("solutionFeatures") or []),
+            int(item.get("runnigTime") or 2**63 - 1),
+            int(item.get("_raw_line") or 2**63 - 1),
+        ),
+    )
+
+
+def parse_evaluator_line(line: str) -> dict[str, Any]:
+    fields = line.strip().split("\t")
+    if len(fields) != 9 or fields[0] != "OK":
+        raise RuntimeError(f"invalid evaluator output: {line.strip()}")
+    names = (
+        "f1_macro", "f1_weighted", "precision_macro", "precision_weighted",
+        "recall_macro", "recall_weighted", "accuracy",
+    )
+    result = {name: float(value) for name, value in zip(names, fields[1:8])}
+    result["elapsed_ms"] = int(fields[8])
+    return result
+
+
+def evaluate_selected_features(args: argparse.Namespace, features: list[int]) -> tuple[dict[str, Any], dict[str, Any]]:
+    zero_based = sorted({int(feature) - 1 for feature in features})
+    if not zero_based or zero_based[0] < 0:
+        raise ValueError(f"distributed feature identifiers must be one-based positive integers: {features}")
+    command = [
+        "docker", "run", "--rm", "-i",
+        "--cpuset-cpus", args.cpuset,
+        "--cpus", str(args.aggregate_cpus),
+        "--memory", args.aggregate_memory,
+        "--memory-swap", args.aggregate_memory,
+        "-v", f"{args.dataset_dir.resolve()}:/datasets:ro",
+        args.evaluator_image,
+        "--train", "/datasets/campaign/erenoall-train.arff",
+        "--validation", "/datasets/campaign/erenoall-validation.arff",
+        "--test", "/datasets/campaign/erenoall-test.arff",
+    ]
+    process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    assert process.stdin is not None and process.stdout is not None
+    ready = process.stdout.readline().strip()
+    if not ready.startswith("READY\tweka-stable-3.8.6\tJ48-default"):
+        process.kill()
+        raise RuntimeError(f"unexpected evaluator banner: {ready}")
+    serialized = ",".join(str(feature) for feature in zero_based)
+    process.stdin.write(f"validation\t{serialized}\n")
+    process.stdin.flush()
+    validation = parse_evaluator_line(process.stdout.readline())
+    # This is the only holdout request made for the selected subset.
+    process.stdin.write(f"test\t{serialized}\n")
+    process.stdin.write("QUIT\n")
+    process.stdin.flush()
+    test = parse_evaluator_line(process.stdout.readline())
+    stderr = process.communicate(timeout=300)[1]
+    if process.returncode != 0:
+        raise RuntimeError(f"evaluator failed with {process.returncode}: {stderr[-2000:]}")
+    return validation, test
+
+
+def normalized_result(
+    args: argparse.Namespace,
+    best: dict[str, Any] | None,
+    validation: dict[str, Any] | None,
+    test: dict[str, Any] | None,
+    started_monotonic: float,
+    stop_reason: str,
+    status: str,
+    candidate_count: int,
+    error_code: str | None = None,
+) -> dict[str, Any]:
+    features = list(best.get("solutionFeatures") or []) if best else []
+    elapsed_ms = int((time.monotonic() - started_monotonic) * 1000)
+    feature_count = args.feature_count
+    reduction = ((feature_count - len(features)) / feature_count * 100.0) if features else None
+    return {
+        "campaign_id": args.campaign_id,
+        "arm_id": args.arm_id,
+        "run_id": args.run_id,
+        "seed": args.seed,
+        "candidate_id": (best or {}).get("candidateId") or (best or {}).get("seedId"),
+        "parent_id": (best or {}).get("parentId"),
+        "request_id": args.request_id,
+        "stage": "end_to_end",
+        "algorithm": "G-FShield",
+        "feature_selector": args.construction,
+        "neighborhood_controller": args.controller,
+        "local_search": args.local_search,
+        "classifier": "Weka J48",
+        "classifier_version": "3.8.6",
+        "classifier_parameters": {"confidence_factor": 0.25, "minimum_instances_per_leaf": 2, "pruned": True},
+        "dataset_hash": args.dataset_hash,
+        "train_hash": args.train_hash,
+        "validation_hash": args.validation_hash,
+        "test_hash": args.test_hash,
+        "selected_features": features,
+        "subset_size": len(features) if features else None,
+        "dimensionality_reduction_percent": reduction,
+        "validation_f1_macro": (validation or {}).get("f1_macro"),
+        "validation_f1_weighted": (validation or {}).get("f1_weighted"),
+        "validation_precision_macro": (validation or {}).get("precision_macro"),
+        "validation_precision_weighted": (validation or {}).get("precision_weighted"),
+        "validation_recall_macro": (validation or {}).get("recall_macro"),
+        "validation_recall_weighted": (validation or {}).get("recall_weighted"),
+        "test_f1_macro": (test or {}).get("f1_macro"),
+        "test_f1_weighted": (test or {}).get("f1_weighted"),
+        "test_precision_macro": (test or {}).get("precision_macro"),
+        "test_recall_macro": (test or {}).get("recall_macro"),
+        "accuracy": (test or {}).get("accuracy"),
+        "candidate_time_ms": (best or {}).get("runnigTime"),
+        "classifier_time_ms": (test or {}).get("elapsed_ms"),
+        "run_elapsed_ms": elapsed_ms,
+        "end_to_end_time_ms": elapsed_ms,
+        "timestamp_utc": utc_now(),
+        "monotonic_elapsed_ms": elapsed_ms,
+        "candidate_count": candidate_count,
+        "accepted_improvement_count": candidate_count,
+        "process_cpu_percent": None,
+        "container_cpu_percent": None,
+        "host_cpu_percent": None,
+        "process_rss_mb": None,
+        "container_memory_mb": None,
+        "host_memory_mb": None,
+        "cpu_throttled_seconds": None,
+        "disk_read_bytes": None,
+        "disk_write_bytes": None,
+        "network_rx_bytes": None,
+        "network_tx_bytes": None,
+        "kafka_lag": None,
+        "restart_count": None,
+        "stop_reason": stop_reason,
+        "status": status,
+        "error_code": error_code,
+    }
+
+
+def run_distributed(args: argparse.Namespace) -> int:
+    started_monotonic = time.monotonic()
+    result_dir = args.output_dir.resolve()
+    result_dir.mkdir(parents=True, exist_ok=True)
+    compose = Path(__file__).with_name("docker-compose.campaign.yml").resolve()
+    project = safe_id(f"gfs10d-{args.run_id}")
+    port = free_loopback_port()
+    request_id = args.request_id or f"{args.run_id}-request"
+    args.request_id = request_id
+    selection_seconds = max(1, args.run_timeout_seconds - args.finalization_reserve_seconds)
+    deadline_epoch_ms = int((time.time() + selection_seconds) * 1000)
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "CAMPAIGN_DATASET_DIR": str(args.dataset_dir.resolve()),
+            "CAMPAIGN_METRICS_DIR": str((result_dir / "metrics").resolve()),
+            "CAMPAIGN_ID": args.campaign_id,
+            "CAMPAIGN_ARM_ID": args.arm_id,
+            "CAMPAIGN_RUN_ID": args.run_id,
+            "CAMPAIGN_REQUEST_ID": request_id,
+            "CAMPAIGN_RANDOM_SEED": str(args.seed),
+            "CAMPAIGN_DEADLINE_EPOCH_MS": str(deadline_epoch_ms),
+            "CAMPAIGN_RCL_HOST_PORT": str(port),
+            "CAMPAIGN_CPUSET": args.cpuset,
+            "CAMPAIGN_IMAGE_TAG": args.image_tag,
+            "CAMPAIGN_MINIMUM_IMPROVEMENT": str(args.minimum_improvement),
+            "CAMPAIGN_MAX_ACCEPTED_IMPROVEMENTS": str(args.max_accepted_improvements),
+        }
+    )
+    rcl_service, _container_port, route = RCL_SERVICES[args.construction]
+    local_service = LOCAL_SEARCH_SERVICES[args.local_search]
+    controller_service = CONTROLLER_SERVICES[args.controller]
+    services = ["zookeeper", "kafka", rcl_service, local_service, controller_service, "grasp-fs-dls-verify"]
+    stack = Stack(project, compose, environment)
+    consumer: subprocess.Popen[str] | None = None
+    stdout_handle = None
+    stderr_handle = None
+    sampler = ResourceSampler(project, compose, environment, result_dir / "resource-samples.jsonl")
+    raw_messages = result_dir / "best-solution-messages.jsonl"
+    raw_consumer_log = result_dir / "kafka-consumer.stderr.log"
+    stop_reason = "run_timeout"
+    try:
+        stack.down()
+        stack.call("up", "-d", "--no-build", *services)
+        wait_for_port(port, time.monotonic() + args.startup_timeout_seconds)
+        sampler.start()
+        stdout_handle = raw_messages.open("w", encoding="utf-8", newline="\n")
+        stderr_handle = raw_consumer_log.open("w", encoding="utf-8", newline="\n")
+        consumer = subprocess.Popen(
+            stack.command(
+                "exec", "-T", "kafka", "kafka-console-consumer",
+                "--bootstrap-server", "kafka:9092",
+                "--topic", "BEST_SOLUTION_TOPIC",
+                "--from-beginning",
+            ),
+            env=environment,
+            stdout=stdout_handle,
+            stderr=stderr_handle,
+            text=True,
+            start_new_session=True,
+        )
+        query = urllib.parse.urlencode(
+            {
+                "maxGenerations": args.max_generations,
+                "rclCutoff": args.rcl_cutoff,
+                "sampleSize": args.sample_size,
+                "datasetTrainingName": "campaign/erenoall-train.arff",
+                "datasetTestingName": "campaign/erenoall-validation.arff",
+                "classifier": "J48",
+                "useTrainingCache": "false",
+                "neighborhoodStrategy": args.controller.upper(),
+                "localSearches": LOCAL_SEARCH_API_NAMES[args.local_search],
+                "neighborhoodMaxIterations": args.neighborhood_iterations,
+                "bitFlipMaxIterations": args.local_search_iterations,
+                "iwssMaxIterations": args.local_search_iterations,
+                "iwssrMaxIterations": args.local_search_iterations,
+            }
+        )
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{port}{route}?{query}",
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            launch = json.loads(response.read().decode("utf-8"))
+        atomic_json(result_dir / "launch.json", launch)
+
+        selection_deadline = started_monotonic + selection_seconds
+        while time.monotonic() < selection_deadline:
+            time.sleep(min(5.0, selection_deadline - time.monotonic()))
+        stop_reason = "run_timeout"
+    except KeyboardInterrupt:
+        stop_reason = "cancelled"
+    except Exception as error:
+        atomic_json(result_dir / "runner-error.json", {"timestamp_utc": utc_now(), "error": repr(error)})
+        stop_reason = "runner_error"
+    finally:
+        sampler.stop()
+        stack.call("stop", "--timeout", "30", rcl_service, local_service, controller_service, "grasp-fs-dls-verify", check=False)
+        time.sleep(3)
+        if consumer is not None and consumer.poll() is None:
+            consumer.terminate()
+            try:
+                consumer.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                consumer.kill()
+                consumer.wait()
+        if stdout_handle is not None:
+            stdout_handle.close()
+        if stderr_handle is not None:
+            stderr_handle.close()
+        stack.call("logs", "--no-color", stdout=(result_dir / "compose.log").open("w", encoding="utf-8"), check=False)
+        stack.down()
+
+    messages = parse_best_messages(raw_messages, args.run_id)
+    best = best_message(messages)
+    if best is None:
+        result = normalized_result(
+            args, None, None, None, started_monotonic, stop_reason,
+            "cancelled" if stop_reason == "cancelled" else "failed", len(messages), "NO_COMPLETE_SOLUTION",
+        )
+        atomic_json(result_dir / "final-result.json", result)
+        return 1
+    try:
+        validation, test = evaluate_selected_features(args, list(best["solutionFeatures"]))
+        status = "timeout" if stop_reason == "run_timeout" else "completed"
+        result = normalized_result(args, best, validation, test, started_monotonic, stop_reason, status, len(messages))
+        atomic_json(result_dir / "selected-validation-solution.json", best)
+        atomic_json(result_dir / "final-result.json", result)
+        return 0
+    except Exception as error:
+        atomic_json(result_dir / "final-evaluation-error.json", {"timestamp_utc": utc_now(), "error": repr(error)})
+        result = normalized_result(args, best, None, None, started_monotonic, "final_evaluation_failed", "failed", len(messages), "FINAL_EVALUATION_FAILED")
+        atomic_json(result_dir / "final-result.json", result)
+        return 1
+
+
+def parser() -> argparse.ArgumentParser:
+    result = argparse.ArgumentParser()
+    result.add_argument("--architecture", choices=("distributed",), default="distributed")
+    result.add_argument("--campaign-id", required=True)
+    result.add_argument("--arm-id", required=True)
+    result.add_argument("--run-id", required=True)
+    result.add_argument("--request-id")
+    result.add_argument("--seed", required=True, type=int)
+    result.add_argument("--construction", choices=tuple(RCL_SERVICES), required=True)
+    result.add_argument("--controller", choices=tuple(CONTROLLER_SERVICES), required=True)
+    result.add_argument("--local-search", choices=tuple(LOCAL_SEARCH_SERVICES), required=True)
+    result.add_argument("--dataset-dir", required=True, type=Path)
+    result.add_argument("--output-dir", required=True, type=Path)
+    result.add_argument("--run-timeout-seconds", type=int, default=3600)
+    result.add_argument("--finalization-reserve-seconds", type=int, default=300)
+    result.add_argument("--startup-timeout-seconds", type=int, default=300)
+    result.add_argument("--max-generations", type=int, default=2_147_483_647)
+    result.add_argument("--rcl-cutoff", type=int, default=30)
+    result.add_argument("--sample-size", type=int, default=5)
+    result.add_argument("--neighborhood-iterations", type=int, default=50)
+    result.add_argument("--local-search-iterations", type=int, default=100)
+    result.add_argument("--minimum-improvement", type=float, default=0.0001)
+    result.add_argument("--max-accepted-improvements", type=int, default=500)
+    result.add_argument("--cpuset", default="8-15")
+    result.add_argument("--aggregate-cpus", type=float, default=8.0)
+    result.add_argument("--aggregate-memory", default="16g")
+    result.add_argument("--image-tag", required=True)
+    result.add_argument("--evaluator-image", required=True)
+    result.add_argument("--feature-count", type=int, required=True)
+    result.add_argument("--dataset-hash", required=True)
+    result.add_argument("--train-hash", required=True)
+    result.add_argument("--validation-hash", required=True)
+    result.add_argument("--test-hash", required=True)
+    return result
+
+
+def handle_termination(_signum: int, _frame: Any) -> None:
+    raise KeyboardInterrupt
+
+
+def main() -> int:
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, handle_termination)
+    args = parser().parse_args()
+    return run_distributed(args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
