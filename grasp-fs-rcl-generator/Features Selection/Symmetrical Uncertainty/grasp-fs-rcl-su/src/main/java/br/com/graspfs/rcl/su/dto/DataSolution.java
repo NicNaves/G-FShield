@@ -15,6 +15,18 @@ import java.util.UUID;
 @AllArgsConstructor
 public class DataSolution {
 
+    @JsonProperty("campaignId") private String campaignId;
+    @JsonProperty("armId") private String armId;
+    @JsonProperty("runId") private String runId;
+    @JsonProperty("requestId") private String requestId;
+    @JsonProperty("candidateId") private String candidateId;
+    @JsonProperty("parentId") private String parentId;
+    @JsonProperty("seed") private Integer seed;
+    @JsonProperty("deadlineEpochMs") private Long deadlineEpochMs;
+    @JsonProperty("stage") private String stage;
+    @JsonProperty("timestampUtc") private String timestampUtc;
+    @JsonProperty("monotonicElapsedMs") private Long monotonicElapsedMs;
+
     @JsonProperty("seedId")
     private UUID seedId;// id da mensagem
 

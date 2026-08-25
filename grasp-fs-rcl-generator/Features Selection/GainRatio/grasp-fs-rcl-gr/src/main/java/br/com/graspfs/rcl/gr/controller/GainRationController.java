@@ -45,7 +45,10 @@ public class GainRationController {
         @RequestParam(value = "iwssMaxIterations", required = false) Integer iwssMaxIterations,
         @RequestParam(value = "iwssrMaxIterations", required = false) Integer iwssrMaxIterations
     ) {
-        String requestId = "GR-" + UUID.randomUUID();
+        String configuredRequestId = System.getenv("CAMPAIGN_REQUEST_ID");
+        String requestId = configuredRequestId == null || configuredRequestId.isBlank()
+                ? "GR-" + UUID.randomUUID()
+                : configuredRequestId;
         logger.info(
             "Received GR requestId={} train={} test={} classifier={} useTrainingCache={} maxGenerations={} rclCutoff={} sampleSize={} neighborhood={} localSearches={}",
             requestId, trainingFileName, testingFileName, classifierName, useTrainingCache, maxGenerations, rclCutoff,

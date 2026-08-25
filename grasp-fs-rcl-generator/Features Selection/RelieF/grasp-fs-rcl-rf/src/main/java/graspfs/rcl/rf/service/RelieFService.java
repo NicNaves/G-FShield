@@ -40,7 +40,7 @@ public class RelieFService {
                     System.currentTimeMillis() - rankingStartedAt
             );
 
-            for (int i = 0; i < trainingDataset.numAttributes(); i++) {
+            for (int i = 0; i < trainingDataset.numAttributes() && !deadlineReached(); i++) {
                 double rfRatio = evaluator.evaluateAttribute(i);
                 allFeatures.add(new FeatureAvaliada(rfRatio, i + 1));
 
@@ -57,7 +57,7 @@ public class RelieFService {
             allFeatures.sort((f1, f2) -> Double.compare(f2.getValorFeature(), f1.getValorFeature()));
 
             ArrayList<Integer> rclFeatures = new ArrayList<>();
-            for (int i = 0; i < Math.min(rclCutoff, allFeatures.size()); i++) {
+            for (int i = 0; i < Math.min(rclCutoff, allFeatures.size()) && !deadlineReached(); i++) {
                 rclFeatures.add(allFeatures.get(i).getIndiceFeature());
             }
 
@@ -103,11 +103,19 @@ public class RelieFService {
             BufferedWriter writer,
             Instances trainingDataset,
             Instances testingDataset,
-            AbstractClassifier classifier
+            AbstractClassifier classifier,
+            Random random
     ) throws Exception {
         // Each generation starts from the same ranked template and samples a new candidate subset.
         DataSolution candidate = DataSolution.builder()
-                .seedId(UUID.randomUUID())
+                .seedId(new UUID(random.nextLong(), random.nextLong()))
+                .campaignId(rcl.getCampaignId())
+                .armId(rcl.getArmId())
+                .runId(rcl.getRunId())
+                .requestId(rcl.getRequestId())
+                .parentId(rcl.getParentId())
+                .seed(rcl.getSeed())
+                .deadlineEpochMs(rcl.getDeadlineEpochMs())
                 .solutionFeatures(new ArrayList<>())
                 .rclfeatures(rcl.getRclfeatures() != null ? new ArrayList<>(rcl.getRclfeatures()) : new ArrayList<>())
                 .neighborhood(rcl.getNeighborhood())
@@ -127,13 +135,12 @@ public class RelieFService {
                 .useTrainingCache(rcl.getUseTrainingCache())
                 .build();
 
-        Random random = new Random();
         long startTime = System.currentTimeMillis();
 
         ArrayList<Integer> rclFeatures = new ArrayList<>(candidate.getRclfeatures());
         ArrayList<Integer> solutionFeatures = new ArrayList<>();
 
-        for (int i = 0; i < cutoff && !rclFeatures.isEmpty(); i++) {
+        for (int i = 0; i < cutoff && !rclFeatures.isEmpty() && !deadlineReached(); i++) {
             int index = random.nextInt(rclFeatures.size());
             solutionFeatures.add(rclFeatures.remove(index));
         }
@@ -144,6 +151,7 @@ public class RelieFService {
         MetricsCollector collector = new MetricsCollector();
         collector.startCollecting();
 
+        ensureWithinDeadline();
         EvaluationResult result = MachineLearning.evaluateSolution(
                 new ArrayList<>(solutionFeatures),
                 new Instances(trainingDataset),
@@ -193,5 +201,23 @@ public class RelieFService {
         writer.newLine();
 
         return candidate;
+    }
+
+    private boolean deadlineReached() {
+        String configured = System.getenv("CAMPAIGN_DEADLINE_EPOCH_MS");
+        if (configured == null || configured.isBlank()) {
+            return false;
+        }
+        try {
+            return System.currentTimeMillis() >= Long.parseLong(configured);
+        } catch (NumberFormatException ignored) {
+            return false;
+        }
+    }
+
+    private void ensureWithinDeadline() {
+        if (deadlineReached()) {
+            throw new IllegalStateException("campaign deadline reached");
+        }
     }
 }

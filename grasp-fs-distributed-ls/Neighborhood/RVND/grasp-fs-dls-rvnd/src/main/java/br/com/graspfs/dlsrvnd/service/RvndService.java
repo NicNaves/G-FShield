@@ -28,13 +28,15 @@ public class RvndService {
     private final KafkaIwssrProducer kafkaIwssrProducer;
     private final KafkaNeighborhoodRestartProducer kafkaNeighborhoodRestartProducer;
 
-    private final Random random = new Random();
-
     public void doRvnd(DataSolution data) {
         doRvnd(data, null);
     }
 
     public void doRvnd(DataSolution data, LocalSearch preferredLocalSearch) {
+        if (deadlineReached(data)) {
+            log.info("rvnd stopped before dispatch seedId={} reason=deadline", data.getSeedId());
+            return;
+        }
         data.setNeighborhood("RVND");
         int maxIterations = resolveMaxIterations(data);
         int currentIteration = data.getIterationNeighborhood() != null ? data.getIterationNeighborhood() : 0;
@@ -44,7 +46,7 @@ public class RvndService {
         List<LocalSearch> enabledSearches = resolveEnabledLocalSearches(data);
         LocalSearch selected = preferredLocalSearch != null && enabledSearches.contains(preferredLocalSearch)
                 ? preferredLocalSearch
-                : enabledSearches.get(random.nextInt(enabledSearches.size()));
+                : enabledSearches.get(randomFor(data, nextIteration).nextInt(enabledSearches.size()));
         data.setLocalSearch(selected);
 
         log.info(
@@ -66,6 +68,10 @@ public class RvndService {
     }
 
     public DataSolution callNextService(DataSolution bestSolution, DataSolution incoming, boolean allowContinuation) {
+        if (deadlineReached(incoming)) {
+            log.info("rvnd stopped after result seedId={} reason=deadline", incoming.getSeedId());
+            return scoreOf(incoming) > scoreOf(bestSolution) ? incoming : bestSolution;
+        }
         List<LocalSearch> enabledSearches = resolveEnabledLocalSearches(incoming);
         int maxIterations = resolveMaxIterations(incoming);
         int currentIteration = incoming.getIterationNeighborhood() != null ? incoming.getIterationNeighborhood() : 0;
@@ -118,7 +124,8 @@ public class RvndService {
             return updatedBest;
         }
 
-        LocalSearch nextSearch = enabledSearches.get(random.nextInt(enabledSearches.size()));
+        LocalSearch nextSearch = enabledSearches.get(
+                randomFor(incoming, currentIteration + 1).nextInt(enabledSearches.size()));
         log.info(
                 "rvnd continuing seedId={} currentSearch={} nextSearch={} iteration={}/{}",
                 incoming.getSeedId(),
@@ -141,6 +148,20 @@ public class RvndService {
 
     private float scoreOf(DataSolution data) {
         return data != null && data.getF1Score() != null ? data.getF1Score() : 0.0F;
+    }
+
+    private Random randomFor(DataSolution data, int iteration) {
+        long seed = data.getSeed() != null ? data.getSeed() : 0L;
+        if (data.getSeedId() != null) {
+            seed = 31L * seed + data.getSeedId().getMostSignificantBits();
+            seed = 31L * seed + data.getSeedId().getLeastSignificantBits();
+        }
+        return new Random(31L * seed + iteration);
+    }
+
+    private boolean deadlineReached(DataSolution data) {
+        return data.getDeadlineEpochMs() != null
+                && System.currentTimeMillis() >= data.getDeadlineEpochMs();
     }
 
     private List<LocalSearch> resolveEnabledLocalSearches(DataSolution data) {

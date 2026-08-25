@@ -19,7 +19,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Random;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -56,6 +58,10 @@ public class RelieFAsyncService {
             String requestId
     ) {
         long requestStartedAt = System.currentTimeMillis();
+        long requestStartedMonotonic = System.nanoTime();
+        long deadlineEpochMs = environmentLong("CAMPAIGN_DEADLINE_EPOCH_MS", Long.MAX_VALUE);
+        int campaignSeed = (int) environmentLong("CAMPAIGN_RANDOM_SEED", 0L);
+        Random campaignRandom = new Random(campaignSeed);
         try {
             logger.info("rcl async start algorithm={} requestId={}", ALGORITHM_NAME, requestId);
 
@@ -76,6 +82,13 @@ public class RelieFAsyncService {
             );
             configureNeighborhood(dataSolution, neighborhoodStrategy, localSearches,
                     neighborhoodMaxIterations, bitFlipMaxIterations, iwssMaxIterations, iwssrMaxIterations, useTrainingCache);
+            dataSolution.setCampaignId(environment("CAMPAIGN_ID", "unassigned"));
+            dataSolution.setArmId(environment("CAMPAIGN_ARM_ID", "unassigned"));
+            dataSolution.setRunId(environment("CAMPAIGN_RUN_ID", requestId));
+            dataSolution.setRequestId(requestId);
+            dataSolution.setSeed(campaignSeed);
+            dataSolution.setDeadlineEpochMs(deadlineEpochMs);
+            dataSolution.setParentId(requestId);
             logger.info(
                     "rcl seed template ready algorithm={} requestId={} featureCount={} neighborhood={} enabledSearches={}",
                     ALGORITHM_NAME,
@@ -89,7 +102,9 @@ public class RelieFAsyncService {
             logger.info("rcl metrics ready algorithm={} requestId={} file={}", ALGORITHM_NAME, requestId, METRICS_FILE_NAME);
 
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(METRICS_FILE_NAME, true))) {
-                for (int generation = 0; generation < maxGenerations; generation++) {
+                for (int generation = 0;
+                     generation < maxGenerations && System.currentTimeMillis() < deadlineEpochMs;
+                     generation++) {
                     long generationStartedAt = System.currentTimeMillis();
                     DataSolution generatedSolution = relieFService.GenerationSolutions(
                             dataSolution,
@@ -97,8 +112,13 @@ public class RelieFAsyncService {
                             writer,
                             trainingDataset,
                             testingDataset,
-                            classifier
+                            classifier,
+                            campaignRandom
                     );
+                    generatedSolution.setCandidateId(generatedSolution.getSeedId().toString());
+                    generatedSolution.setStage("initial_solution");
+                    generatedSolution.setTimestampUtc(Instant.now().toString());
+                    generatedSolution.setMonotonicElapsedMs((System.nanoTime() - requestStartedMonotonic) / 1_000_000L);
 
                     logger.info(
                             "rcl generation ready algorithm={} requestId={} generation={} seedId={} featureCount={} rclSize={} neighborhood={} enabledSearches={} f1={}",
@@ -132,6 +152,19 @@ public class RelieFAsyncService {
             );
         } catch (Exception ex) {
             logger.error("rcl async failed algorithm={} requestId={}", ALGORITHM_NAME, requestId, ex);
+        }
+    }
+
+    private String environment(String name, String fallback) {
+        String value = System.getenv(name);
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private long environmentLong(String name, long fallback) {
+        try {
+            return Long.parseLong(environment(name, Long.toString(fallback)));
+        } catch (NumberFormatException ignored) {
+            return fallback;
         }
     }
 

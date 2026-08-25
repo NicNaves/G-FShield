@@ -40,7 +40,10 @@ public class SymmetricalUncertaintyController {
         @RequestParam(value = "iwssMaxIterations", required = false) Integer iwssMaxIterations,
         @RequestParam(value = "iwssrMaxIterations", required = false) Integer iwssrMaxIterations
     ) {
-        String requestId = "SU-" + UUID.randomUUID();
+        String configuredRequestId = System.getenv("CAMPAIGN_REQUEST_ID");
+        String requestId = configuredRequestId == null || configuredRequestId.isBlank()
+                ? "SU-" + UUID.randomUUID()
+                : configuredRequestId;
         logger.info(
             "Received SU requestId={} train={} test={} classifier={} useTrainingCache={} maxGenerations={} rclCutoff={} sampleSize={} neighborhood={} localSearches={}",
             requestId, trainingFileName, testingFileName, classifierName, useTrainingCache, maxGenerations, rclCutoff,

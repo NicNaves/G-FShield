@@ -32,6 +32,10 @@ public class VndService {
     private final ConcurrentMap<UUID, Float> cycleBaselineScores = new ConcurrentHashMap<>();
 
     public void doVnd(DataSolution data, LocalSearch localSearch) {
+        if (deadlineReached(data)) {
+            log.info("vnd stopped before dispatch seedId={} reason=deadline", data.getSeedId());
+            return;
+        }
         List<LocalSearch> sequence = resolveEnabledLocalSearches(data);
         LocalSearch effectiveLocalSearch = localSearch != null && sequence.contains(localSearch)
                 ? localSearch
@@ -63,6 +67,10 @@ public class VndService {
     }
 
     public DataSolution callNextService(DataSolution bestSolution, DataSolution incoming, boolean allowContinuation) {
+        if (deadlineReached(incoming)) {
+            log.info("vnd stopped after result seedId={} reason=deadline", incoming.getSeedId());
+            return scoreOf(incoming) > scoreOf(bestSolution) ? incoming : bestSolution;
+        }
         List<LocalSearch> sequence = resolveEnabledLocalSearches(incoming);
         int dispatchBudget = resolveDispatchBudget(incoming, sequence);
         int currentStep = incoming.getIterationNeighborhood() != null ? incoming.getIterationNeighborhood() : 0;
@@ -139,6 +147,11 @@ public class VndService {
 
     private float scoreOf(DataSolution data) {
         return data.getF1Score() != null ? data.getF1Score() : 0.0F;
+    }
+
+    private boolean deadlineReached(DataSolution data) {
+        return data.getDeadlineEpochMs() != null
+                && System.currentTimeMillis() >= data.getDeadlineEpochMs();
     }
 
     private void initializeCycleBaseline(DataSolution data, List<LocalSearch> sequence, LocalSearch effectiveLocalSearch) {

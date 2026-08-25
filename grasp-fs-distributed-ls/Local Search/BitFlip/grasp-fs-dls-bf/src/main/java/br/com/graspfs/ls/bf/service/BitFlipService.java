@@ -23,6 +23,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Random;
@@ -73,6 +74,8 @@ public class BitFlipService {
             bestSolution.setIterationNeighborhood(data.getIterationNeighborhood());
             bestSolution.setSeedId(data.getSeedId());
             bestSolution.setLocalSearch(LocalSearch.BIT_FLIP);
+            bestSolution.setStage("local_search_best");
+            bestSolution.setTimestampUtc(Instant.now().toString());
 
             log.info(
                     "dls completed search=BIT_FLIP seedId={} bestF1={} iterationLocalSearch={} elapsedMs={}",
@@ -97,7 +100,7 @@ public class BitFlipService {
     }
 
     private DataSolution flipFeatures(DataSolution solution, BufferedWriter writer) throws Exception {
-        Random random = new Random();
+        Random random = new Random(solution.getSeed() != null ? solution.getSeed() : 0);
         int i = 0;
         double lastPublishedBestF1 = Double.NEGATIVE_INFINITY;
         int configuredMaxIterations = resolveMaxIterations(solution);
@@ -112,7 +115,7 @@ public class BitFlipService {
         // Keep a detached snapshot so later random swaps do not mutate the best-so-far result.
         DataSolution bestSolution = updateSolution(solution);
 
-        while (i < configuredMaxIterations) {
+        while (i < configuredMaxIterations && !deadlineReached(solution)) {
             int valueIndex = random.nextInt(solution.getRclfeatures().size());
             int positionReplace = random.nextInt(solution.getSolutionFeatures().size());
 
@@ -278,6 +281,17 @@ public class BitFlipService {
         // Kafka messages and neighborhood restarts must use immutable snapshots of the current state.
         return DataSolution.builder()
                 .seedId(s.getSeedId())
+                .campaignId(s.getCampaignId())
+                .armId(s.getArmId())
+                .runId(s.getRunId())
+                .requestId(s.getRequestId())
+                .candidateId(s.getCandidateId())
+                .parentId(s.getParentId())
+                .seed(s.getSeed())
+                .deadlineEpochMs(s.getDeadlineEpochMs())
+                .stage(s.getStage())
+                .timestampUtc(s.getTimestampUtc())
+                .monotonicElapsedMs(s.getMonotonicElapsedMs())
                 .rclfeatures(new ArrayList<>(s.getRclfeatures()))
                 .solutionFeatures(new ArrayList<>(s.getSolutionFeatures()))
                 .neighborhood(s.getNeighborhood())
@@ -303,6 +317,11 @@ public class BitFlipService {
                 .runnigTime(s.getRunnigTime())
                 .iterationLocalSearch(s.getIterationLocalSearch())
                 .build();
+    }
+
+    private boolean deadlineReached(DataSolution solution) {
+        return solution.getDeadlineEpochMs() != null
+                && System.currentTimeMillis() >= solution.getDeadlineEpochMs();
     }
 
     private int resolveMaxIterations(DataSolution solution) {

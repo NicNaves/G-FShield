@@ -45,7 +45,10 @@ public class InformationGainController {
         @RequestParam(value = "iwssMaxIterations", required = false) Integer iwssMaxIterations,
         @RequestParam(value = "iwssrMaxIterations", required = false) Integer iwssrMaxIterations
     ) {
-        String requestId = "IG-" + UUID.randomUUID();
+        String configuredRequestId = System.getenv("CAMPAIGN_REQUEST_ID");
+        String requestId = configuredRequestId == null || configuredRequestId.isBlank()
+                ? "IG-" + UUID.randomUUID()
+                : configuredRequestId;
         logger.info(
             "Received IG requestId={} train={} test={} classifier={} useTrainingCache={} maxGenerations={} rclCutoff={} sampleSize={} neighborhood={} localSearches={}",
             requestId, trainingFileName, testingFileName, classifierName, useTrainingCache, maxGenerations, rclCutoff,

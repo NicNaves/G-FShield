@@ -21,6 +21,7 @@ import java.io.BufferedWriter;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Locale;
 
@@ -80,6 +81,8 @@ public class IwssrService {
             DataSolution bestSolution = incrementalWrapperSequencialSearch(
                     data, trainingDataset, testingDataset, classifier);
             bestSolution = updateSolution(resetDataSolution(seed, bestSolution));
+            bestSolution.setStage("local_search_best");
+            bestSolution.setTimestampUtc(Instant.now().toString());
             log.info(
                     "dls completed search=IWSSR seedId={} bestF1={} iterationLocalSearch={} elapsedMs={}",
                     bestSolution.getSeedId(),
@@ -106,7 +109,7 @@ public class IwssrService {
 
         int n = resolveMaxIterations(localSolutionAdd);
 
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < n && !deadlineReached(localSolutionAdd); i++) {
             localSolutionAdd.setIterationLocalSearch(i);
             localSolutionAdd = updateSolution(addMovement(
                     localSolutionAdd, trainingDataset, testingDataset, classifier));
@@ -170,7 +173,7 @@ public class IwssrService {
     ) throws Exception {
         DataSolution bestReplace = updateSolution(solution);
 
-        for (int i = 0; i < solution.getSolutionFeatures().size(); i++) {
+        for (int i = 0; i < solution.getSolutionFeatures().size() && !deadlineReached(solution); i++) {
             MetricsCollector collector = new MetricsCollector();
             collector.startCollecting();
 
@@ -353,6 +356,17 @@ public class IwssrService {
         // Kafka messages and neighborhood restarts must use immutable snapshots of the current state.
         return DataSolution.builder()
                 .seedId(solution.getSeedId())
+                .campaignId(solution.getCampaignId())
+                .armId(solution.getArmId())
+                .runId(solution.getRunId())
+                .requestId(solution.getRequestId())
+                .candidateId(solution.getCandidateId())
+                .parentId(solution.getParentId())
+                .seed(solution.getSeed())
+                .deadlineEpochMs(solution.getDeadlineEpochMs())
+                .stage(solution.getStage())
+                .timestampUtc(solution.getTimestampUtc())
+                .monotonicElapsedMs(solution.getMonotonicElapsedMs())
                 .rclfeatures(new ArrayList<>(solution.getRclfeatures()))
                 .solutionFeatures(new ArrayList<>(solution.getSolutionFeatures()))
                 .iterationNeighborhood(solution.getIterationNeighborhood())
@@ -378,6 +392,11 @@ public class IwssrService {
                 .iterationLocalSearch(solution.getIterationLocalSearch())
                 .localSearch(solution.getLocalSearch())
                 .build();
+    }
+
+    private boolean deadlineReached(DataSolution solution) {
+        return solution.getDeadlineEpochMs() != null
+                && System.currentTimeMillis() >= solution.getDeadlineEpochMs();
     }
 
     private int resolveMaxIterations(DataSolution solution) {
