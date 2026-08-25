@@ -11,9 +11,10 @@ services:
       - ./data:/data:ro      # datasets (somente leitura)
       - ./logs:/app/logs     # saída de logs CSV
     command: >
-      -tr /data/erenoall.arff
-      -ts /data/erenoall.arff
-      --classifier J48
+      -tr /data/erenoall-train.arff
+      --validation /data/erenoall-validation.arff
+      -ts /data/erenoall-test.arff
+      --classifier CART
       --fs_algos ig,gr,su
       --neighborhoods vnd,rvnd
       --ls_ops iwss,iwssr,bitflip
@@ -28,7 +29,16 @@ services:
       --log_flush_every 50
       --log_all_iters 1
       --log_sys_metrics 1
-    restart: unless-stopped
+      --run_timeout_seconds 7200
+      --max_accepted_improvements 500
+      --minimum_improvement 0.0001
+      --campaign_id ${CAMPAIGN_ID:?CAMPAIGN_ID is required}
+      --arm_id ${ARM_ID:?ARM_ID is required}
+      --run_id ${RUN_ID:?RUN_ID is required}
+      --final_metrics_file /app/logs/final-result.json
+    cpus: 2.0
+    mem_limit: 8g
+    restart: "no"
     logging:
       driver: json-file
       options:

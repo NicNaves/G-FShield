@@ -11,6 +11,8 @@ solutionFeatures;f1Score;accuracy;precision;recall;runningTime(ms);cpuUsage(%);m
 """
 
 import argparse
+import hashlib
+import json
 import math
 import os
 import random
@@ -19,10 +21,12 @@ import time
 import csv
 import re
 from collections import Counter
+from datetime import datetime, timezone
 from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
+import sklearn
 
 try:
     import psutil
@@ -217,7 +221,13 @@ def evaluate_solution(features, train_df, test_df, label_col, classifier):
     Xtr, Xte = ensure_numeric_train_test(train_df, test_df, features)
     ytr, yte = train_df[label_col].values, test_df[label_col].values
     name = classifier.lower()
-    if name in ('j48','decisiontree','dt'):
+    if name == 'j48':
+        raise ValueError(
+            "J48 is the Weka implementation and cannot be mapped silently to "
+            "sklearn.tree.DecisionTreeClassifier; use cart outside the paired "
+            "campaign or configure the common Weka evaluator"
+        )
+    if name in ('cart','decisiontree','dt'):
         clf = DecisionTreeClassifier(random_state=0)
     elif name in ('nb','naivebayes'):
         clf = GaussianNB()
@@ -229,10 +239,21 @@ def evaluate_solution(features, train_df, test_df, label_col, classifier):
     preds = clf.predict(Xte)
     return dict(
         f1 = float(f1_score(yte, preds, average='macro')),
+        f1_weighted = float(f1_score(yte, preds, average='weighted')),
         precision = float(precision_score(yte, preds, average='macro', zero_division=0)),
+        precision_weighted = float(precision_score(yte, preds, average='weighted', zero_division=0)),
         recall = float(recall_score(yte, preds, average='macro', zero_division=0)),
+        recall_weighted = float(recall_score(yte, preds, average='weighted', zero_division=0)),
         accuracy = float(accuracy_score(yte, preds))
     )
+
+
+def sha256_file(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 def write_metrics(writer, feats, metrics, elapsed, mc,
                   clf, feature_selector, local_search, phase, generation, iteration,
@@ -269,16 +290,17 @@ def initial_solution_from_ranking(ranked, sample_size, rcl_cutoff, seed=None):
     rcl = pool[:rcl_cutoff]
     return sol, rcl
 
-def bitflip_search(data, train, test, label, clf, iters, writer,
-                   feature_selector, local_search, generation):
+def bitflip_search(data, train, validation, label, clf, iters, writer,
+                   feature_selector, local_search, generation, rng, deadline,
+                   minimum_improvement):
     sol = list(data['solutionFeatures'])
     rcl = list(data['rclfeatures'])
     best = sol.copy()
-    best_m = evaluate_solution(sol, train, test, label, clf)
-    rng = random.Random(data.get('seed', 0))
+    best_m = evaluate_solution(sol, train, validation, label, clf)
+    data['candidate_count'] += 1
 
     for it in range(1, iters+1):
-        if not rcl:
+        if not rcl or time.monotonic() >= deadline:
             break
         inx = rng.randrange(len(rcl))
         outx = rng.randrange(len(sol))
@@ -288,20 +310,24 @@ def bitflip_search(data, train, test, label, clf, iters, writer,
         start = time.time()
         mc = MetricsCollector(); mc.start()
         try:
-            m = evaluate_solution(new, train, test, label, clf)
+            m = evaluate_solution(new, train, validation, label, clf)
         finally:
             mc.stop(); mc.join()
+        data['candidate_count'] += 1
         elapsed = int((time.time() - start) * 1000)
 
         write_metrics(writer, new, m, elapsed, mc,
                       clf, feature_selector, local_search, "search", generation, it,
                       data['trainingFileName'], data['testingFileName'])
 
-        if m['f1'] > best_m['f1']:
+        if m['f1'] >= best_m['f1'] + minimum_improvement:
             old = sol[outx]
             best, best_m = new, m
             sol = new
             rcl[inx] = old
+            data['accepted_improvements'] += 1
+            if data['accepted_improvements'] >= data['max_accepted_improvements']:
+                break
     return best, best_m
 
 # ================================
@@ -311,6 +337,7 @@ def bitflip_search(data, train, test, label, clf, iters, writer,
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--training', required=True)
+    p.add_argument('--validation', required=True)
     p.add_argument('--testing', required=True)
     p.add_argument('--label-col', default=None)
     p.add_argument('--max-generations', type=int, default=5)
@@ -318,10 +345,19 @@ def main():
     p.add_argument('--sample-size', type=int, default=5)
     p.add_argument('--feature-selector', choices=['gainratio','infogain'], default='gainratio')
     p.add_argument('--local-search', choices=['bitflip'], default='bitflip')
-    p.add_argument('--classifier', choices=['j48','nb','rf'], default='j48')
+    p.add_argument('--classifier', choices=['cart','j48','nb','rf'], default='cart')
     p.add_argument('--metrics-file', default='metrics/GainRatio_METRICS.csv')
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--max-iterations-local', type=int, default=50)
+    p.add_argument('--run-timeout-seconds', type=int, default=7200)
+    p.add_argument('--final-evaluation-reserve-seconds', type=int, default=300)
+    p.add_argument('--max-accepted-improvements', type=int, default=500)
+    p.add_argument('--minimum-improvement', type=float, default=0.0001)
+    p.add_argument('--campaign-id', required=True)
+    p.add_argument('--arm-id', required=True)
+    p.add_argument('--run-id', required=True)
+    p.add_argument('--final-metrics-file', default='metrics/final-result.json')
+    p.add_argument('--dataset-hash', default='')
     a = p.parse_args()
 
     random.seed(a.seed); np.random.seed(a.seed)
@@ -329,7 +365,8 @@ def main():
     if out_dir: os.makedirs(out_dir, exist_ok=True)
 
     train = read_dataset(a.training)
-    test  = read_dataset(a.testing)
+    validation = read_dataset(a.validation)
+    test = read_dataset(a.testing)
     label = resolve_label_column(train, a.label_col)
 
     ranked = score_gainratio(train, label) if a.feature_selector == 'gainratio' else score_infogain(train, label)
@@ -342,10 +379,21 @@ def main():
         'solutionFeatures': sol,
         'rclfeatures': rcl,
         'trainingFileName': a.training,
-        'testingFileName': a.testing,
+        # Legacy CSV column name; search metrics use validation, not holdout test.
+        'testingFileName': a.validation,
         'classifier': a.classifier,
-        'seed': a.seed
+        'seed': a.seed,
+        'accepted_improvements': 0,
+        'candidate_count': 1,
+        'max_accepted_improvements': a.max_accepted_improvements,
     }
+    rng = random.Random(a.seed)
+    started_monotonic = time.monotonic()
+    selection_seconds = max(
+        1,
+        a.run_timeout_seconds - a.final_evaluation_reserve_seconds,
+    )
+    deadline = started_monotonic + selection_seconds
 
     first_write = not os.path.exists(a.metrics_file) or os.path.getsize(a.metrics_file) == 0
     with open(a.metrics_file, 'a', encoding='utf-8', newline='') as mf:
@@ -353,31 +401,125 @@ def main():
             mf.write(CSV_HEADER + '\n')
 
         # avaliação inicial
-        start = time.time()
+        start = time.perf_counter()
         mc = MetricsCollector(); mc.start()
         try:
-            met = evaluate_solution(sol, train, test, label, a.classifier)
+            met = evaluate_solution(sol, train, validation, label, a.classifier)
         finally:
             mc.stop(); mc.join()
-        elapsed = int((time.time() - start) * 1000)
+        elapsed = int((time.perf_counter() - start) * 1000)
 
         write_metrics(
             mf, sol, met, elapsed, mc,
             a.classifier, a.feature_selector, a.local_search,
             "initial", 0, 0,
-            a.training, a.testing
+            a.training, a.validation
         )
 
         # gerações
+        best = sol
+        bm = met
+        stop_reason = "max_generations"
         for g in range(1, a.max_generations + 1):
+            if time.monotonic() >= deadline:
+                stop_reason = "time_limit"
+                break
+            if data['accepted_improvements'] >= data['max_accepted_improvements']:
+                stop_reason = "accepted_improvement_limit"
+                break
             best, bm = bitflip_search(
-                data, train, test, label, a.classifier, a.max_iterations_local, mf,
-                a.feature_selector, a.local_search, g
+                data, train, validation, label, a.classifier, a.max_iterations_local, mf,
+                a.feature_selector, a.local_search, g, rng, deadline,
+                a.minimum_improvement
             )
             data['solutionFeatures'] = best
             rem = [c for c in cols if c not in best]
             data['rclfeatures'] = rem[:a.rcl_cutoff]
             print(f"Generation {g}: F1={bm['f1']:.4f} Features={best}")
+
+    # Consume the untouched test split only once, after model selection.
+    test_started = time.perf_counter()
+    test_metrics = evaluate_solution(best, train, test, label, a.classifier)
+    test_elapsed_ms = int((time.perf_counter() - test_started) * 1000)
+    train_hash = sha256_file(a.training)
+    validation_hash = sha256_file(a.validation)
+    test_hash = sha256_file(a.testing)
+    dataset_hash = a.dataset_hash or hashlib.sha256(
+        f"{train_hash}:{validation_hash}:{test_hash}".encode("ascii")
+    ).hexdigest()
+    elapsed_ms = int((time.monotonic() - started_monotonic) * 1000)
+    if data['accepted_improvements'] >= data['max_accepted_improvements']:
+        stop_reason = "accepted_improvement_limit"
+    elif time.monotonic() >= deadline:
+        stop_reason = "time_limit"
+    result = {
+        "campaign_id": a.campaign_id,
+        "arm_id": a.arm_id,
+        "run_id": a.run_id,
+        "seed": a.seed,
+        "candidate_id": None,
+        "parent_id": None,
+        "request_id": None,
+        "stage": "final_holdout",
+        "algorithm": "GRASP-FS monolith1-graspy2",
+        "feature_selector": a.feature_selector,
+        "neighborhood_controller": None,
+        "local_search": a.local_search,
+        "classifier": a.classifier.upper(),
+        "classifier_version": f"scikit-learn {sklearn.__version__}",
+        "classifier_parameters": {"random_state": 0},
+        "dataset_hash": dataset_hash,
+        "train_hash": train_hash,
+        "validation_hash": validation_hash,
+        "test_hash": test_hash,
+        "selected_features": best,
+        "subset_size": len(best),
+        "dimensionality_reduction_percent": 100.0 * (1.0 - len(best) / len(cols)),
+        "validation_f1_macro": bm["f1"],
+        "validation_f1_weighted": bm["f1_weighted"],
+        "validation_precision_macro": bm["precision"],
+        "validation_precision_weighted": bm["precision_weighted"],
+        "validation_recall_macro": bm["recall"],
+        "validation_recall_weighted": bm["recall_weighted"],
+        "test_f1_macro": test_metrics["f1"],
+        "test_f1_weighted": test_metrics["f1_weighted"],
+        "test_precision_macro": test_metrics["precision"],
+        "test_recall_macro": test_metrics["recall"],
+        "accuracy": test_metrics["accuracy"],
+        "candidate_time_ms": None,
+        "classifier_time_ms": test_elapsed_ms,
+        "run_elapsed_ms": elapsed_ms,
+        "end_to_end_time_ms": elapsed_ms,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "monotonic_elapsed_ms": elapsed_ms,
+        "candidate_count": data['candidate_count'],
+        "accepted_improvement_count": data['accepted_improvements'],
+        "process_cpu_percent": None,
+        "container_cpu_percent": None,
+        "host_cpu_percent": None,
+        "process_rss_mb": None,
+        "container_memory_mb": None,
+        "host_memory_mb": None,
+        "cpu_throttled_seconds": None,
+        "disk_read_bytes": None,
+        "disk_write_bytes": None,
+        "network_rx_bytes": None,
+        "network_tx_bytes": None,
+        "kafka_lag": None,
+        "restart_count": None,
+        "stop_reason": stop_reason,
+        "status": "completed",
+        "error_code": None,
+    }
+    final_path = os.path.abspath(a.final_metrics_file)
+    final_dir = os.path.dirname(final_path)
+    if final_dir:
+        os.makedirs(final_dir, exist_ok=True)
+    temporary_path = final_path + ".tmp"
+    with open(temporary_path, "w", encoding="utf-8") as handle:
+        json.dump(result, handle, ensure_ascii=False, indent=2, sort_keys=True)
+        handle.write("\n")
+    os.replace(temporary_path, final_path)
 
 if __name__ == '__main__':
     main()

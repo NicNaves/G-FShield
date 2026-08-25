@@ -12,19 +12,29 @@ services:
       - ./logs:/logs             # métricas/saída
     # Apenas os argumentos (ENTRYPOINT já é "python /app/main.py")
     command: >
-      --training /data/erenoall.arff
-      --testing  /data/erenoall.arff
+      --training /data/erenoall-train.arff
+      --validation /data/erenoall-validation.arff
+      --testing /data/erenoall-test.arff
       --label-col class
       --max-generations 3000
       --rcl-cutoff 30
       --sample-size 5
       --feature-selector gainratio
       --local-search bitflip
-      --classifier j48
+      --classifier cart
       --metrics-file /logs/GainRatio_METRICS.csv
       --seed 42
       --max-iterations-local 100
-    restart: unless-stopped
+      --run-timeout-seconds 7200
+      --max-accepted-improvements 500
+      --minimum-improvement 0.0001
+      --campaign-id ${CAMPAIGN_ID:?CAMPAIGN_ID is required}
+      --arm-id ${ARM_ID:?ARM_ID is required}
+      --run-id ${RUN_ID:?RUN_ID is required}
+      --final-metrics-file /logs/final-result.json
+    cpus: 2.0
+    mem_limit: 8g
+    restart: "no"
     healthcheck:
       test: ["CMD", "python", "-c", "import os,sys; sys.exit(0 if os.path.isdir('/logs') and os.path.isdir('/data') else 1)"]
       interval: 30s

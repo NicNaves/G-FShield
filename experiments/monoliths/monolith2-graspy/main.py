@@ -2,15 +2,19 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import hashlib
+import json
 import os
 import time
 import random
 import uuid
+from datetime import datetime, timezone
 from typing import List, Tuple, Iterable, Optional
 
 import numpy as np
 import pandas as pd
 import psutil
+import sklearn
 
 from sklearn import set_config
 from sklearn.compose import ColumnTransformer
@@ -28,6 +32,28 @@ try:
     import arff  # liac-arff
 except Exception:
     arff = None
+
+
+RUN_DEADLINE = float("inf")
+MAX_ACCEPTED_IMPROVEMENTS = 0
+MINIMUM_IMPROVEMENT = 0.0001
+ACCEPTED_IMPROVEMENTS = 0
+CANDIDATE_COUNT = 0
+
+
+def stop_requested() -> bool:
+    return (
+        time.monotonic() >= RUN_DEADLINE
+        or ACCEPTED_IMPROVEMENTS >= MAX_ACCEPTED_IMPROVEMENTS
+    )
+
+
+def sha256_file(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 # =============================================================================
@@ -137,7 +163,13 @@ def build_preprocessor_by_index(X_subset: pd.DataFrame) -> ColumnTransformer:
 # =============================================================================
 def get_classifier(name: str):
     name = name.upper()
-    if name in ("J48", "DT"):
+    if name == "J48":
+        raise ValueError(
+            "J48 is the Weka implementation and cannot be mapped silently to "
+            "sklearn.tree.DecisionTreeClassifier; use CART outside the paired "
+            "campaign or configure the common Weka evaluator"
+        )
+    if name in ("CART", "DT"):
         return DecisionTreeClassifier(random_state=0)
     if name in ("NB", "NAIVEBAYES"):
         return GaussianNB()
@@ -150,6 +182,8 @@ def get_classifier(name: str):
 # Avaliação (SEM CACHE de pipeline)
 # =============================================================================
 def evaluate_subset(X_train, y_train, X_test, y_test, feat_idx0b: List[int], clf_name: str):
+    global CANDIDATE_COUNT
+    CANDIDATE_COUNT += 1
     if not feat_idx0b:
         return {"f1": 0.0, "acc": 0.0, "prec": 0.0, "rec": 0.0}
     Xtr = X_train.iloc[:, feat_idx0b]
@@ -167,10 +201,13 @@ def evaluate_subset(X_train, y_train, X_test, y_test, feat_idx0b: List[int], clf
     y_pred = model.predict(Xte)
 
     return {
-        "f1": f1_score(y_test, y_pred, average="weighted", zero_division=0),
+        "f1": f1_score(y_test, y_pred, average="macro", zero_division=0),
+        "f1_weighted": f1_score(y_test, y_pred, average="weighted", zero_division=0),
         "acc": accuracy_score(y_test, y_pred),
-        "prec": precision_score(y_test, y_pred, average="weighted", zero_division=0),
-        "rec": recall_score(y_test, y_pred, average="weighted", zero_division=0),
+        "prec": precision_score(y_test, y_pred, average="macro", zero_division=0),
+        "prec_weighted": precision_score(y_test, y_pred, average="weighted", zero_division=0),
+        "rec": recall_score(y_test, y_pred, average="macro", zero_division=0),
+        "rec_weighted": recall_score(y_test, y_pred, average="weighted", zero_division=0),
     }
 
 
@@ -255,10 +292,10 @@ def construct_initial_solution(
     cpu, mem, memp = get_system_metrics(log_sys_metrics)
     writer.writerow([
         str(S),
-        f"{met_S['f1']*1000:.3f}",
-        f"{met_S['acc']*1000:.3f}",
-        f"{met_S['prec']*1000:.3f}",
-        f"{met_S['rec']*1000:.3f}",
+        f"{met_S['f1']:.6f}",
+        f"{met_S['acc']:.6f}",
+        f"{met_S['prec']:.6f}",
+        f"{met_S['rec']:.6f}",
         run_ms, cpu, mem, memp,
         classifier_name, train_name, test_name, seed_id
     ])
@@ -293,12 +330,14 @@ def op_iwss_stream(S, R, Xtr, ytr, Xte, yte, clf_name):
     best_gain, best = 0.0, None
     for i_pos, _ in enumerate(S):
         for r_idx, r in enumerate(R):
+            if stop_requested():
+                return
             cand = S[:]
             cand[i_pos] = r
             cand = _fix_cardinality(cand, universe, k)
             met = evaluate_subset(Xtr, ytr, Xte, yte, cand, clf_name)
             gain = met["f1"] - base
-            if gain > best_gain + 1e-12:
+            if gain >= best_gain + MINIMUM_IMPROVEMENT:
                 best_gain, best = gain, (cand, r_idx, i_pos, met)
 
     if best is not None:
@@ -318,15 +357,19 @@ def op_iwssr_stream(S, R, Xtr, ytr, Xte, yte, clf_name, subset_size: Optional[in
     improved = True
 
     while improved:
+        if stop_requested():
+            return
         improved = False
         t_start = time.perf_counter()
         base = evaluate_subset(Xtr, ytr, Xte, yte, S, clf_name)["f1"]
 
         if subset_size is not None and len(S) < subset_size and len(R) > 0:
             for r in list(R):
+                if stop_requested():
+                    return
                 cand = sorted(S + [r])
                 met = evaluate_subset(Xtr, ytr, Xte, yte, cand, clf_name)
-                if met["f1"] > base + 1e-12:
+                if met["f1"] >= base + MINIMUM_IMPROVEMENT:
                     S[:] = cand
                     try:
                         R.remove(r)
@@ -342,11 +385,13 @@ def op_iwssr_stream(S, R, Xtr, ytr, Xte, yte, clf_name, subset_size: Optional[in
 
         for i_pos, _ in enumerate(S):
             for r_idx, r in enumerate(R):
+                if stop_requested():
+                    return
                 cand = S[:]
                 cand[i_pos] = r
                 cand = _fix_cardinality(cand, universe, k)
                 met = evaluate_subset(Xtr, ytr, Xte, yte, cand, clf_name)
-                if met["f1"] > base + 1e-12:
+                if met["f1"] >= base + MINIMUM_IMPROVEMENT:
                     out = S[i_pos]
                     S[:] = sorted(cand)
                     R[r_idx] = out
@@ -375,14 +420,14 @@ def op_bitflip_stream(S, R, Xtr, ytr, Xte, yte, clf_name, tries: int):
     attempts = 0
     for i_pos in idx_S:
         for r_idx in idx_R:
-            if attempts >= tries:
+            if attempts >= tries or stop_requested():
                 return
             attempts += 1
             cand = S[:]
             cand[i_pos] = R[r_idx]
             cand = _fix_cardinality(cand, universe, k)
             met = evaluate_subset(Xtr, ytr, Xte, yte, cand, clf_name)
-            if met["f1"] > base + 1e-12:
+            if met["f1"] >= base + MINIMUM_IMPROVEMENT:
                 out = S[i_pos]
                 S[:] = sorted(cand)
                 R[r_idx] = out
@@ -440,6 +485,7 @@ def local_search_loop(S0: List[int], R: List[int],
                       subset_size: int,
                       log_all_iters: bool,
                       log_sys_metrics: bool) -> List[int]:
+    global ACCEPTED_IMPROVEMENTS
     S = S0[:]
     last_vnd_idx = -1
     op_names = [op.strip().lower() for op in ls_ops if op.strip()]
@@ -450,6 +496,8 @@ def local_search_loop(S0: List[int], R: List[int],
     last_metrics = evaluate_subset(Xtr, ytr, Xte, yte, S, clf_name)
 
     for it in range(1, iters + 1):
+        if stop_requested():
+            break
         op_idx, op_choice = pick_operator(neighborhood, last_vnd_idx, op_names)
         if neighborhood.lower() == "vnd":
             last_vnd_idx = op_idx
@@ -471,12 +519,13 @@ def local_search_loop(S0: List[int], R: List[int],
         accepted_any = False
         for cand, tag, met, elapsed_ms in gen:
             accepted_any = True
+            ACCEPTED_IMPROVEMENTS += 1
             S[:] = cand  # S já vem atualizado, mas garantimos
             last_metrics = met  # atualiza cache com as métricas aceitas
             cpu, mem, memp = get_system_metrics(log_sys_metrics)
             target_writer.writerow([
                 str(cand),
-                f"{met['f1']*1000:.3f}", f"{met['acc']*1000:.3f}", f"{met['prec']*1000:.3f}", f"{met['rec']*1000:.3f}",
+                f"{met['f1']:.6f}", f"{met['acc']:.6f}", f"{met['prec']:.6f}", f"{met['rec']:.6f}",
                 neighborhood, iterNeighborhood, tag, it,
                 elapsed_ms, cpu, mem, memp,
                 clf_name.upper(), train_name, test_name, seed_id
@@ -487,8 +536,8 @@ def local_search_loop(S0: List[int], R: List[int],
             cpu, mem, memp = get_system_metrics(log_sys_metrics)
             target_writer.writerow([
                 str(S),
-                f"{last_metrics['f1']*1000:.3f}", f"{last_metrics['acc']*1000:.3f}",
-                f"{last_metrics['prec']*1000:.3f}", f"{last_metrics['rec']*1000:.3f}",
+                f"{last_metrics['f1']:.6f}", f"{last_metrics['acc']:.6f}",
+                f"{last_metrics['prec']:.6f}", f"{last_metrics['rec']:.6f}",
                 neighborhood, iterNeighborhood, none_tag, it,
                 elapsed_ms, cpu, mem, memp,
                 clf_name.upper(), train_name, test_name, seed_id
@@ -508,8 +557,9 @@ def parse_args():
         "GRASP-FS (SU/IG/GR) + Neighborhood (RVND/VND) + IWSS/IWSSR/BitFlip (logs otimizados)"
     )
     p.add_argument("-tr", "--train", required=True, help="CSV/ARFF (classe na última coluna)")
-    p.add_argument("-ts", "--test", help="CSV/ARFF (se ausente, split 80/20)")
-    p.add_argument("--classifier", choices=["J48", "NB", "RF"], default="J48")
+    p.add_argument("--validation", required=True, help="Dataset used only for model selection")
+    p.add_argument("-ts", "--test", required=True, help="Untouched holdout dataset")
+    p.add_argument("--classifier", choices=["CART", "J48", "NB", "RF"], default="CART")
     p.add_argument("--fs_algos", default="ig,gr,su", help="Lista: su,ig,gr")
     p.add_argument("--neighborhoods", default="vnd,rvnd", help="Lista: rvnd,vnd")
     p.add_argument("--ls_ops", default="iwss,iwssr,bitflip", help="bitflip,iwss,iwssr (ordem no VND)")
@@ -530,6 +580,15 @@ def parse_args():
     p.add_argument("--log_sys_metrics", type=int, default=1, help="1=registrar CPU/Mem; 0=desligar (mais rápido)")
 
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--run_timeout_seconds", type=int, default=7200)
+    p.add_argument("--final_evaluation_reserve_seconds", type=int, default=300)
+    p.add_argument("--max_accepted_improvements", type=int, default=500)
+    p.add_argument("--minimum_improvement", type=float, default=0.0001)
+    p.add_argument("--campaign_id", required=True)
+    p.add_argument("--arm_id", required=True)
+    p.add_argument("--run_id", required=True)
+    p.add_argument("--final_metrics_file", default="logs/final-result.json")
+    p.add_argument("--dataset_hash", default="")
     return p.parse_args()
 
 
@@ -537,16 +596,25 @@ def parse_args():
 # Main
 # =============================================================================
 def main():
+    global RUN_DEADLINE, MAX_ACCEPTED_IMPROVEMENTS, MINIMUM_IMPROVEMENT
     args = parse_args()
     random.seed(args.seed)
     np.random.seed(args.seed)
+    run_started = time.monotonic()
+    selection_seconds = max(
+        1,
+        args.run_timeout_seconds - args.final_evaluation_reserve_seconds,
+    )
+    RUN_DEADLINE = run_started + selection_seconds
+    MAX_ACCEPTED_IMPROVEMENTS = args.max_accepted_improvements
+    MINIMUM_IMPROVEMENT = args.minimum_improvement
 
     ensure_logs_dir()
 
     # params string (separado por ';' para fácil transposição)
     params_row = [
         "RUN_PARAMS",
-        f"train={args.train}", f"test={args.test or ''}",
+        f"train={args.train}", f"validation={args.validation}", f"test={args.test}",
         f"classifier={args.classifier}",
         f"fs_algos={args.fs_algos}", f"neighborhoods={args.neighborhoods}",
         f"ls_ops={args.ls_ops}",
@@ -574,23 +642,17 @@ def main():
 
     # carga de dados
     train_df = load_dataset(args.train)
-    if args.test:
-        test_df = load_dataset(args.test)
-    else:
-        from sklearn.model_selection import train_test_split
-        Xall, yall = split_xy(train_df)
-        Xtr0, Xte0, ytr0, yte0 = train_test_split(
-            Xall, yall, test_size=0.2, random_state=args.seed, stratify=yall
-        )
-        train_df = pd.concat([Xtr0.reset_index(drop=True), ytr0.reset_index(drop=True)], axis=1)
-        test_df  = pd.concat([Xte0.reset_index(drop=True), yte0.reset_index(drop=True)], axis=1)
+    validation_df = load_dataset(args.validation)
+    test_df = load_dataset(args.test)
 
     X_train, y_train = split_xy(train_df)
-    X_test,  y_test  = split_xy(test_df)
+    X_validation, y_validation = split_xy(validation_df)
+    X_holdout, y_holdout = split_xy(test_df)
 
     # padroniza nomes
     X_train.columns = pd.Index([f"c{i}" for i in range(X_train.shape[1])], dtype=object)
-    X_test.columns  = pd.Index([f"c{i}" for i in range(X_test.shape[1])], dtype=object)
+    X_validation.columns = pd.Index([f"c{i}" for i in range(X_validation.shape[1])], dtype=object)
+    X_holdout.columns = pd.Index([f"c{i}" for i in range(X_holdout.shape[1])], dtype=object)
 
     n_feats = X_train.shape[1]
     rcl_size = max(1, min(args.rcl_size, n_feats))
@@ -601,9 +663,14 @@ def main():
     ops_list = [op.strip().lower() for op in args.ls_ops.split(",") if op.strip()]
 
     train_name = os.path.basename(args.train)
-    test_name  = os.path.basename(args.test) if args.test else os.path.basename(args.train)
+    validation_name = os.path.basename(args.validation)
+    best_solution = None
+    best_validation = None
+    best_configuration = None
 
     for fs in fs_list:
+        if stop_requested():
+            break
         try:
             ranked = rank_features(X_train, y_train, fs)
         except Exception as e:
@@ -611,6 +678,8 @@ def main():
             continue
 
         for ngh in ngh_list:
+            if stop_requested():
+                break
             # arquivos de log por combinação
             f_construct_path = f"logs/construcao_{fs}_{ngh}.csv"
             f_bitflip_path   = f"logs/bitflip_{fs}_{ngh}.csv"
@@ -649,63 +718,50 @@ def main():
 
                     # GRASP: N soluções iniciais por FS×Neighborhood
                     for b in range(1, args.build_restarts + 1):
+                        if stop_requested():
+                            break
                         seed_id = str(uuid.uuid4())
 
                         try:
                             # 1) construção
                             S0, R0 = construct_initial_solution(
                                 ranked, rcl_size, subset_size,
-                                X_train, y_train, X_test, y_test, args.classifier,
-                                construct_writer, args.classifier.upper(), train_name, test_name,
+                                X_train, y_train, X_validation, y_validation, args.classifier,
+                                construct_writer, args.classifier.upper(), train_name, validation_name,
                                 seed_id, bool(args.log_sys_metrics)
                             )
 
                             # 2) “microserviços” no monolito: cada operador parte da mesma S0
-                            for op in ops_list:
-                                S = S0[:]
-                                R = R0[:]
-
-                                if op == "iwss":
-                                    _ = local_search_loop(
-                                        S, R, X_train, y_train, X_test, y_test, args.classifier,
-                                        neighborhood=ngh, iters=args.ls_iters,
-                                        bitflip_writer=bitflip_writer, iwss_writer=iwss_writer, iwssr_writer=iwssr_writer,
-                                        train_name=train_name, test_name=test_name, seed_id=seed_id,
-                                        iterNeighborhood=b,
-                                        ls_ops=["iwss"],
-                                        bitflip_tries=0,
-                                        subset_size=subset_size,
-                                        log_all_iters=bool(args.log_all_iters),
-                                        log_sys_metrics=bool(args.log_sys_metrics)
-                                    )
-                                elif op == "iwssr":
-                                    _ = local_search_loop(
-                                        S, R, X_train, y_train, X_test, y_test, args.classifier,
-                                        neighborhood=ngh, iters=args.ls_iters,
-                                        bitflip_writer=bitflip_writer, iwss_writer=iwss_writer, iwssr_writer=iwssr_writer,
-                                        train_name=train_name, test_name=test_name, seed_id=seed_id,
-                                        iterNeighborhood=b,
-                                        ls_ops=["iwssr"],
-                                        bitflip_tries=0,
-                                        subset_size=subset_size,
-                                        log_all_iters=bool(args.log_all_iters),
-                                        log_sys_metrics=bool(args.log_sys_metrics)
-                                    )
-                                elif op == "bitflip":
-                                    _ = local_search_loop(
-                                        S, R, X_train, y_train, X_test, y_test, args.classifier,
-                                        neighborhood=ngh, iters=args.ls_iters,
-                                        bitflip_writer=bitflip_writer, iwss_writer=iwss_writer, iwssr_writer=iwssr_writer,
-                                        train_name=train_name, test_name=test_name, seed_id=seed_id,
-                                        iterNeighborhood=b,
-                                        ls_ops=["bitflip"],
-                                        bitflip_tries=args.bitflip_tries,
-                                        subset_size=subset_size,
-                                        log_all_iters=bool(args.log_all_iters),
-                                        log_sys_metrics=bool(args.log_sys_metrics)
-                                    )
-                                else:
-                                    continue
+                            # The controller receives all neighborhoods together.
+                            # Invoking it once per operator makes VND and RVND
+                            # degenerate to the same single-neighborhood search.
+                            candidate = local_search_loop(
+                                S0[:], R0[:], X_train, y_train, X_validation, y_validation, args.classifier,
+                                neighborhood=ngh, iters=args.ls_iters,
+                                bitflip_writer=bitflip_writer, iwss_writer=iwss_writer, iwssr_writer=iwssr_writer,
+                                train_name=train_name, test_name=validation_name, seed_id=seed_id,
+                                iterNeighborhood=b,
+                                ls_ops=ops_list,
+                                bitflip_tries=args.bitflip_tries,
+                                subset_size=subset_size,
+                                log_all_iters=bool(args.log_all_iters),
+                                log_sys_metrics=bool(args.log_sys_metrics)
+                            )
+                            validation_metrics = evaluate_subset(
+                                X_train, y_train, X_validation, y_validation,
+                                candidate, args.classifier
+                            )
+                            if (
+                                best_validation is None
+                                or validation_metrics["f1"] > best_validation["f1"]
+                            ):
+                                best_solution = candidate[:]
+                                best_validation = validation_metrics
+                                best_configuration = {
+                                    "feature_selector": fs,
+                                    "neighborhood_controller": ngh,
+                                    "local_search": ops_list,
+                                }
 
                         except Exception as e_build:
                             log_error(f"FS={fs} NGH={ngh} build #{b} falhou: {e_build}")
@@ -722,6 +778,104 @@ def main():
                 continue
 
     err_fh.close()
+
+    if best_solution is None or best_validation is None or best_configuration is None:
+        raise RuntimeError("No candidate completed before the selection deadline")
+
+    # Evaluate the untouched holdout exactly once, after every selection choice.
+    holdout_started = time.perf_counter()
+    holdout_metrics = evaluate_subset(
+        X_train, y_train, X_holdout, y_holdout,
+        best_solution, args.classifier
+    )
+    classifier_time_ms = int((time.perf_counter() - holdout_started) * 1000)
+    train_hash = sha256_file(args.train)
+    validation_hash = sha256_file(args.validation)
+    test_hash = sha256_file(args.test)
+    if args.dataset_hash:
+        dataset_hash = args.dataset_hash
+    else:
+        dataset_hash = hashlib.sha256(
+            f"{train_hash}:{validation_hash}:{test_hash}".encode("ascii")
+        ).hexdigest()
+
+    elapsed_ms = int((time.monotonic() - run_started) * 1000)
+    if ACCEPTED_IMPROVEMENTS >= MAX_ACCEPTED_IMPROVEMENTS:
+        stop_reason = "accepted_improvement_limit"
+    elif time.monotonic() >= RUN_DEADLINE:
+        stop_reason = "time_limit"
+    else:
+        stop_reason = "configured_search_exhausted"
+
+    process = psutil.Process(os.getpid())
+    result = {
+        "campaign_id": args.campaign_id,
+        "arm_id": args.arm_id,
+        "run_id": args.run_id,
+        "seed": args.seed,
+        "candidate_id": None,
+        "parent_id": None,
+        "request_id": None,
+        "stage": "final_holdout",
+        "algorithm": "GRASP-FS monolith2-graspy",
+        "feature_selector": best_configuration["feature_selector"],
+        "neighborhood_controller": best_configuration["neighborhood_controller"],
+        "local_search": ",".join(best_configuration["local_search"]),
+        "classifier": args.classifier.upper(),
+        "classifier_version": f"scikit-learn {sklearn.__version__}",
+        "classifier_parameters": {"random_state": 0},
+        "dataset_hash": dataset_hash,
+        "train_hash": train_hash,
+        "validation_hash": validation_hash,
+        "test_hash": test_hash,
+        "selected_features": best_solution,
+        "subset_size": len(best_solution),
+        "dimensionality_reduction_percent": 100.0 * (1.0 - len(best_solution) / n_feats),
+        "validation_f1_macro": float(best_validation["f1"]),
+        "validation_f1_weighted": float(best_validation["f1_weighted"]),
+        "validation_precision_macro": float(best_validation["prec"]),
+        "validation_precision_weighted": float(best_validation["prec_weighted"]),
+        "validation_recall_macro": float(best_validation["rec"]),
+        "validation_recall_weighted": float(best_validation["rec_weighted"]),
+        "test_f1_macro": float(holdout_metrics["f1"]),
+        "test_f1_weighted": float(holdout_metrics["f1_weighted"]),
+        "test_precision_macro": float(holdout_metrics["prec"]),
+        "test_recall_macro": float(holdout_metrics["rec"]),
+        "accuracy": float(holdout_metrics["acc"]),
+        "candidate_time_ms": None,
+        "classifier_time_ms": classifier_time_ms,
+        "run_elapsed_ms": elapsed_ms,
+        "end_to_end_time_ms": elapsed_ms,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "monotonic_elapsed_ms": elapsed_ms,
+        "candidate_count": CANDIDATE_COUNT,
+        "accepted_improvement_count": ACCEPTED_IMPROVEMENTS,
+        "process_cpu_percent": float(process.cpu_percent(interval=None)),
+        "container_cpu_percent": None,
+        "host_cpu_percent": None,
+        "process_rss_mb": process.memory_info().rss / (1024 * 1024),
+        "container_memory_mb": None,
+        "host_memory_mb": None,
+        "cpu_throttled_seconds": None,
+        "disk_read_bytes": None,
+        "disk_write_bytes": None,
+        "network_rx_bytes": None,
+        "network_tx_bytes": None,
+        "kafka_lag": None,
+        "restart_count": None,
+        "stop_reason": stop_reason,
+        "status": "completed",
+        "error_code": None,
+    }
+    output_path = os.path.abspath(args.final_metrics_file)
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    temporary_path = output_path + ".tmp"
+    with open(temporary_path, "w", encoding="utf-8") as handle:
+        json.dump(result, handle, ensure_ascii=False, indent=2, sort_keys=True)
+        handle.write("\n")
+    os.replace(temporary_path, output_path)
 
 
 if __name__ == "__main__":

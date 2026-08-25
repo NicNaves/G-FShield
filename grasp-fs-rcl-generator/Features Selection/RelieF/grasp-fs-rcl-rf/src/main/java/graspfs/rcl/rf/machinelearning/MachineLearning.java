@@ -2,6 +2,7 @@ package graspfs.rcl.rf.machinelearning;
 import graspfs.rcl.rf.dto.EvaluationResult;
 import graspfs.rcl.rf.util.MachineLearningUtils;
 import weka.classifiers.AbstractClassifier;
+import weka.classifiers.Evaluation;
 import weka.classifiers.trees.J48;
 import weka.core.Instance;
 import weka.core.Instances;
@@ -25,6 +26,8 @@ public class MachineLearning {
         testingDataset = MachineLearningUtils.selecionaFeatures(testingDataset, features);
 
         AbstractClassifier classificadorTreinado = MachineLearningUtils.construir(trainingDataset, classificador); // treina o classificador recebido
+        Evaluation evaluation = new Evaluation(trainingDataset);
+        evaluation.evaluateModel(classificadorTreinado, testingDataset);
 
         // Resultados
         float VP = 0; // quando o IDS diz que está acontecendo um ataque, e realmente está
@@ -65,11 +68,30 @@ public class MachineLearning {
         long endNano = System.nanoTime();
         float totalNano = (endNano - beginNano) / 1000f; // converte para microssegundos
 
-        EvaluationResult scores = calculateScore(testingDataset, totalNano, VP, VN, FP, FN);
+        EvaluationResult scores = calculateMacroScore(evaluation, testingDataset.numClasses());
 
         //MachineLearningUtils.printResults(testingDataset, totalNano, VP, VN, FP, FN);
 
         return scores;
+    }
+
+    private static EvaluationResult calculateMacroScore(Evaluation evaluation, int numberOfClasses) {
+        double f1 = 0.0;
+        double precision = 0.0;
+        double recall = 0.0;
+        for (int classIndex = 0; classIndex < numberOfClasses; classIndex++) {
+            double classF1 = evaluation.fMeasure(classIndex);
+            double classPrecision = evaluation.precision(classIndex);
+            double classRecall = evaluation.recall(classIndex);
+            f1 += Double.isNaN(classF1) ? 0.0 : classF1;
+            precision += Double.isNaN(classPrecision) ? 0.0 : classPrecision;
+            recall += Double.isNaN(classRecall) ? 0.0 : classRecall;
+        }
+        return new EvaluationResult(
+                (float) (f1 / numberOfClasses),
+                (float) (precision / numberOfClasses),
+                (float) (recall / numberOfClasses),
+                (float) (evaluation.pctCorrect() / 100.0));
     }
 
     public static EvaluationResult calculateScore(Instances datasetTestes, float totalNano, float VP, float VN, float FP, float FN) {
