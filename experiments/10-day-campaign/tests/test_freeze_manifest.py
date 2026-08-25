@@ -22,6 +22,11 @@ ORCHESTRATOR = load_module("campaign_orchestrator_for_freeze", ROOT / "orchestra
 
 
 class FrozenCommandTest(unittest.TestCase):
+    def test_freeze_uses_git_command_supported_by_the_target_server(self):
+        source = (ROOT / "freeze_manifest.py").read_text(encoding="utf-8")
+        self.assertNotIn('"branch", "--show-current"', source)
+        self.assertIn('"symbolic-ref", "--quiet", "--short", "HEAD"', source)
+
     def test_all_command_templates_resolve_with_orchestrator_context(self):
         manifest = json.loads((ROOT / "manifest.yaml").read_text(encoding="utf-8"))
         context = {

@@ -231,7 +231,9 @@ def main() -> int:
     source_commit = checked(
         "git", "rev-parse", args.image_source_commit or "HEAD", cwd=repo_root
     )
-    branch = checked("git", "branch", "--show-current", cwd=repo_root)
+    # `git branch --show-current` is unavailable on the target server's older
+    # Git release; symbolic-ref provides the same attached-branch value.
+    branch = checked("git", "symbolic-ref", "--quiet", "--short", "HEAD", cwd=repo_root)
     images = image_metadata(args.image_tag)
     compose_text = resolved_compose(repo_root, args.image_tag)
     args.resolved_compose.write_text(compose_text, encoding="utf-8", newline="\n")
