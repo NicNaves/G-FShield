@@ -37,6 +37,10 @@ class RunPilotsTest(unittest.TestCase):
             '"--local-search-iterations", str(args.local_search_iterations)',
             source,
         )
+        self.assertIn(
+            '"--max-accepted-improvements", str(args.max_accepted_improvements)',
+            source,
+        )
 
     def test_verify_consumes_best_so_far_progress(self):
         consumer = (

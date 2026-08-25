@@ -61,6 +61,7 @@ def command_for(args: argparse.Namespace, case: dict[str, str], output: Path) ->
             "--rcl-cutoff", "30", "--sample-size", "5",
             "--neighborhood-iterations", "100",
             "--local-search-iterations", str(args.local_search_iterations),
+            "--max-accepted-improvements", str(args.max_accepted_improvements),
             "--image-tag", args.image_tag,
             "--evaluator-image", f"gfshield-campaign-evaluator:{args.image_tag}",
             "--feature-count", "51",
@@ -78,6 +79,7 @@ def command_for(args: argparse.Namespace, case: dict[str, str], output: Path) ->
             "--image-tag", args.image_tag,
             "--run-timeout-seconds", str(args.duration_seconds),
             "--finalization-reserve-seconds", str(args.finalization_reserve_seconds),
+            "--max-accepted-improvements", str(args.max_accepted_improvements),
             *resource,
             "--dataset-hash", SOURCE_HASH,
         ]
@@ -148,7 +150,12 @@ def validate_resource_samples(path: Path, expected_containers: int) -> tuple[lis
     }
 
 
-def validate_case(output: Path, case: dict[str, str], duration_seconds: int) -> dict[str, Any]:
+def validate_case(
+    output: Path,
+    case: dict[str, str],
+    duration_seconds: int,
+    maximum_accepted_improvements: int,
+) -> dict[str, Any]:
     issues: list[str] = []
     result_path = output / "final-result.json"
     result: dict[str, Any] = {}
@@ -177,6 +184,17 @@ def validate_case(output: Path, case: dict[str, str], duration_seconds: int) -> 
         value = result.get(metric)
         if not isinstance(value, (int, float)) or not 0 <= value <= 1:
             issues.append(f"invalid {metric}: {value!r}")
+    accepted = result.get("accepted_improvement_count")
+    if isinstance(accepted, int) and accepted > maximum_accepted_improvements:
+        issues.append(
+            f"accepted improvement count {accepted} exceeds {maximum_accepted_improvements}"
+        )
+    if (
+        case["kind"] != "baseline"
+        and accepted == maximum_accepted_improvements
+        and result.get("stop_reason") != "accepted_improvement_limit"
+    ):
+        issues.append("improvement limit was reached without stopping on that criterion")
     expected_containers = 8 if case["kind"] == "distributed" else 1
     resource_issues, resource_summary = validate_resource_samples(
         output / "resource-samples.jsonl", expected_containers
@@ -210,6 +228,7 @@ def main() -> int:
     parser.add_argument("--duration-seconds", type=int, default=30 * 60)
     parser.add_argument("--finalization-reserve-seconds", type=int, default=5 * 60)
     parser.add_argument("--local-search-iterations", type=int, default=5)
+    parser.add_argument("--max-accepted-improvements", type=int, default=3)
     parser.add_argument("--seed", type=int, default=104729)
     parser.add_argument("--pilot-namespace")
     args = parser.parse_args()
@@ -217,6 +236,8 @@ def main() -> int:
         parser.error("finalization reserve must be shorter than pilot duration")
     if args.local_search_iterations <= 0:
         parser.error("local-search iterations must be positive")
+    if args.max_accepted_improvements <= 0:
+        parser.error("maximum accepted improvements must be positive")
     args.output_root.mkdir(parents=True, exist_ok=True)
     state_path = args.output_root / "pilot-state.json"
     report_path = args.output_root / "pilot-report.json"
@@ -225,6 +246,7 @@ def main() -> int:
         "image_tag": args.image_tag,
         "duration_seconds": args.duration_seconds,
         "local_search_iterations": args.local_search_iterations,
+        "max_accepted_improvements": args.max_accepted_improvements,
         "seed": args.seed,
         "cases": {},
         "pilot_namespace": args.pilot_namespace
@@ -238,11 +260,19 @@ def main() -> int:
             raise RuntimeError("existing pilot state belongs to a different pilot namespace")
         if state.get("local_search_iterations") != args.local_search_iterations:
             raise RuntimeError("existing pilot state uses different local-search iterations")
+        if state.get("max_accepted_improvements") != args.max_accepted_improvements:
+            raise RuntimeError("existing pilot state uses a different improvement limit")
     args.pilot_namespace = state["pilot_namespace"]
     atomic_json(state_path, state)
     for case in cases():
         output = args.output_root / case["name"]
-        prior = validate_case(output, case, args.duration_seconds) if output.exists() else {"approved": False}
+        prior = (
+            validate_case(
+                output, case, args.duration_seconds, args.max_accepted_improvements
+            )
+            if output.exists()
+            else {"approved": False}
+        )
         if prior.get("approved"):
             state["cases"][case["name"]] = {"status": "reused", **prior}
             atomic_json(state_path, state)
@@ -284,7 +314,9 @@ def main() -> int:
                 else:
                     process.kill()
                 return_code = process.wait()
-        validation = validate_case(output, case, args.duration_seconds)
+        validation = validate_case(
+            output, case, args.duration_seconds, args.max_accepted_improvements
+        )
         state["cases"][case["name"]] = {
             "status": "passed" if validation["approved"] else "failed",
             "return_code": return_code,

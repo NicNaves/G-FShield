@@ -288,6 +288,14 @@ def wait_for_http_service(port: int, route: str, deadline: float) -> None:
     raise TimeoutError(f"RCL HTTP service did not become ready on loopback port {port}")
 
 
+def complete_record_count(path: Path) -> int:
+    """Count only newline-terminated records while another process writes the file."""
+    if not path.exists():
+        return 0
+    with path.open("rb") as handle:
+        return sum(1 for line in handle if line.endswith(b"\n") and line.strip())
+
+
 def parse_best_messages(path: Path, run_id: str) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
     if not path.exists():
@@ -519,6 +527,8 @@ def run_distributed(args: argparse.Namespace) -> int:
     args.request_id = request_id
     if args.finalization_reserve_seconds >= args.run_timeout_seconds:
         raise ValueError("finalization reserve must be shorter than the absolute run timeout")
+    if args.max_accepted_improvements <= 0:
+        raise ValueError("maximum accepted improvements must be positive")
     absolute_deadline = started_monotonic + args.run_timeout_seconds
     selection_deadline = absolute_deadline - args.finalization_reserve_seconds
     deadline_epoch_ms = int((time.time() + max(0.0, selection_deadline - time.monotonic())) * 1000)
@@ -614,9 +624,15 @@ def run_distributed(args: argparse.Namespace) -> int:
             launch = json.loads(response.read().decode("utf-8"))
         atomic_json(result_dir / "launch.json", launch)
 
-        while time.monotonic() < selection_deadline:
-            time.sleep(min(5.0, selection_deadline - time.monotonic()))
-        stop_reason = "run_timeout"
+        while True:
+            if complete_record_count(raw_messages) >= args.max_accepted_improvements:
+                stop_reason = "accepted_improvement_limit"
+                break
+            remaining = selection_deadline - time.monotonic()
+            if remaining <= 0:
+                stop_reason = "run_timeout"
+                break
+            time.sleep(min(5.0, remaining))
     except KeyboardInterrupt:
         stop_reason = "cancelled"
     except Exception as error:

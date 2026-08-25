@@ -1,5 +1,6 @@
 import base64
 import importlib.util
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -46,6 +47,21 @@ class RunArmResultTest(unittest.TestCase):
             {"f1Score": 0.95, "solutionFeatures": [0, 2]},
         ]
         self.assertIsNone(RUN_ARM.best_message(messages))
+
+    def test_only_complete_best_solution_records_trigger_the_limit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "best.jsonl"
+            path.write_bytes(b'{"one":1}\n\n{"partial":')
+            self.assertEqual(1, RUN_ARM.complete_record_count(path))
+            with path.open("ab") as handle:
+                handle.write(b'true}\n')
+            self.assertEqual(2, RUN_ARM.complete_record_count(path))
+        source = (ROOT / "run_arm.py").read_text(encoding="utf-8")
+        self.assertIn(
+            "complete_record_count(raw_messages) >= args.max_accepted_improvements",
+            source,
+        )
+        self.assertIn('stop_reason = "accepted_improvement_limit"', source)
 
 
 if __name__ == "__main__":

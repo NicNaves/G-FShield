@@ -55,6 +55,8 @@ The formal pilots use five iterations per local-search invocation so a complete
 VND/RVND handoff can be observed within 30 minutes. The official frozen commands
 retain 100 iterations and additionally persist best-so-far progress throughout
 the bounded run; the pilot report records its iteration limit explicitly.
+The pilot also uses a three-improvement cap to exercise the same stop-on-first
+criterion used by the official 500-improvement or 50-minute bound.
 
 ```sh
 python3 experiments/10-day-campaign/run_resilience_pilot.py \
