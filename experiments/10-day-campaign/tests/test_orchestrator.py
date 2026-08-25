@@ -45,6 +45,7 @@ class OrchestratorPreflightTest(unittest.TestCase):
         self.assertEqual(240 * 60 * 60, manifest["campaign"]["maximum_seconds"])
         self.assertEqual(8, len(manifest["seeds"]))
         self.assertEqual(8, len(set(manifest["seeds"])))
+        self.assertEqual(list(range(42, 50)), manifest["seeds"])
 
     def test_compose_image_digests_have_sha256_length(self):
         compose = (ROOT / "docker-compose.campaign.yml").read_text(encoding="utf-8")

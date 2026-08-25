@@ -14,6 +14,8 @@ selection, controlled shutdown, validation, and the single holdout evaluation;
 the final ten minutes of each arm window cover transitions and permit at least
 eight attempts. Eight hours are reserved for the all-features baseline and 24
 hours for campaign-level transitions and final consolidation.
+The eight independent runs use the first eight seeds from the protocol's
+fixed sequence: `42, 43, 44, 45, 46, 47, 48, 49`.
 
 The checked-in `manifest.yaml` is JSON syntax, which is valid YAML 1.2 and can
 be parsed with Python's standard `json` module. `ready: false` is deliberate:
