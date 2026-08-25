@@ -51,6 +51,11 @@ start timestamp is written.
 After the seven formal 30-minute cases finish, run the destructive resilience
 checks separately so signal injection cannot contaminate scientific outputs:
 
+The formal pilots use five iterations per local-search invocation so a complete
+VND/RVND handoff can be observed within 30 minutes. The official frozen commands
+retain 100 iterations and additionally persist best-so-far progress throughout
+the bounded run; the pilot report records its iteration limit explicitly.
+
 ```sh
 python3 experiments/10-day-campaign/run_resilience_pilot.py \
   --pilot-report /path/to/formal-pilots/pilot-report.json \

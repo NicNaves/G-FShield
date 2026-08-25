@@ -96,6 +96,12 @@ def source_audit(repo_root: Path) -> tuple[list[str], dict[str, str]]:
         "experiments/monoliths/monolith2-graspy/main.py": [
             "Evaluate the untouched holdout exactly once",
         ],
+        (
+            "grasp-fs-distributed-ls/Verify/grasp-fs.dls.verify/src/main/java/"
+            "com/br/graspfs/dls/verify/consumer/KafkaSolutionsConsumer.java"
+        ): [
+            'topics = {"SOLUTIONS_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC"}',
+        ],
     }
     hashes: dict[str, str] = {}
     for relative, markers in expected_markers.items():

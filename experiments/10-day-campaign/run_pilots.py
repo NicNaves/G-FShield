@@ -60,7 +60,7 @@ def command_for(args: argparse.Namespace, case: dict[str, str], output: Path) ->
             "--max-generations", "2147483647",
             "--rcl-cutoff", "30", "--sample-size", "5",
             "--neighborhood-iterations", "100",
-            "--local-search-iterations", "100",
+            "--local-search-iterations", str(args.local_search_iterations),
             "--image-tag", args.image_tag,
             "--evaluator-image", f"gfshield-campaign-evaluator:{args.image_tag}",
             "--feature-count", "51",
@@ -209,11 +209,14 @@ def main() -> int:
     parser.add_argument("--image-tag", required=True)
     parser.add_argument("--duration-seconds", type=int, default=30 * 60)
     parser.add_argument("--finalization-reserve-seconds", type=int, default=5 * 60)
+    parser.add_argument("--local-search-iterations", type=int, default=5)
     parser.add_argument("--seed", type=int, default=104729)
     parser.add_argument("--pilot-namespace")
     args = parser.parse_args()
     if args.finalization_reserve_seconds >= args.duration_seconds:
         parser.error("finalization reserve must be shorter than pilot duration")
+    if args.local_search_iterations <= 0:
+        parser.error("local-search iterations must be positive")
     args.output_root.mkdir(parents=True, exist_ok=True)
     state_path = args.output_root / "pilot-state.json"
     report_path = args.output_root / "pilot-report.json"
@@ -221,6 +224,7 @@ def main() -> int:
         "started_utc": utc_now(),
         "image_tag": args.image_tag,
         "duration_seconds": args.duration_seconds,
+        "local_search_iterations": args.local_search_iterations,
         "seed": args.seed,
         "cases": {},
         "pilot_namespace": args.pilot_namespace
@@ -232,6 +236,8 @@ def main() -> int:
             raise RuntimeError("existing pilot state belongs to a different image tag")
         if args.pilot_namespace and state.get("pilot_namespace") != args.pilot_namespace:
             raise RuntimeError("existing pilot state belongs to a different pilot namespace")
+        if state.get("local_search_iterations") != args.local_search_iterations:
+            raise RuntimeError("existing pilot state uses different local-search iterations")
     args.pilot_namespace = state["pilot_namespace"]
     atomic_json(state_path, state)
     for case in cases():

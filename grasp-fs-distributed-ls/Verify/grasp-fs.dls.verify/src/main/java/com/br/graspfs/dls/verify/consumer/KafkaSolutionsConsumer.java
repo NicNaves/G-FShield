@@ -16,7 +16,7 @@ public class KafkaSolutionsConsumer {
     private final VerifyService verifyService;
 
     @KafkaListener(
-        topics = "SOLUTIONS_TOPIC",
+        topics = {"SOLUTIONS_TOPIC", "LOCAL_SEARCH_PROGRESS_TOPIC"},
         groupId = "${spring.kafka.consumer.group-id}",
         containerFactory = "solutionListenerContainerFactory"
     )
