@@ -59,6 +59,7 @@ public class RelieFAsyncService {
     ) {
         long requestStartedAt = System.currentTimeMillis();
         long requestStartedMonotonic = System.nanoTime();
+        long campaignStartedMonotonic = environmentLong("CAMPAIGN_START_MONOTONIC_NS", requestStartedMonotonic);
         long deadlineEpochMs = environmentLong("CAMPAIGN_DEADLINE_EPOCH_MS", Long.MAX_VALUE);
         int campaignSeed = (int) environmentLong("CAMPAIGN_RANDOM_SEED", 0L);
         Random campaignRandom = new Random(campaignSeed);
@@ -118,7 +119,8 @@ public class RelieFAsyncService {
                     generatedSolution.setCandidateId(generatedSolution.getSeedId().toString());
                     generatedSolution.setStage("initial_solution");
                     generatedSolution.setTimestampUtc(Instant.now().toString());
-                    generatedSolution.setMonotonicElapsedMs((System.nanoTime() - requestStartedMonotonic) / 1_000_000L);
+                    generatedSolution.setMonotonicElapsedMs(
+                            Math.max(0L, System.nanoTime() - campaignStartedMonotonic) / 1_000_000L);
 
                     logger.info(
                             "rcl generation ready algorithm={} requestId={} generation={} seedId={} featureCount={} rclSize={} neighborhood={} enabledSearches={} f1={}",

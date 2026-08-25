@@ -315,8 +315,22 @@ def score_of(message: dict[str, Any]) -> float:
         return float("-inf")
 
 
+def has_valid_feature_subset(message: dict[str, Any]) -> bool:
+    raw = message.get("solutionFeatures")
+    if not isinstance(raw, list) or not raw:
+        return False
+    try:
+        features = [int(feature) for feature in raw]
+    except (TypeError, ValueError):
+        return False
+    return all(feature > 0 for feature in features) and len(features) == len(set(features))
+
+
 def best_message(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
-    eligible = [item for item in messages if item.get("solutionFeatures") and 0.0 <= score_of(item) <= 1.0]
+    eligible = [
+        item for item in messages
+        if has_valid_feature_subset(item) and 0.0 <= score_of(item) <= 1.0
+    ]
     if not eligible:
         return None
     return min(
@@ -361,7 +375,11 @@ def parse_evaluator_line(line: str) -> dict[str, Any]:
     return result
 
 
-def evaluate_selected_features(args: argparse.Namespace, features: list[int]) -> tuple[dict[str, Any], dict[str, Any]]:
+def evaluate_selected_features(
+    args: argparse.Namespace,
+    features: list[int],
+    deadline_monotonic: float,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     zero_based = sorted({int(feature) - 1 for feature in features})
     if not zero_based or zero_based[0] < 0:
         raise ValueError(f"distributed feature identifiers must be one-based positive integers: {features}")
@@ -378,24 +396,30 @@ def evaluate_selected_features(args: argparse.Namespace, features: list[int]) ->
         "--validation", "/datasets/campaign/erenoall-validation.arff",
         "--test", "/datasets/campaign/erenoall-test.arff",
     ]
-    process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    assert process.stdin is not None and process.stdout is not None
-    ready = process.stdout.readline().strip()
-    if not ready.startswith("READY\tweka-stable-3.8.6\tJ48-default"):
-        process.kill()
-        raise RuntimeError(f"unexpected evaluator banner: {ready}")
     serialized = ",".join(str(feature) for feature in zero_based)
-    process.stdin.write(f"validation\t{serialized}\n")
-    process.stdin.flush()
-    validation = parse_evaluator_line(process.stdout.readline())
-    # This is the only holdout request made for the selected subset.
-    process.stdin.write(f"test\t{serialized}\n")
-    process.stdin.write("QUIT\n")
-    process.stdin.flush()
-    test = parse_evaluator_line(process.stdout.readline())
-    stderr = process.communicate(timeout=300)[1]
+    protocol = f"validation\t{serialized}\ntest\t{serialized}\nQUIT\n"
+    remaining = deadline_monotonic - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("no finalization reserve remained for validation/test evaluation")
+    process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        stdout, stderr = process.communicate(input=protocol, timeout=remaining)
+    except subprocess.TimeoutExpired as error:
+        process.kill()
+        process.communicate()
+        raise TimeoutError("validation/test evaluator exceeded the arm's absolute deadline") from error
     if process.returncode != 0:
         raise RuntimeError(f"evaluator failed with {process.returncode}: {stderr[-2000:]}")
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    ready = next((line for line in lines if line.startswith("READY\t")), "")
+    if not ready.startswith("READY\tweka-stable-3.8.6\tJ48-default"):
+        raise RuntimeError(f"unexpected evaluator banner: {ready or stdout[-2000:]}")
+    results = [line for line in lines if line.startswith("OK\t")]
+    if len(results) != 2:
+        raise RuntimeError(f"evaluator returned {len(results)} result rows instead of two: {stdout[-2000:]}")
+    validation = parse_evaluator_line(results[0])
+    # results[1] is the only holdout request made for the selected subset.
+    test = parse_evaluator_line(results[1])
     return validation, test
 
 
@@ -411,7 +435,7 @@ def normalized_result(
     error_code: str | None = None,
 ) -> dict[str, Any]:
     raw_features = list(best.get("solutionFeatures") or []) if best else []
-    features = sorted({int(feature) - 1 for feature in raw_features})
+    features = sorted(int(feature) - 1 for feature in raw_features)
     elapsed_ms = int((time.monotonic() - started_monotonic) * 1000)
     feature_count = args.feature_count
     reduction = ((feature_count - len(features)) / feature_count * 100.0) if features else None
@@ -485,6 +509,7 @@ def normalized_result(
 
 def run_distributed(args: argparse.Namespace) -> int:
     started_monotonic = time.monotonic()
+    started_monotonic_ns = time.monotonic_ns()
     result_dir = args.output_dir.resolve()
     result_dir.mkdir(parents=True, exist_ok=True)
     compose = Path(__file__).with_name("docker-compose.campaign.yml").resolve()
@@ -492,8 +517,11 @@ def run_distributed(args: argparse.Namespace) -> int:
     port = free_loopback_port()
     request_id = args.request_id or f"{args.run_id}-request"
     args.request_id = request_id
-    selection_seconds = max(1, args.run_timeout_seconds - args.finalization_reserve_seconds)
-    deadline_epoch_ms = int((time.time() + selection_seconds) * 1000)
+    if args.finalization_reserve_seconds >= args.run_timeout_seconds:
+        raise ValueError("finalization reserve must be shorter than the absolute run timeout")
+    absolute_deadline = started_monotonic + args.run_timeout_seconds
+    selection_deadline = absolute_deadline - args.finalization_reserve_seconds
+    deadline_epoch_ms = int((time.time() + max(0.0, selection_deadline - time.monotonic())) * 1000)
     environment = os.environ.copy()
     environment.update(
         {
@@ -505,6 +533,7 @@ def run_distributed(args: argparse.Namespace) -> int:
             "CAMPAIGN_REQUEST_ID": request_id,
             "CAMPAIGN_RANDOM_SEED": str(args.seed),
             "CAMPAIGN_DEADLINE_EPOCH_MS": str(deadline_epoch_ms),
+            "CAMPAIGN_START_MONOTONIC_NS": str(started_monotonic_ns),
             "CAMPAIGN_RCL_HOST_PORT": str(port),
             "CAMPAIGN_CPUSET": args.cpuset,
             "CAMPAIGN_IMAGE_TAG": args.image_tag,
@@ -583,7 +612,6 @@ def run_distributed(args: argparse.Namespace) -> int:
             launch = json.loads(response.read().decode("utf-8"))
         atomic_json(result_dir / "launch.json", launch)
 
-        selection_deadline = started_monotonic + selection_seconds
         while time.monotonic() < selection_deadline:
             time.sleep(min(5.0, selection_deadline - time.monotonic()))
         stop_reason = "run_timeout"
@@ -621,7 +649,8 @@ def run_distributed(args: argparse.Namespace) -> int:
         atomic_json(result_dir / "final-result.json", result)
         return 1
     try:
-        validation, test = evaluate_selected_features(args, list(best["solutionFeatures"]))
+        validation, test = evaluate_selected_features(
+            args, list(best["solutionFeatures"]), absolute_deadline)
         status = "timeout" if stop_reason == "run_timeout" else "completed"
         result = normalized_result(args, best, validation, test, started_monotonic, stop_reason, status, len(messages))
         atomic_json(result_dir / "selected-validation-solution.json", best)

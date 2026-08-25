@@ -21,12 +21,15 @@ import java.io.BufferedWriter;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Random;
+import java.util.UUID;
 
 @Component
 @Slf4j
@@ -49,6 +52,8 @@ public class BitFlipService {
 
     public void doBitFlip(DataSolution data) throws Exception {
         long startedAt = System.currentTimeMillis();
+        data = updateSolution(data);
+        normalizeFeaturePartition(data);
         data.setLocalSearch(LocalSearch.BIT_FLIP);
         int configuredMaxIterations = resolveMaxIterations(data);
         log.info(
@@ -75,7 +80,7 @@ public class BitFlipService {
             bestSolution.setSeedId(data.getSeedId());
             bestSolution.setLocalSearch(LocalSearch.BIT_FLIP);
             bestSolution.setStage("local_search_best");
-            bestSolution.setTimestampUtc(Instant.now().toString());
+            stampEventTime(bestSolution);
 
             log.info(
                     "dls completed search=BIT_FLIP seedId={} bestF1={} iterationLocalSearch={} elapsedMs={}",
@@ -115,7 +120,10 @@ public class BitFlipService {
         // Keep a detached snapshot so later random swaps do not mutate the best-so-far result.
         DataSolution bestSolution = updateSolution(solution);
 
-        while (i < configuredMaxIterations && !deadlineReached(solution)) {
+        while (i < configuredMaxIterations
+                && !deadlineReached(solution)
+                && !solution.getRclfeatures().isEmpty()
+                && !solution.getSolutionFeatures().isEmpty()) {
             int valueIndex = random.nextInt(solution.getRclfeatures().size());
             int positionReplace = random.nextInt(solution.getSolutionFeatures().size());
 
@@ -142,6 +150,7 @@ public class BitFlipService {
             solution.setAccuracy(scores.getAccuracy());
             solution.setRecall(scores.getRecall());
             solution.setRunnigTime(System.currentTimeMillis() - startTime);
+            stampCandidate(solution, "bitflip-swap");
 
             log.info(
                     "dls iteration search=BIT_FLIP seedId={} iteration={}/{} f1={} featureCount={}",
@@ -164,6 +173,43 @@ public class BitFlipService {
         }
 
         return bestSolution;
+    }
+
+    private void normalizeFeaturePartition(DataSolution solution) {
+        LinkedHashSet<Integer> selected = new LinkedHashSet<>(solution.getSolutionFeatures());
+        LinkedHashSet<Integer> remaining = new LinkedHashSet<>(solution.getRclfeatures());
+        remaining.removeAll(selected);
+        solution.setSolutionFeatures(new ArrayList<>(selected));
+        solution.setRclfeatures(new ArrayList<>(remaining));
+    }
+
+    private void stampCandidate(DataSolution solution, String movement) {
+        String previousCandidate = solution.getCandidateId();
+        String identity = String.join("|",
+                String.valueOf(solution.getRunId()),
+                movement,
+                String.valueOf(solution.getNeighborhood()),
+                String.valueOf(solution.getIterationNeighborhood()),
+                String.valueOf(solution.getIterationLocalSearch()),
+                solution.getSolutionFeatures().toString());
+        solution.setParentId(previousCandidate);
+        solution.setCandidateId(UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8)).toString());
+        stampEventTime(solution);
+    }
+
+    private void stampEventTime(DataSolution solution) {
+        long campaignStart = environmentLong("CAMPAIGN_START_MONOTONIC_NS", System.nanoTime());
+        solution.setTimestampUtc(Instant.now().toString());
+        solution.setMonotonicElapsedMs(Math.max(0L, System.nanoTime() - campaignStart) / 1_000_000L);
+    }
+
+    private long environmentLong(String name, long fallback) {
+        try {
+            String value = System.getenv(name);
+            return value == null || value.isBlank() ? fallback : Long.parseLong(value);
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
     }
 
     private void escreverLinhaCSV(BufferedWriter writer, DataSolution s, MetricsCollector collector) throws IOException {

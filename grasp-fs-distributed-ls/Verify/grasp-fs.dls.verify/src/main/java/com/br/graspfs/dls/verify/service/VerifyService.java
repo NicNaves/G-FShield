@@ -67,6 +67,7 @@ public class VerifyService {
             int accepted = improvementCount.incrementAndGet();
             data.setStage("best_so_far");
             data.setTimestampUtc(Instant.now().toString());
+            data.setMonotonicElapsedMs(campaignElapsedMs());
             log.info(
                     "verify accepted new best runId={} seedId={} previousBestF1={} newBestF1={} gain={} acceptedImprovements={} rcl={} localSearch={} neighborhood={}",
                     runKey,
@@ -136,6 +137,16 @@ public class VerifyService {
             return Double.parseDouble(System.getenv().getOrDefault(name, Double.toString(fallback)));
         } catch (NumberFormatException ignored) {
             return fallback;
+        }
+    }
+
+    private long campaignElapsedMs() {
+        try {
+            long campaignStart = Long.parseLong(System.getenv().getOrDefault(
+                    "CAMPAIGN_START_MONOTONIC_NS", Long.toString(System.nanoTime())));
+            return Math.max(0L, System.nanoTime() - campaignStart) / 1_000_000L;
+        } catch (NumberFormatException ignored) {
+            return 0L;
         }
     }
 }

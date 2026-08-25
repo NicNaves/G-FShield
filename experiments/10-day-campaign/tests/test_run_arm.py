@@ -42,6 +42,8 @@ class RunArmResultTest(unittest.TestCase):
             {"f1Score": 1.1, "solutionFeatures": [1]},
             {"f1Score": 0.9, "solutionFeatures": []},
             {"f1Score": "not-a-number", "solutionFeatures": [1]},
+            {"f1Score": 0.95, "solutionFeatures": [1, 1, 2]},
+            {"f1Score": 0.95, "solutionFeatures": [0, 2]},
         ]
         self.assertIsNone(RUN_ARM.best_message(messages))
 

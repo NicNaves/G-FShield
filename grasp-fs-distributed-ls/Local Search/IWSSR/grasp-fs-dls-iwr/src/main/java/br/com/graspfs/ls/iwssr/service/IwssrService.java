@@ -20,10 +20,13 @@ import weka.core.Instances;
 import java.io.BufferedWriter;
 import java.io.FileInputStream;
 import java.io.FileWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -50,6 +53,7 @@ public class IwssrService {
     public void doIwssr(DataSolution seed) throws Exception {
         long startedAt = System.currentTimeMillis();
         DataSolution data = updateSolution(seed);
+        normalizeFeaturePartition(data);
         data.setLocalSearch(LocalSearch.IWSSR);
         data.setIterationLocalSearch(data.getIterationLocalSearch() + 1);
         int configuredMaxIterations = resolveMaxIterations(data);
@@ -82,7 +86,7 @@ public class IwssrService {
                     data, trainingDataset, testingDataset, classifier);
             bestSolution = updateSolution(resetDataSolution(seed, bestSolution));
             bestSolution.setStage("local_search_best");
-            bestSolution.setTimestampUtc(Instant.now().toString());
+            stampEventTime(bestSolution);
             log.info(
                     "dls completed search=IWSSR seedId={} bestF1={} iterationLocalSearch={} elapsedMs={}",
                     bestSolution.getSeedId(),
@@ -109,7 +113,9 @@ public class IwssrService {
 
         int n = resolveMaxIterations(localSolutionAdd);
 
-        for (int i = 0; i < n && !deadlineReached(localSolutionAdd); i++) {
+        for (int i = 0;
+             i < n && !deadlineReached(localSolutionAdd) && !localSolutionAdd.getRclfeatures().isEmpty();
+             i++) {
             localSolutionAdd.setIterationLocalSearch(i);
             localSolutionAdd = updateSolution(addMovement(
                     localSolutionAdd, trainingDataset, testingDataset, classifier));
@@ -147,7 +153,13 @@ public class IwssrService {
 
         long startTime = System.currentTimeMillis();
 
-        solution.getSolutionFeatures().add(solution.getRclfeatures().remove(0));
+        if (solution.getRclfeatures().isEmpty()) {
+            throw new IllegalStateException("IWSSR cannot add a feature from an empty RCL");
+        }
+        Integer feature = solution.getRclfeatures().remove(0);
+        if (!solution.getSolutionFeatures().contains(feature)) {
+            solution.getSolutionFeatures().add(feature);
+        }
 
         EvaluationResult scores = evaluateWithDataset(solution, trainingDataset, testingDataset, classifier);
 
@@ -158,6 +170,7 @@ public class IwssrService {
         solution.setPrecision(scores.getPrecision());
         solution.setRecall(scores.getRecall());
         solution.setRunnigTime(endTime - startTime);
+        stampCandidate(solution, "iwssr-add");
 
         collector.stopCollectingAndAwait();
 
@@ -191,6 +204,7 @@ public class IwssrService {
             replaced.setPrecision(scores.getPrecision());
             replaced.setRecall(scores.getRecall());
             replaced.setRunnigTime(endTime - startTime);
+            stampCandidate(replaced, "iwssr-replace-" + i);
 
             collector.stopCollectingAndAwait();
 
@@ -220,15 +234,48 @@ public class IwssrService {
     }
 
     public DataSolution resetDataSolution(DataSolution seed, DataSolution data) {
-        int k = seed.getRclfeatures().size() + seed.getSolutionFeatures().size();
-        ArrayList<Integer> novaRcl = new ArrayList<>();
-        for (int i = 1; i <= k; i++) {
-            if (!data.getSolutionFeatures().contains(i)) {
-                novaRcl.add(i);
-            }
-        }
-        data.setRclfeatures(novaRcl);
+        LinkedHashSet<Integer> rankedCandidates = new LinkedHashSet<>(seed.getRclfeatures());
+        rankedCandidates.removeAll(data.getSolutionFeatures());
+        data.setRclfeatures(new ArrayList<>(rankedCandidates));
+        normalizeFeaturePartition(data);
         return data;
+    }
+
+    private void normalizeFeaturePartition(DataSolution solution) {
+        LinkedHashSet<Integer> selected = new LinkedHashSet<>(solution.getSolutionFeatures());
+        LinkedHashSet<Integer> remaining = new LinkedHashSet<>(solution.getRclfeatures());
+        remaining.removeAll(selected);
+        solution.setSolutionFeatures(new ArrayList<>(selected));
+        solution.setRclfeatures(new ArrayList<>(remaining));
+    }
+
+    private void stampCandidate(DataSolution solution, String movement) {
+        String previousCandidate = solution.getCandidateId();
+        String identity = String.join("|",
+                String.valueOf(solution.getRunId()),
+                movement,
+                String.valueOf(solution.getNeighborhood()),
+                String.valueOf(solution.getIterationNeighborhood()),
+                String.valueOf(solution.getIterationLocalSearch()),
+                solution.getSolutionFeatures().toString());
+        solution.setParentId(previousCandidate);
+        solution.setCandidateId(UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8)).toString());
+        stampEventTime(solution);
+    }
+
+    private void stampEventTime(DataSolution solution) {
+        long campaignStart = environmentLong("CAMPAIGN_START_MONOTONIC_NS", System.nanoTime());
+        solution.setTimestampUtc(Instant.now().toString());
+        solution.setMonotonicElapsedMs(Math.max(0L, System.nanoTime() - campaignStart) / 1_000_000L);
+    }
+
+    private long environmentLong(String name, long fallback) {
+        try {
+            String value = System.getenv(name);
+            return value == null || value.isBlank() ? fallback : Long.parseLong(value);
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
     }
 
     private void logMetrics(DataSolution solution, MetricsCollector collector) throws Exception {
