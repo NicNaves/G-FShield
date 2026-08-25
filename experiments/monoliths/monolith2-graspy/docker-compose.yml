@@ -2,7 +2,9 @@ version: "3.9"
 
 services:
   grasp-fs:
-    build: .
+    build:
+      context: ../../..
+      dockerfile: experiments/monoliths/monolith2-graspy/Dockerfile
     image: grasp-fs:latest
     container_name: grasp-fs
     environment:
@@ -14,7 +16,7 @@ services:
       -tr /data/erenoall-train.arff
       --validation /data/erenoall-validation.arff
       -ts /data/erenoall-test.arff
-      --classifier CART
+      --classifier J48
       --fs_algos ig,gr,su
       --neighborhoods vnd,rvnd
       --ls_ops iwss,iwssr,bitflip

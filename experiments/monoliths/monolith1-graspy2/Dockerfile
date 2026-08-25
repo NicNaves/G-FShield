@@ -1,14 +1,20 @@
-FROM python:3.10-slim
+FROM maven:3.9.6-eclipse-temurin-17 AS weka-builder
+WORKDIR /build
+COPY experiments/common-weka-evaluator/pom.xml ./pom.xml
+COPY experiments/common-weka-evaluator/src ./src
+RUN mvn -q -DskipTests package
 
-ENV PYTHONUNBUFFERED=1
+FROM python:3.11-slim@sha256:9c900dea9e8fb7e16277c179b555cc72d29a352dbc33cff48ad5a0412fd5bfc7
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 WORKDIR /app
-
-# Copia o script
-COPY requirements.txt /app/requirements.txt
-COPY main.py /app/main.py
-
-# Dependências mínimas
-RUN pip install --no-cache-dir -r /app/requirements.txt
-
-# Vamos usar ENTRYPOINT para o script; os argumentos virão do docker-compose
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openjdk-17-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+COPY experiments/monoliths/monolith1-graspy2/requirements.txt ./requirements.txt
+RUN pip install -r requirements.txt
+COPY experiments/monoliths/monolith1-graspy2/main.py ./main.py
+COPY --from=weka-builder /build/target/common-weka-evaluator.jar ./common-weka-evaluator.jar
+VOLUME ["/logs", "/data"]
 ENTRYPOINT ["python", "/app/main.py"]

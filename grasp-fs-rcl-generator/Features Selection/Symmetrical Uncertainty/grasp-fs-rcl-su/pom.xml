@@ -72,12 +72,6 @@
 			<artifactId>spring-web</artifactId>
 			<version>6.0.2</version>
 		</dependency>
-		<dependency>
-			<groupId>nz.ac.waikato.cms.weka</groupId>
-			<artifactId>weka-stable</artifactId>
-			<version>3.8.0</version>
-			<type>jar</type>
-		</dependency>
 	</dependencies>
 
 	<build>

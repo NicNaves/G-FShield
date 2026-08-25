@@ -2,7 +2,9 @@ version: "3.9"
 
 services:
   graspys-fs:
-    build: .
+    build:
+      context: ../../..
+      dockerfile: experiments/monoliths/monolith1-graspy2/Dockerfile
     image: graspys-fs:latest
     container_name: graspys-fs
     environment:
@@ -21,7 +23,7 @@ services:
       --sample-size 5
       --feature-selector gainratio
       --local-search bitflip
-      --classifier cart
+      --classifier j48
       --metrics-file /logs/GainRatio_METRICS.csv
       --seed 42
       --max-iterations-local 100

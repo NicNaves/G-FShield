@@ -11,11 +11,13 @@ solutionFeatures;f1Score;accuracy;precision;recall;runningTime(ms);cpuUsage(%);m
 """
 
 import argparse
+import atexit
 import hashlib
 import json
 import math
 import os
 import random
+import subprocess
 import threading
 import time
 import csv
@@ -43,6 +45,50 @@ CSV_HEADER = (
     "memoryUsage(MB);memoryUsagePercent(%);classifier;featureSelector;localSearch;phase;"
     "generation;iteration;trainingFileName;testingFileName"
 )
+
+WEKA_EVALUATOR = None
+WEKA_SPLIT_BY_OBJECT_ID = {}
+
+
+class WekaEvaluatorClient:
+    def __init__(self, jar, training, validation, testing):
+        self.process = subprocess.Popen(
+            ["java", "-jar", jar, "--train", training,
+             "--validation", validation, "--test", testing],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+        ready = self.process.stdout.readline().strip()
+        if ready != "READY\tweka-stable-3.8.6\tJ48-default":
+            raise RuntimeError(f"Weka evaluator did not become ready: {ready}")
+        atexit.register(self.close)
+
+    def evaluate(self, split, features):
+        self.process.stdin.write(
+            f"{split}\t{','.join(str(feature) for feature in features)}\n"
+        )
+        self.process.stdin.flush()
+        response = self.process.stdout.readline().strip().split("\t")
+        if not response or response[0] != "OK":
+            raise RuntimeError("Weka evaluation failed: " + "\t".join(response))
+        values = [float(value) for value in response[1:8]]
+        return {
+            "f1": values[0], "f1_weighted": values[1],
+            "precision": values[2], "precision_weighted": values[3],
+            "recall": values[4], "recall_weighted": values[5],
+            "accuracy": values[6],
+        }
+
+    def close(self):
+        if self.process.poll() is None:
+            try:
+                self.process.stdin.write("QUIT\n")
+                self.process.stdin.flush()
+                self.process.wait(timeout=10)
+            except Exception:
+                self.process.terminate()
 
 # ================================
 # Leitura ARFF/CSV
@@ -216,17 +262,16 @@ class MetricsCollector(threading.Thread):
 # ================================
 
 def evaluate_solution(features, train_df, test_df, label_col, classifier):
+    if classifier.lower() == 'j48':
+        split = WEKA_SPLIT_BY_OBJECT_ID.get(id(test_df))
+        if WEKA_EVALUATOR is None or split is None:
+            raise RuntimeError("Weka evaluator or split mapping is not initialized")
+        return WEKA_EVALUATOR.evaluate(split, features)
     train_df = train_df.dropna(subset=[label_col])
     test_df = test_df.dropna(subset=[label_col])
     Xtr, Xte = ensure_numeric_train_test(train_df, test_df, features)
     ytr, yte = train_df[label_col].values, test_df[label_col].values
     name = classifier.lower()
-    if name == 'j48':
-        raise ValueError(
-            "J48 is the Weka implementation and cannot be mapped silently to "
-            "sklearn.tree.DecisionTreeClassifier; use cart outside the paired "
-            "campaign or configure the common Weka evaluator"
-        )
     if name in ('cart','decisiontree','dt'):
         clf = DecisionTreeClassifier(random_state=0)
     elif name in ('nb','naivebayes'):
@@ -358,6 +403,7 @@ def main():
     p.add_argument('--run-id', required=True)
     p.add_argument('--final-metrics-file', default='metrics/final-result.json')
     p.add_argument('--dataset-hash', default='')
+    p.add_argument('--weka-evaluator-jar', default='/app/common-weka-evaluator.jar')
     a = p.parse_args()
 
     random.seed(a.seed); np.random.seed(a.seed)
@@ -367,6 +413,12 @@ def main():
     train = read_dataset(a.training)
     validation = read_dataset(a.validation)
     test = read_dataset(a.testing)
+    global WEKA_EVALUATOR, WEKA_SPLIT_BY_OBJECT_ID
+    WEKA_SPLIT_BY_OBJECT_ID = {id(validation): "validation", id(test): "test"}
+    if a.classifier == "j48":
+        WEKA_EVALUATOR = WekaEvaluatorClient(
+            a.weka_evaluator_jar, a.training, a.validation, a.testing
+        )
     label = resolve_label_column(train, a.label_col)
 
     ranked = score_gainratio(train, label) if a.feature_selector == 'gainratio' else score_infogain(train, label)
@@ -466,8 +518,14 @@ def main():
         "neighborhood_controller": None,
         "local_search": a.local_search,
         "classifier": a.classifier.upper(),
-        "classifier_version": f"scikit-learn {sklearn.__version__}",
-        "classifier_parameters": {"random_state": 0},
+        "classifier_version": (
+            "weka-stable 3.8.6" if a.classifier == "j48"
+            else f"scikit-learn {sklearn.__version__}"
+        ),
+        "classifier_parameters": (
+            {"weka_options": "J48 defaults"} if a.classifier == "j48"
+            else {"random_state": 0}
+        ),
         "dataset_hash": dataset_hash,
         "train_hash": train_hash,
         "validation_hash": validation_hash,

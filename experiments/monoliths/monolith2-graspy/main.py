@@ -2,11 +2,13 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import atexit
 import hashlib
 import json
 import os
 import time
 import random
+import subprocess
 import uuid
 from datetime import datetime, timezone
 from typing import List, Tuple, Iterable, Optional
@@ -39,6 +41,49 @@ MAX_ACCEPTED_IMPROVEMENTS = 0
 MINIMUM_IMPROVEMENT = 0.0001
 ACCEPTED_IMPROVEMENTS = 0
 CANDIDATE_COUNT = 0
+WEKA_EVALUATOR = None
+WEKA_SPLIT_BY_OBJECT_ID = {}
+
+
+class WekaEvaluatorClient:
+    def __init__(self, jar, training, validation, testing):
+        self.process = subprocess.Popen(
+            ["java", "-jar", jar, "--train", training,
+             "--validation", validation, "--test", testing],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+        ready = self.process.stdout.readline().strip()
+        if ready != "READY\tweka-stable-3.8.6\tJ48-default":
+            raise RuntimeError(f"Weka evaluator did not become ready: {ready}")
+        atexit.register(self.close)
+
+    def evaluate(self, split, features):
+        self.process.stdin.write(
+            f"{split}\t{','.join(str(feature) for feature in features)}\n"
+        )
+        self.process.stdin.flush()
+        response = self.process.stdout.readline().strip().split("\t")
+        if not response or response[0] != "OK":
+            raise RuntimeError("Weka evaluation failed: " + "\t".join(response))
+        values = [float(value) for value in response[1:8]]
+        return {
+            "f1": values[0], "f1_weighted": values[1],
+            "prec": values[2], "prec_weighted": values[3],
+            "rec": values[4], "rec_weighted": values[5],
+            "acc": values[6],
+        }
+
+    def close(self):
+        if self.process.poll() is None:
+            try:
+                self.process.stdin.write("QUIT\n")
+                self.process.stdin.flush()
+                self.process.wait(timeout=10)
+            except Exception:
+                self.process.terminate()
 
 
 def stop_requested() -> bool:
@@ -186,6 +231,11 @@ def evaluate_subset(X_train, y_train, X_test, y_test, feat_idx0b: List[int], clf
     CANDIDATE_COUNT += 1
     if not feat_idx0b:
         return {"f1": 0.0, "acc": 0.0, "prec": 0.0, "rec": 0.0}
+    if clf_name.upper() == "J48":
+        split = WEKA_SPLIT_BY_OBJECT_ID.get(id(X_test))
+        if WEKA_EVALUATOR is None or split is None:
+            raise RuntimeError("Weka evaluator or split mapping is not initialized")
+        return WEKA_EVALUATOR.evaluate(split, feat_idx0b)
     Xtr = X_train.iloc[:, feat_idx0b]
     Xte = X_test.iloc[:, feat_idx0b]
 
@@ -589,6 +639,7 @@ def parse_args():
     p.add_argument("--run_id", required=True)
     p.add_argument("--final_metrics_file", default="logs/final-result.json")
     p.add_argument("--dataset_hash", default="")
+    p.add_argument("--weka_evaluator_jar", default="/app/common-weka-evaluator.jar")
     return p.parse_args()
 
 
@@ -597,6 +648,7 @@ def parse_args():
 # =============================================================================
 def main():
     global RUN_DEADLINE, MAX_ACCEPTED_IMPROVEMENTS, MINIMUM_IMPROVEMENT
+    global WEKA_EVALUATOR, WEKA_SPLIT_BY_OBJECT_ID
     args = parse_args()
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -653,6 +705,14 @@ def main():
     X_train.columns = pd.Index([f"c{i}" for i in range(X_train.shape[1])], dtype=object)
     X_validation.columns = pd.Index([f"c{i}" for i in range(X_validation.shape[1])], dtype=object)
     X_holdout.columns = pd.Index([f"c{i}" for i in range(X_holdout.shape[1])], dtype=object)
+    WEKA_SPLIT_BY_OBJECT_ID = {
+        id(X_validation): "validation",
+        id(X_holdout): "test",
+    }
+    if args.classifier == "J48":
+        WEKA_EVALUATOR = WekaEvaluatorClient(
+            args.weka_evaluator_jar, args.train, args.validation, args.test
+        )
 
     n_feats = X_train.shape[1]
     rcl_size = max(1, min(args.rcl_size, n_feats))
@@ -822,8 +882,14 @@ def main():
         "neighborhood_controller": best_configuration["neighborhood_controller"],
         "local_search": ",".join(best_configuration["local_search"]),
         "classifier": args.classifier.upper(),
-        "classifier_version": f"scikit-learn {sklearn.__version__}",
-        "classifier_parameters": {"random_state": 0},
+        "classifier_version": (
+            "weka-stable 3.8.6" if args.classifier == "J48"
+            else f"scikit-learn {sklearn.__version__}"
+        ),
+        "classifier_parameters": (
+            {"weka_options": "J48 defaults"} if args.classifier == "J48"
+            else {"random_state": 0}
+        ),
         "dataset_hash": dataset_hash,
         "train_hash": train_hash,
         "validation_hash": validation_hash,

@@ -3,3 +3,10 @@ pandas==2.2.2
 scikit-learn==1.4.2
 psutil==5.9.8
 liac-arff==2.5.0
+scipy==1.13.1
+joblib==1.4.2
+threadpoolctl==3.5.0
+python-dateutil==2.9.0.post0
+pytz==2024.1
+tzdata==2024.1
+six==1.16.0

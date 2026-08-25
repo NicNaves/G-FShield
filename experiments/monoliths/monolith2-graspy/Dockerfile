@@ -1,26 +1,20 @@
-# Imagem leve + Python 3.11
-FROM python:3.11-slim
+FROM maven:3.9.6-eclipse-temurin-17 AS weka-builder
+WORKDIR /build
+COPY experiments/common-weka-evaluator/pom.xml ./pom.xml
+COPY experiments/common-weka-evaluator/src ./src
+RUN mvn -q -DskipTests package
 
+FROM python:3.11-slim@sha256:9c900dea9e8fb7e16277c179b555cc72d29a352dbc33cff48ad5a0412fd5bfc7
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
-
-# Compiladores/basics (úteis caso algum wheel falhe)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
- && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
-
-# Dependências primeiro (melhora cache)
-COPY requirements.txt .
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openjdk-17-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+COPY experiments/monoliths/monolith2-graspy/requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
-
-# Código
-COPY main.py .
-
-# Pastas úteis (logs fora da imagem; dados montados em /data)
+COPY experiments/monoliths/monolith2-graspy/main.py ./main.py
+COPY --from=weka-builder /build/target/common-weka-evaluator.jar ./common-weka-evaluator.jar
 VOLUME ["/app/logs", "/data"]
-
-# Por padrão chamamos o script; os args vêm do `docker run`
-ENTRYPOINT ["python", "main.py"]
+ENTRYPOINT ["python", "/app/main.py"]
