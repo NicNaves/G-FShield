@@ -266,7 +266,8 @@ def evaluate_solution(features, train_df, test_df, label_col, classifier):
         split = WEKA_SPLIT_BY_OBJECT_ID.get(id(test_df))
         if WEKA_EVALUATOR is None or split is None:
             raise RuntimeError("Weka evaluator or split mapping is not initialized")
-        return WEKA_EVALUATOR.evaluate(split, features)
+        feature_indices = [int(train_df.columns.get_loc(feature)) for feature in features]
+        return WEKA_EVALUATOR.evaluate(split, feature_indices)
     train_df = train_df.dropna(subset=[label_col])
     test_df = test_df.dropna(subset=[label_col])
     Xtr, Xte = ensure_numeric_train_test(train_df, test_df, features)
