@@ -294,7 +294,8 @@ def normalized_result(
     candidate_count: int,
     error_code: str | None = None,
 ) -> dict[str, Any]:
-    features = list(best.get("solutionFeatures") or []) if best else []
+    raw_features = list(best.get("solutionFeatures") or []) if best else []
+    features = sorted({int(feature) - 1 for feature in raw_features})
     elapsed_ms = int((time.monotonic() - started_monotonic) * 1000)
     feature_count = args.feature_count
     reduction = ((feature_count - len(features)) / feature_count * 100.0) if features else None

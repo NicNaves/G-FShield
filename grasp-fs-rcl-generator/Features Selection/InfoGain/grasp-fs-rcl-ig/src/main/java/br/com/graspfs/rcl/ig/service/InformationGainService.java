@@ -29,7 +29,7 @@ public class InformationGainService {
     public void rankFeatures(DataSolution solution, Instances trainingDataset, int rclCutoff) throws Exception {
         try {
             ArrayList<FeatureAvaliada> allFeatures = new ArrayList<>();
-            for (int i = 0; i < trainingDataset.numAttributes() && !deadlineReached(); i++) {
+            for (int i = 0; i < trainingDataset.numAttributes() - 1 && !deadlineReached(); i++) {
                 double igRatio = SelectionFeaturesUtils.calcularaInfoGain(trainingDataset, i);
                 allFeatures.add(new FeatureAvaliada(igRatio, i + 1));
             }

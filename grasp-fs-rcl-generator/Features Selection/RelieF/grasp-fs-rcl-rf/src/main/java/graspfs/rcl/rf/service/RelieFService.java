@@ -40,7 +40,7 @@ public class RelieFService {
                     System.currentTimeMillis() - rankingStartedAt
             );
 
-            for (int i = 0; i < trainingDataset.numAttributes() && !deadlineReached(); i++) {
+            for (int i = 0; i < trainingDataset.numAttributes() - 1 && !deadlineReached(); i++) {
                 double rfRatio = evaluator.evaluateAttribute(i);
                 allFeatures.add(new FeatureAvaliada(rfRatio, i + 1));
 

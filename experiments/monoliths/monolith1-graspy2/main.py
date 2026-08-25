@@ -561,7 +561,7 @@ def main():
         "train_hash": train_hash,
         "validation_hash": validation_hash,
         "test_hash": test_hash,
-        "selected_features": best,
+        "selected_features": sorted(cols.index(feature) for feature in best),
         "subset_size": len(best),
         "dimensionality_reduction_percent": 100.0 * (1.0 - len(best) / len(cols)),
         "validation_f1_macro": bm["f1"],

@@ -29,7 +29,7 @@ public class SymmetricalUncertaintyService {
     public void rankFeatures(DataSolution rcl, Instances trainingDataset, int rclCutoff) throws Exception {
         try {
             ArrayList<FeatureAvaliada> allFeatures = new ArrayList<>();
-            for (int i = 0; i < trainingDataset.numAttributes() && !deadlineReached(); i++) {
+            for (int i = 0; i < trainingDataset.numAttributes() - 1 && !deadlineReached(); i++) {
                 double suRatio = SelectionFeaturesUtils.calcularaSU(trainingDataset, i);
                 allFeatures.add(new FeatureAvaliada(suRatio, i + 1));
             }

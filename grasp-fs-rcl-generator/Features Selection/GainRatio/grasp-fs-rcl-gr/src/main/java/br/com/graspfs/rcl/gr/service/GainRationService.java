@@ -29,7 +29,7 @@ public class GainRationService {
     public void rankFeatures(DataSolution solution, Instances trainingDataset, int rclCutoff) throws Exception {
         try {
             ArrayList<FeatureAvaliada> allFeatures = new ArrayList<>();
-            for (int i = 0; i < trainingDataset.numAttributes() && !deadlineReached(); i++) {
+            for (int i = 0; i < trainingDataset.numAttributes() - 1 && !deadlineReached(); i++) {
                 double grRatio = SelectionFeaturesUtils.calcularaGainRatio(trainingDataset, i);
                 allFeatures.add(new FeatureAvaliada(grRatio, i + 1));
             }
