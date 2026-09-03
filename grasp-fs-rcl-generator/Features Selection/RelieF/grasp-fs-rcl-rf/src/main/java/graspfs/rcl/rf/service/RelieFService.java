@@ -211,6 +211,9 @@ public class RelieFService {
                 candidate.getClassfier(), candidate.getTrainingFileName(), candidate.getTestingFileName()
         ));
         writer.newLine();
+        // The supervisor may stop the generator exactly at the selection
+        // deadline; persist every completed evaluation before that shutdown.
+        writer.flush();
 
         return candidate;
     }

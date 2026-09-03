@@ -56,6 +56,15 @@ class CausalParityTest(unittest.TestCase):
         self.assertIn("campaignElapsedMs={}", source)
         self.assertNotIn("private boolean firstTime", source)
 
+    def test_relief_flushes_each_completed_candidate_metric(self):
+        source = (
+            REPO
+            / "grasp-fs-rcl-generator/Features Selection/RelieF/grasp-fs-rcl-rf"
+            / "src/main/java/graspfs/rcl/rf/service/RelieFService.java"
+        ).read_text(encoding="utf-8")
+        self.assertIn("writer.newLine();\n        // The supervisor", source)
+        self.assertIn("writer.flush();", source)
+
 
 if __name__ == "__main__":
     unittest.main()

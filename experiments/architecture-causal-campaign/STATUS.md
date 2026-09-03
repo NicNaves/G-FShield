@@ -22,9 +22,9 @@ IWSSR. Isso comprova o mecanismo no piloto, mas ainda não comprova uma vantagem
 estatística de velocidade ou eficiência.
 
 Nenhuma conclusão final de superioridade deve ser escrita na dissertação antes
-da conclusão e análise da campanha v4.
+da conclusão e análise da campanha v5.
 
-## Desenho formal congelado para a v4
+## Desenho formal congelado para a v5
 
 - 30 sementes pareadas: 42 a 71.
 - Ordem AB/BA alternada: 15 pares começam pelo distribuído e 15 pelo monólito.
@@ -96,7 +96,8 @@ e limites de validade devem acompanhar os valores de p.
 - Uma amostra de `docker stats` mostrou RCL e IWSSR próximos de 100% de um
   núcleo cada, simultaneamente.
 - Com somente um consumidor, as construções seguintes ficaram em fila. Esse
-  gargalo motivou a v4 com três partições/consumidores, ainda dentro dos mesmos
+  gargalo motivou a configuração concorrente com três partições/consumidores,
+  ainda dentro dos mesmos
   6 CPUs e 12 GiB.
 - O caminho inicialmente configurado como `datasets/campaign-10d` estava
   incorreto; o caminho canônico é `datasets/campaign`. Os hashes já conferiram.
@@ -105,6 +106,17 @@ e limites de validade devem acompanhar os valores de p.
 - O Python global do servidor não possui NumPy/Matplotlib. Isso não afeta os
   executores Docker. A análise pode ser feita localmente depois de baixar os
   artefatos, ou em ambiente Python isolado no servidor.
+- O piloto v2 terminou com duas células válidas. Em 600 s de seleção, o braço
+  distribuído de um consumidor obteve F1 de validação 0,922230 (29 avaliações
+  registradas) e o monólito obteve 0,944423 (67 avaliações). Esses números são
+  diagnósticos e não fazem parte da campanha formal v4/v5.
+- A primeira trajetória teve paridade exata. O subconjunto distribuído de base
+  1 `[2, 8, 24, 37, 48]` corresponde ao subconjunto monolítico de base 0
+  `[1, 7, 23, 36, 47]`; a primeira adição também correspondeu (22 versus 21) e
+  produziu o mesmo F1 macro 0,852939.
+- O CSV do RCL v2 continha apenas o cabeçalho porque o processo foi encerrado no
+  prazo antes de fechar o buffer. A revisão posterior força `flush` após cada
+  avaliação concluída para que a contagem de trabalho não seja subestimada.
 
 ## Identificadores e caminhos
 
@@ -121,7 +133,9 @@ Histórico relevante:
 - `a75d8a6`: campanha causal pareada e instrumentação inicial;
 - `dd6b4a7`: correção do caminho canônico dos dados;
 - `fcff0f5`: pipeline concorrente e telemetria interna equivalente;
-- a revisão seguinte congela a identidade/tag v4 e inclui este relatório.
+- `0275cce`: identidade v4 e primeira versão deste relatório;
+- a revisão seguinte adiciona persistência imediata das métricas RCL e congela
+  a identidade/tag v5.
 
 Servidor autorizado pelo usuário:
 
@@ -135,9 +149,9 @@ As credenciais do servidor não devem ser registradas no repositório.
 
 ## Estado de versionamento
 
-No momento da criação deste arquivo, `fcff0f5` contém a implementação
-concorrente. `protocol.json` e `README.md` já apontam conceitualmente para a v4,
-mas ainda precisam ser incluídos, junto com este relatório, no commit/tag v4.
+`fcff0f5` contém a implementação concorrente e `0275cce` registra o contexto
+v4. A revisão corrente aponta para a v5, que acrescenta a persistência imediata
+das métricas de construção antes do desligamento no prazo.
 
 Os bundles locais `architecture-causal-*.bundle` são artefatos temporários e
 não devem ser adicionados ao Git.
@@ -145,14 +159,14 @@ não devem ser adicionados ao Git.
 ## Próximos passos obrigatórios
 
 1. Executar os 48 testes locais novamente.
-2. Criar o commit e a tag `experiment-architecture-causal-v4`.
+2. Criar o commit e a tag `experiment-architecture-causal-v5`.
 3. Gerar e enviar um novo bundle ao servidor.
 4. Fazer fast-forward do worktree isolado; não tocar no repositório principal
    sujo nem nos contêineres de produção.
 5. Validar `docker compose config`, conferindo três partições/consumidores e a
    soma de 6 CPUs/12 GiB.
 6. Recompilar as seis imagens com um sufixo derivado do commit v4.
-7. Executar novo piloto pareado em diretório `pilot-v4` separado.
+7. Executar novo piloto pareado em diretório `pilot-v5` separado.
 8. Confirmar no piloto:
    - três buscas IWSSR simultâneas com seeds/candidatos distintos;
    - ausência de corrupção no CSV;
@@ -161,7 +175,7 @@ não devem ser adicionados ao Git.
    - presença de `campaignElapsedMs`, intervalos de fase, resultados finais,
      amostras de recursos e checksums;
    - nenhuma exceção, OOM, reinício ou timeout de polling Kafka.
-9. Somente depois iniciar a campanha formal v4 em `tmux`, com estado/resultados
+9. Somente depois iniciar a campanha formal v5 em `tmux`, com estado/resultados
    separados e retomáveis.
 10. Ao terminar, baixar uma cópia dos artefatos, verificar checksums, executar
     `analyze_results.py` e interpretar o critério pré-especificado.
