@@ -1,0 +1,23 @@
+\chapter{Introduction}
+\label{chapter:introducao}
+
+Cyber-physical systems (CPS) connect software, networks, and physical processes in environments where performance and reliability must coexist. In critical infrastructures, a security failure can affect computational systems, physical assets, and service continuity \cite{Cardenas2009,Mitchell2014,Alcaraz2019}. Intrusion detection systems (IDS) must therefore handle high-dimensional data, time constraints, and operational traceability.
+
+Feature selection reduces dimensionality and redundancy before classification \cite{Hall1999,Saeys2007,guyon2003introduction}. Original GRASP combines greedy randomized construction and local search \cite{ResendeRibeiro2010}. Its GRASP-FS adaptation for feature selection is addressed by \citeonline{quincozes2020grasp,quincozes2021performance,quincozes2022extended}. In the monolithic implementations studied here, ranking, construction, refinement, and execution records remain in one process, restricting separation of responsibilities and stage inspection.
+
+This dissertation proposes \textit{G-FShield}, a distributed, event-driven architecture for GRASP-FS in \acp{ids} applied to \acp{cps}. \ac{drg} computes four independent rankings and constructs initial solutions; \ac{dls} combines VND or RVND with Bit-Flip, IWSS, and IWSSR to refine them. Apache Kafka connects the stages, and a web layer queries persisted events, metrics, states, identifiers, timestamps, and intermediate results. Observability here means inspecting the recorded external state of search, not causally explaining classifier decisions.
+
+The general objective is to design, implement, and evaluate this distributed decomposition under a traceable protocol. The specific objectives are:
+
+\begin{itemize}
+  \item separate candidate generation, neighborhood control, local search, verification, and monitoring;
+  \item provide a web layer for inspecting runs and persisted artifacts;
+  \item compare quality, dimensionality reduction, time, and resources with monoliths and a baseline under common data, evaluator, and computational ceiling;
+  \item preserve enough provenance to reconstruct runs and explicitly delimit properties not yet measured.
+\end{itemize}
+
+Four research questions guide the evaluation. \textbf{RQ1}: under the common protocol, what predictive quality and dimensionality reduction are obtained by G-FShield configurations, the monoliths, and the all-features baseline? \textbf{RQ2}: how are RCL ranking, neighborhood controller, and local-search preference descriptively related to final solutions and bounded search time? \textbf{RQ3}: what CPU and memory are observed for each architecture under the same aggregate ceiling, without conflating consumption with efficiency? \textbf{RQ4}: which events, identifiers, metrics, and artifacts allow a run to be reconstructed, and which observability and recovery properties remain unevaluated?
+
+The contribution includes the implemented architecture and a formal campaign with 27 arms, eight seeds per arm, a stratified training/validation/test split, a common final evaluator, and a verifiable manifest. Corpus independence is architectural rather than experimental: input must be labeled tabular data compatible with the service contract. The evaluation covers only the ERENO corpus and J48 classifier.
+
+The remainder of this dissertation is organized as follows. Chapter~\ref{chapter:fundamentacao} presents the foundations; Chapter~\ref{chapter:relacionados} discusses related work; Chapter~\ref{chapter:desenvolvimento} describes architecture and implementation; Chapter~\ref{chapter:avaliacao} details protocol and results; and Chapter~\ref{chapter:conclusao} summarizes conclusions, limitations, and future work.

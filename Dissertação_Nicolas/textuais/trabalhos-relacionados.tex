@@ -1,0 +1,55 @@
+\chapter{Trabalhos Relacionados}
+\label{chapter:relacionados}
+
+Este capítulo situa o \textit{G-FShield} na literatura sobre \acp{ids} em \acp{cps}, GRASP-FS, arquiteturas distribuídas e observabilidade.
+
+\section{Detecção de Intrusão em Sistemas Ciber-Físicos}
+
+Os estudos de \citeonline{Cardenas2009}, \citeonline{Mitchell2014} e \citeonline{Alcaraz2019} mostram que a segurança de \acp{cps} deve considerar o acoplamento entre software, rede e ativos físicos. Em subestações digitais, a literatura sobre \ac{iec} destaca tráfego específico e requisitos temporais \cite{iec61850,mackiewicz2006overview,aftab2020iec}. Trabalhos como \citeonline{quincozes2021survey} e \citeonline{quincozes2022ereno} reforçam a importância de corpora realistas na avaliação de IDS.
+
+\section{Seleção de Características e GRASP-FS}
+
+\citeonline{Hall1999,Saeys2007,guyon2003introduction} apresentam a seleção de características como técnica para reduzir redundância e custo de processamento. Fora da linhagem específica desta dissertação, \citeonline{yusta2009different} compara estratégias metaheurísticas para seleção de características, e \citeonline{esseghir2010effective} combina filtros e \textit{wrappers} em um esquema GRASP. Esses trabalhos tratam o desenho da busca, mas não a operação observável de um pipeline distribuído.
+
+GRASP é fundamentado por \citeonline{ResendeRibeiro2010}; sua aplicação à seleção de características para IDS é investigada por \citeonline{quincozes2020grasp,quincozes2021performance,quincozes2022extended}. Revisões recentes indicam que metaheurísticas continuam relevantes para detecção de ataques em ambientes industriais e IIoT \cite{Termanini2025Survey,Francis2026MFSReview}. Essa trajetória sustenta os componentes algorítmicos reutilizados pelo G-FShield, não uma alegação de novo algoritmo.
+
+\section{Arquiteturas Distribuídas e Observabilidade}
+
+Trabalhos anteriores exploram paralelismo em partes do GRASP-FS. A proposta de \citeonline{Silva2023GDLSFS} distribui a busca local, enquanto a de \citeonline{Naves2023DRG} distribui a geração da lista restrita de candidatos. Em metaheurísticas de outros domínios, \citeonline{SUBRAMANIAN20101899} exemplifica busca paralela, mas sem o problema de seleção de características ou a integração operacional aqui estudada.
+
+Em outra linha, sistemas distribuídos fundamentam o desacoplamento entre componentes \cite{Tanenbaum2007Distributed}. A decomposição em serviços é discutida por \citeonline{Newman2021}, e logs de mensageria por \citeonline{Kreps2011}. Trabalhos de confiabilidade operacional tratam sinais de telemetria \cite{beyer2016site,mateus2021security}. Revisões de observabilidade discutem diagnóstico em arquiteturas de serviços \cite{usman2022observabilitysurvey,Faseeha2025MicroservicesObs}. Já \citeonline{wu2012online} trata seleção de características recebidas em fluxo. Esse problema é distinto: o G-FShield avaliado recebe corpus pré-materializado e não realiza seleção online. Entre os trabalhos analisados, não foi encontrada a reunião de DRG, DLS, persistência de eventos e consulta operacional em um fluxo GRASP-FS; como a busca não foi sistemática, essa conclusão é delimitada ao conjunto efetivamente examinado.
+
+\section{Lacuna Identificada}
+
+O \textit{G-FShield} integra geração distribuída, busca local distribuída, persistência de resultados e visualização de telemetria em uma única arquitetura. Sua contribuição principal é arquitetural e de engenharia de software: a integração ponta a ponta, a orquestração e a rastreabilidade do processo. Os componentes DRG e DLS derivam e estendem a trajetória de trabalhos anteriores, e não são apresentados como um novo algoritmo de busca.
+
+\section{Tabela Comparativa}
+
+A Tabela~\ref{tab:related_work_gfshield} sintetiza as capacidades discutidas. ``Construção dist.'' significa distribuir a formação da solução inicial; ``refinamento dist.'', distribuir a busca local; ``integração E2E'', conectar ambas no mesmo fluxo; e ``telemetria'', persistir sinais que permitam reconstruir uma execução. A tabela não atribui seleção online ao G-FShield.
+
+\begin{landscape}
+\begin{table}[p]
+\centering
+\scriptsize
+\caption{Síntese dos trabalhos relacionados citados no manuscrito.}
+\label{tab:related_work_gfshield}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{.20\linewidth}*{6}{>{\centering\arraybackslash}p{.105\linewidth}}}
+\toprule
+\textbf{Referência} & \textbf{CPS/ IDS} & \textbf{GRASP- FS} & \shortstack{\textbf{Construção}\\\textbf{dist.}} & \shortstack{\textbf{Refinamento}\\\textbf{dist.}} & \shortstack{\textbf{Integração}\\\textbf{E2E}} & \textbf{Telemetria} \\
+\midrule
+Resende e Ribeiro (2016) & -- & \checkmark & -- & -- & -- & -- \\
+Yusta (2009); Esseghir et al. (2010) & -- & Parcial & -- & -- & -- & -- \\
+Quincozes et al. (2020--2022) & \checkmark & \checkmark & -- & -- & -- & -- \\
+Silva et al. (2023) & \checkmark & \checkmark & -- & \checkmark & Parcial & -- \\
+Faria et al. (2023) & \checkmark & \checkmark & \checkmark & -- & Parcial & -- \\
+Beyer et al. (2016); Usman et al. (2022) & -- & -- & -- & -- & -- & \checkmark \\
+Wu et al. (2013) & -- & -- & -- & -- & -- & -- \\
+\textbf{Este trabalho (G-FShield)} & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{landscape}
+
+Portanto, a tabela sustenta uma diferenciação arquitetural: o G-FShield conecta etapas de seleção e seus sinais operacionais. Uma afirmação de cobertura exaustiva da literatura exigiria uma revisão sistemática ou uma estratégia bibliográfica documentada.

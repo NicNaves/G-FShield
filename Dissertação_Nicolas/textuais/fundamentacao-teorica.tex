@@ -1,0 +1,45 @@
+\chapter{Fundamentação Teórica}
+\label{chapter:fundamentacao}
+
+Este capítulo reúne os conceitos que sustentam a proposta do \textit{G-FShield}: \acp{cps}, \acp{ids}, seleção de características, \ac{graspfs}, orquestração distribuída e observabilidade.
+
+\section{Sistemas Ciber-Físicos e Detecção de Intrusão}
+
+Os \acp{cps} integram componentes computacionais, sensores, atuadores e redes de comunicação em sistemas fortemente acoplados \cite{Cardenas2009,Mitchell2014}. Em domínios como subestações digitais e automação industrial, padrões como a série \ac{iec} 61850 tornam a comunicação interoperável, mas ampliam a superfície de ataque \cite{iec61850,mackiewicz2006overview,aftab2020iec}. Assim, \acp{ids} precisam responder a eventos maliciosos sem comprometer a operação do ambiente protegido.
+
+\section{Seleção de Características}
+
+A seleção de características busca subconjuntos de atributos que preservem poder discriminativo e reduzam custo computacional \cite{Hall1999,Saeys2007,guyon2003introduction}. Sejam $X$ um atributo, $Y$ a classe e $H(Z)=-\sum_z p(z)\log_2p(z)$ a entropia. O ganho de informação é
+\begin{equation}
+  \operatorname{IG}(X;Y)=H(Y)-H(Y\mid X),
+\end{equation}
+isto é, a redução da incerteza da classe após observar $X$ \cite{Quinlan1986InformationGain}. O Gain Ratio normaliza esse ganho pela informação intrínseca do atributo,
+\begin{equation}
+  \operatorname{GR}(X;Y)=\frac{\operatorname{IG}(X;Y)}{H(X)},
+\end{equation}
+reduzindo a preferência por atributos com muitos valores \cite{Quinlan1993C45}. A Symmetrical Uncertainty torna a dependência simétrica e limitada:
+\begin{equation}
+  \operatorname{SU}(X,Y)=2\,\frac{\operatorname{IG}(X;Y)}{H(X)+H(Y)}.
+\end{equation}
+Essa forma normalizada é a utilizada na seleção baseada em correlação \cite{Hall1999}.
+Por fim, ReliefF atualiza o peso $W_j$ de cada atributo pela diferença para vizinhos próximos da mesma classe (\textit{hit}) e de classes diferentes (\textit{miss}):
+\begin{equation}
+ \Delta W_j=-\frac{\operatorname{diff}(x_j,H_j)}{mk}+\sum_{c\neq y}\frac{p(c)}{1-p(y)}\frac{\operatorname{diff}(x_j,M_{j,c})}{mk},
+\end{equation}
+em que $m$ é o número de amostras e $k$ o número de vizinhos \cite{kononenko1994estimating,robnik2003theoretical}. Essas quatro métricas geram ordenações independentes usadas na construção das listas restritas de candidatos.
+
+\section{\ac{graspfs}}
+
+GRASP é uma metaheurística que alterna construção gulosa-randômica e busca local \cite{ResendeRibeiro2010}. Na construção, uma lista restrita de candidatos (RCL) reúne alternativas bem avaliadas; uma delas é escolhida aleatoriamente e compõe a solução inicial. A busca local então aplica vizinhanças para melhorar essa solução. O GRASP-FS adapta esse procedimento à seleção de características, usando critérios de relevância para compor a RCL e operadores de busca para refinar o subconjunto \cite{quincozes2020grasp,quincozes2021performance,quincozes2022extended}.
+
+\section{Distribuição e Orquestração}
+
+Arquiteturas distribuídas decompõem responsabilidades em unidades menores e podem isolar falhas e permitir escala independente quando a implantação assim as configura \cite{Tanenbaum2007Distributed,Newman2021}. Em sistemas orientados a eventos, \ac{kafka} fornece um log distribuído durável que desacopla produtores e consumidores \cite{Kreps2011}. Quando combinado à conteinerização, esse modelo torna explícitas as dependências e a implantação dos serviços \cite{Anderson2015Docker}.
+
+\section{Observabilidade}
+
+Observabilidade é a capacidade de inferir o estado de um sistema a partir dos sinais que ele produz, tais como eventos, métricas, logs e rastros temporais \cite{beyer2016site,usman2022observabilitysurvey}. No \textit{G-FShield}, os serviços registram eventos de execução, métricas, estados, identificadores de \textit{run} e marcas temporais. Esses sinais são persistidos e consultados pela API; a interface web é, portanto, uma visualização dessa telemetria e não a própria observabilidade. Esse arranjo permite reconstruir uma execução e relacionar resultados intermediários aos componentes que os produziram.
+
+\section{Síntese}
+
+O problema tratado combina requisitos de qualidade da solução, escalabilidade arquitetural e observabilidade operacional em cenários de \acp{ids} para \acp{cps}. Os próximos capítulos situam a proposta na literatura, descrevem suas decisões de implementação e delimitam a evidência experimental disponível.

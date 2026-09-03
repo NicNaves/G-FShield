@@ -1,0 +1,12 @@
+\begin{resumo}[Resumo]
+
+A seleção de características reduz a dimensionalidade de dados usados por sistemas de detecção de intrusão, mas implementações sequenciais dificultam distribuir a busca e inspecionar resultados intermediários. Esta dissertação apresenta o \textit{G-FShield}, uma arquitetura distribuída e orientada a eventos para GRASP-FS aplicado a sistemas ciber-físicos. A proposta separa geração da lista restrita de candidatos e busca local, usa Apache Kafka para comunicação e persiste eventos, métricas, estados, identificadores e marcas temporais consultados por uma camada web.
+
+Uma campanha reproduzível, limitada a dez dias, avaliou 24 configurações G-FShield, dois monólitos e um baseline com todas as 51 características. Cada braço teve oito sementes independentes, o mesmo particionamento estratificado de treino/validação/teste, Weka J48 3.8.6 como avaliador final e teto agregado de oito CPUs e 16~GiB. Foram obtidas 216 execuções válidas. A configuração ReliefF--VND--IWSSR, escolhida pela validação, alcançou F1 macro mediano de 0,9448 no teste com 11 características, redução dimensional de 78,4\%; o baseline obteve 0,9378. Nenhuma das 72 comparações exploratórias ajustadas por Holm apresentou $p<0{,}05$.
+
+Os resultados demonstram integração arquitetural, rastreabilidade experimental e diferenças descritivas, não causalidade arquitetural, escalabilidade ou tolerância a falhas. O objetivo interno legado do G-FShield ainda difere do F1 macro usado pelos monólitos durante a busca, e as classes \textit{grayhole} e \textit{normal} permanecem mais difíceis. Completude e custo da telemetria, recuperação, reprocessamento, escala horizontal e generalização para outros dados e classificadores requerem experimentos específicos.
+
+\noindent
+\textbf{Palavras-chave}: seleção de características, detecção de intrusão, sistemas ciber-físicos, GRASP-FS, sistemas distribuídos, observabilidade.
+
+\end{resumo}

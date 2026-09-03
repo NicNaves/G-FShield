@@ -1,0 +1,494 @@
+[
+  {
+    "number": 1,
+    "location": "Resumo, par. 1",
+    "excerpt": "Cyber-Physical Systemss (CPSs)",
+    "comment": "Corrigir para Cyber-Physical Systems. Esse erro também aparece na Introdução. Fazer uma busca global porque provavelmente veio da macro usada para pluralizar a sigla."
+  },
+  {
+    "number": 2,
+    "location": "Resumo, par. 3",
+    "excerpt": "indicam maior vazão de candidatos, melhor disponibilidade de soluções intermediárias e uma leitura operacional mais clara",
+    "comment": "A primeira afirmação é mensurável; as duas seguintes estão mais subjetivas. Precisamos dizer exatamente qual métrica demonstra 'melhor disponibilidade' e 'leitura operacional mais clara', ou suavizar essas expressões. O resumo deve refletir somente resultados efetivamente medidos."
+  },
+  {
+    "number": 3,
+    "location": "Resumo, par. 3",
+    "excerpt": "permite acompanhar cronogramas",
+    "comment": "Acho que aqui queremos dizer 'linhas do tempo das execuções', não 'cronogramas'. Cronograma passa a ideia de planejamento futuro."
+  },
+  {
+    "number": 4,
+    "location": "Resumo, par. 3",
+    "excerpt": "resultados apresentados apenas qualitativamente",
+    "comment": "Depois de estabilizar os experimentos, incluir pelo menos um resultado quantitativo no resumo. O 4,4x é forte, mas só deve entrar depois de resolvermos a questão do orçamento computacional e a inconsistência 25.873/25.836."
+  },
+  {
+    "number": 5,
+    "location": "§1, par. 1",
+    "excerpt": "restrições de tempo e necessidade de explicabilidade",
+    "comment": "'Explicabilidade' não parece ser a propriedade estudada nesta dissertação. O trabalho trata de observabilidade, rastreabilidade e acompanhamento da execução, não de explicabilidade do modelo de classificação. Trocar o termo para não abrir uma frente de cobrança sobre XAI."
+  },
+  {
+    "number": 6,
+    "location": "§1, par. 2",
+    "excerpt": "a geração da lista de candidatos, a refinamento local",
+    "comment": "Erro gramatical: 'o refinamento local'."
+  },
+  {
+    "number": 7,
+    "location": "§1, par. 2",
+    "excerpt": "muitas implementações continuam monolíticas",
+    "comment": "A afirmação é importante porque praticamente inicia a motivação da dissertação, mas está genérica. Ou citar literatura que demonstre essa predominância ou restringir: 'nas implementações de GRASP-FS consideradas neste trabalho...'. Isso ajuda muito depois na sustentação da lacuna."
+  },
+  {
+    "number": 8,
+    "location": "§1, par. 4",
+    "excerpt": "Além do ganho de vazão, o trabalho enfatiza...",
+    "comment": "Aqui ainda estamos apresentando o problema/proposta, portanto não anteciparia como fato que há ganho de vazão. Melhor algo como 'Além de buscar maior vazão...'. Deixar a constatação para os resultados."
+  },
+  {
+    "number": 9,
+    "location": "§1, par. 5",
+    "excerpt": "objetivo geral e objetivos específicos",
+    "comment": "Eu incluiria perguntas de pesquisa explícitas. Hoje os objetivos estão claros, mas o Capítulo 5 ficaria muito mais sólido se cada resultado respondesse diretamente a uma RQ. Sugestão de estrutura: RQ1 - vazão; RQ2 - tempo para atingir soluções de determinada qualidade; RQ3 - qualidade das soluções; RQ4 - custo/overhead e propriedades operacionais da arquitetura."
+  },
+  {
+    "number": 10,
+    "location": "§1, par. 6",
+    "excerpt": "serviço operacional contínuo / dados genéricos de entrada",
+    "comment": "Cuidado com a amplitude da afirmação. A avaliação utiliza um corpus pré-materializado e o próprio texto depois reconhece que o sistema não opera em fluxo contínuo. Eu usaria 'serviço operacional persistente' ou 'pipeline operacional' e deixaria 'contínuo' reservado para uma futura versão streaming."
+  },
+  {
+    "number": 11,
+    "location": "§2.2, par. 2",
+    "excerpt": "Information Gain, Gain Ratio, Symmetrical Uncertainty e ReliefF...",
+    "comment": "Revisar as referências individualmente para cada métrica. O bloco atual mistura Kullback-Leibler, Gini, Forman, Tangirala, Kira e Kononenko, mas não fica claro qual fonte fundamenta IG, GR, SU e RF. Para uma dissertação que usa essas métricas como parte central da arquitetura, vale apresentar definição/equação e uma referência específica para cada uma."
+  },
+  {
+    "number": 12,
+    "location": "§2.3, par. 1",
+    "excerpt": "O GRASP-FS é uma metaheurística... (RESENDE; RIBEIRO, 2010)",
+    "comment": "Resende e Ribeiro fundamentam o GRASP, não especificamente a adaptação GRASP-FS usada aqui. Separar as duas coisas: primeiro explicar o GRASP original; depois citar o trabalho que introduz/adapta o procedimento para seleção de características."
+  },
+  {
+    "number": 13,
+    "location": "§2.4, par. 1",
+    "excerpt": "Quando combinado a conteinerização",
+    "comment": "Corrigir para 'quando combinado à conteinerização'."
+  },
+  {
+    "number": 14,
+    "location": "§2.5, par. 2",
+    "excerpt": "essa observabilidade aparece em uma camada web que expõe APIs, execução de runs...",
+    "comment": "Aqui precisamos definir melhor o que significa observabilidade no G-FShield. A interface é a visualização, não a observabilidade em si. Explicar quais sinais são coletados - eventos, métricas, estado, logs, timestamps etc. -, como são persistidos e como permitem reconstruir uma execução. Isso fortalece bastante a contribuição de Engenharia de Software."
+  },
+  {
+    "number": 15,
+    "location": "§2.6, par. 1",
+    "excerpt": "A proposta só faz sentido porque...",
+    "comment": "Retirar essa construção. É coloquial e um pouco artificial. Dizer diretamente que 'o problema combina requisitos de qualidade da solução, escalabilidade e observabilidade...'."
+  },
+  {
+    "number": 16,
+    "location": "§3.2, par. 1",
+    "excerpt": "revisão de seleção de características/metaheurísticas",
+    "comment": "O capítulo de trabalhos relacionados está muito curto para sustentar com segurança uma afirmação de lacuna. Eu ampliaria principalmente com trabalhos externos ao histórico direto do próprio GRASP-FS: feature selection distribuída/paralela, metaheurísticas distribuídas, pipelines de ML orientados a eventos e sistemas de otimização observáveis. Hoje a trajetória Faria/Silva -> G-FShield está clara, mas a busca pelo estado da arte parece estreita."
+  },
+  {
+    "number": 17,
+    "location": "§3.3, par. 1",
+    "excerpt": "A proposta Silva et al. (2023)",
+    "comment": "Corrigir para 'A proposta de Silva et al. (2023)'."
+  },
+  {
+    "number": 18,
+    "location": "§3.3, par. 2",
+    "excerpt": "O G-FShield parte exatamente dessa lacuna.",
+    "comment": "Evitar 'exatamente'. A frase soa mais retórica do que científica e reaparece quase igual na seção seguinte. Aqui basta descrever objetivamente o que permanece não integrado nos trabalhos anteriores."
+  },
+  {
+    "number": 19,
+    "location": "§3.5, par. 1",
+    "excerpt": "há trabalhos fortes sobre... / poucos integram essas partes",
+    "comment": "'Trabalhos fortes' é vago e 'poucos integram' exige evidência de cobertura da literatura. Eu escreveria 'Entre os trabalhos analisados...' caso não tenha sido feita uma revisão sistemática. Se quisermos sustentar 'poucos', precisamos ampliar e documentar minimamente a busca bibliográfica."
+  },
+  {
+    "number": 20,
+    "location": "§3.5, par. 2",
+    "excerpt": "foi construído para preencher justamente essa lacuna",
+    "comment": "Retirar 'justamente'. A redação fica mais natural e menos promocional dizendo diretamente o que é integrado pela proposta."
+  },
+  {
+    "number": 21,
+    "location": "§3.6 - Tabela 1",
+    "excerpt": "Tabela 1 - trabalhos relacionados",
+    "comment": "A tabela está muito pequena no PDF e é justamente a principal síntese da lacuna. Precisa ficar legível sem zoom. Além disso, definir o critério de cada coluna na legenda ou no texto. Eu revisaria especialmente 'FS Contínua', porque o texto reconhece que o G-FShield ainda não é online em sentido estrito."
+  },
+  {
+    "number": 22,
+    "location": "§3.6, par. 2",
+    "excerpt": "sustenta a contribuição do trabalho tanto do ponto de vista algorítmico quanto...",
+    "comment": "Eu não venderia a principal contribuição como algorítmica. DRG e DLS já existem nos trabalhos anteriores e não vejo aqui um novo algoritmo de busca. A novidade forte é arquitetural: integração ponta a ponta, orquestração, persistência e observabilidade. Essa posição é mais precisa e mais fácil de defender."
+  },
+  {
+    "number": 23,
+    "location": "§4.1, par. 2",
+    "excerpt": "receber dados genéricos de entrada",
+    "comment": "Explicar qual é o contrato que torna a entrada genérica. Qual esquema/interface um novo dataset precisa cumprir? Sem isso, 'genérico' fica como uma propriedade declarada, mas não demonstrada. Se só foi testado ERENO, deixar claro que a independência é arquitetural, não experimentalmente validada."
+  },
+  {
+    "number": 24,
+    "location": "§4.2, par. 1",
+    "excerpt": "A ordem dos diagramas nesta dissertação é intencional.",
+    "comment": "Esta seção chama-se 'Justificativa Arquitetural', mas o primeiro parágrafo justifica a ordem das figuras. Eu substituiria completamente esse parágrafo pelos architectural drivers: vazão, desacoplamento, rastreabilidade, tolerância a falhas, escalabilidade e necessidade de acompanhar resultados intermediários. Depois explicar quais decisões atendem a cada driver."
+  },
+  {
+    "number": 25,
+    "location": "§4.2, par. 2",
+    "excerpt": "podem ser escalados, substituídos ou inspecionados de forma independente",
+    "comment": "É uma boa justificativa de projeto, mas não apresentar como propriedade comprovada se isso não foi medido. Podemos dizer que a decomposição 'permite' ou 'foi projetada para permitir', e depois validar aquilo que realmente foi experimentado."
+  },
+  {
+    "number": 26,
+    "location": "§4.2, par. 3",
+    "excerpt": "referências de React, Vite, Express e PostgreSQL usadas para justificar decisões arquiteturais",
+    "comment": "Documentação de tecnologia é adequada para descrever a ferramenta, mas não para sustentar afirmações como redução de carga, consistência arquitetural ou qualidade da solução. Para justificativa arquitetural, usar literatura de arquitetura/microserviços; para dizer apenas 'foi implementado com React/Express/PostgreSQL', a documentação oficial basta."
+  },
+  {
+    "number": 27,
+    "location": "§4.3, pars. 1-3",
+    "excerpt": "DRG -> lista parcial -> solução inicial",
+    "comment": "Está faltando um passo conceitual aqui. A seção se chama geração distribuída da RCL, mas o diagrama termina em initial_solution. Precisamos explicitar: como os rankings são combinados, como a RCL é construída, como ocorre a aleatorização e como da RCL surge o subconjunto inicial. Um pseudocódigo curto resolveria bastante coisa."
+  },
+  {
+    "number": 28,
+    "location": "§4.3, par. 2",
+    "excerpt": "Newman e Kreps citados para justificar diversidade da RCL",
+    "comment": "Essas referências sustentam microserviços/mensageria, não a lógica de seleção de características ou diversidade da RCL. Aqui usar referências de GRASP/GRASP-FS e das próprias métricas."
+  },
+  {
+    "number": 29,
+    "location": "§4.4, par. 2",
+    "excerpt": "VND/RVND justificados com Newman e Tanenbaum",
+    "comment": "Mesma questão: precisamos citar fontes algorítmicas de VND/RVND e dos operadores. Newman/Tanenbaum podem justificar a decomposição em serviços, não intensificação/diversificação da busca."
+  },
+  {
+    "number": 30,
+    "location": "§4.5, par. 3",
+    "excerpt": "Essa decisão arquitetural torna o sistema mais resiliente",
+    "comment": "Não afirmaria resiliência sem experimento de falha, recuperação/reprocessamento ou alguma avaliação equivalente. Melhor: 'foi adotada com o objetivo de desacoplar os serviços e permitir reprocessamento...'."
+  },
+  {
+    "number": 31,
+    "location": "§4.6, pars. 2-3",
+    "excerpt": "duas descrições sucessivas de React/Vite/componentes/backend",
+    "comment": "Há repetição aqui. Consolidar em um parágrafo. Também remover construções como 'React (React)', 'Vite (Vite)', 'Express (Express)', 'PostgreSQL (PostgreSQL)' e 'Redis (Redis)'. Isso parece efeito automático de glossário e dá um aspecto pouco revisado ao texto."
+  },
+  {
+    "number": 32,
+    "location": "§4.6, par. 2",
+    "excerpt": "acelera o ciclo de desenvolvimento / manter a interface responsiva",
+    "comment": "São afirmações de qualidade não avaliadas. Ou retirar/transformar em motivação de projeto, ou apresentar evidência. Evitar que documentação do React/Vite pareça comprovar desempenho ou produtividade."
+  },
+  {
+    "number": 33,
+    "location": "§4.6, par. 4",
+    "excerpt": "ajuda a manter o backend mais estável",
+    "comment": "'Mais estável' em relação a quê? Sem avaliação, retirar esse comparativo. Podemos explicar apenas a separação de responsabilidades e redução de acoplamento."
+  },
+  {
+    "number": 34,
+    "location": "§4.7, par. 3",
+    "excerpt": "Isso é importante em um trabalho de mestrado profissional porque...",
+    "comment": "Retirar. O texto não deve explicar ao leitor por que algo 'é importante em um mestrado profissional'. Mostrar a contribuição já é suficiente; esse tipo de frase soa defensivo e quebra o registro científico."
+  },
+  {
+    "number": 35,
+    "location": "§4.7, par. 3",
+    "excerpt": "deixa de ser apenas uma ideia de arquitetura e passa a ser um sistema operacional concreto",
+    "comment": "Muito retórico. Trocar por uma descrição objetiva da correspondência entre os componentes do modelo arquitetural e os componentes implementados."
+  },
+  {
+    "number": 36,
+    "location": "§4 - Figuras 6 a 10",
+    "excerpt": "escala e legibilidade dos diagramas",
+    "comment": "Rever escala. Em particular, a Figura 10 fica muito pequena e ocupa uma página com grande área em branco; vários rótulos só ficam legíveis com zoom. Essas figuras são evidência importante da implementação, então precisam ser legíveis no tamanho normal de leitura."
+  },
+  {
+    "number": 37,
+    "location": "§4 - comentário geral",
+    "excerpt": "reprodutibilidade/implantação",
+    "comment": "Falta uma subseção de reprodutibilidade/implantação. Eu colocaria versões, número e função dos serviços, tópicos Kafka principais, configuração usada nos experimentos, Docker/Compose, repositório e uma tag/commit correspondente à versão avaliada. Isso aumenta bastante a qualidade do trabalho sem exigir novo experimento."
+  },
+  {
+    "number": 38,
+    "location": "§5.1, par. 1",
+    "excerpt": "dois baselines monolíticos de GRASP-FS",
+    "comment": "Definir imediatamente o que são Monólito 1 e Monólito 2. Algoritmo, configuração, operadores, parâmetros e correspondência com os componentes distribuídos. Hoje o leitor só encontra os nomes nos gráficos e não consegue reproduzir a comparação."
+  },
+  {
+    "number": 39,
+    "location": "§5.1, par. 2",
+    "excerpt": "O ambiente de execução foi padronizado em contêineres",
+    "comment": "Isto ainda é insuficiente para reprodução. Informar hardware, CPU, RAM, sistema operacional, versões, quantidade de workers/replicas por serviço, limites de CPU/RAM dos containers, número de threads/processos e se todas as configurações foram executadas na mesma máquina."
+  },
+  {
+    "number": 40,
+    "location": "§5.1, par. 2",
+    "excerpt": "mesma condição de parada / mesma janela temporal",
+    "comment": "Este é provavelmente o ponto metodológico mais importante do trabalho. Mesma janela de 9,5 h não significa mesmo orçamento computacional. Se o distribuído usa vários workers e o monólito usa um, o 4,4x pode refletir simplesmente mais CPU disponível. Precisamos separar dois experimentos: (i) comparação com recursos equivalentes e (ii) experimento de scale-out variando o número de workers."
+  },
+  {
+    "number": 41,
+    "location": "§5.1, par. 2",
+    "excerpt": "descrição do ERENO 1k limitada aos nomes dos arquivos",
+    "comment": "Caracterizar o conjunto experimental: número de instâncias, número de atributos, distribuição das classes, tipos de ataque, proporção treino/teste e qualquer pré-processamento. Isso deveria estar no protocolo, não depender apenas da referência externa."
+  },
+  {
+    "number": 42,
+    "location": "§5.1, após par. 2",
+    "excerpt": "cálculo do F1 e separação treino/validação/teste",
+    "comment": "Falta a informação mais importante para interpretar o F1: qual classificador calcula o fitness? Quais hiperparâmetros? Em qual conjunto o subconjunto é otimizado? Há validação separada? O test é consultado somente depois que a seleção terminou? Precisamos deixar explicitamente impossível a interpretação de que houve seleção de características usando o conjunto de teste."
+  },
+  {
+    "number": 43,
+    "location": "§5.1, após par. 2",
+    "excerpt": "execuções independentes e sementes",
+    "comment": "Informar número de execuções independentes e sementes aleatórias. GRASP/RVND envolvem aleatoriedade. Não podemos avaliar robustez observando apenas milhares de soluções correlacionadas produzidas dentro de uma mesma execução. A unidade experimental deve ser uma execução independente."
+  },
+  {
+    "number": 44,
+    "location": "§5.1, após par. 2",
+    "excerpt": "estatística por execução",
+    "comment": "Para uma versão realmente forte, eu faria pelo menos múltiplas execuções independentes por configuração e reportaria mediana/média + IQR ou IC. Se houver número suficiente de repetições, incluir teste estatístico e tamanho de efeito. O mais importante é não tratar cada solução intermediária como uma réplica independente."
+  },
+  {
+    "number": 45,
+    "location": "§5.1 - comentário geral",
+    "excerpt": "uso de um único dataset",
+    "comment": "Um único dataset é uma limitação relevante para um título que fala genericamente em CPSs. Não considero obrigatório adicionar vários datasets se o trabalho for assumido como estudo de caso de Engenharia de Software, mas, se houver tempo experimental, um segundo corpus seria provavelmente o reforço de validade externa com melhor custo/benefício."
+  },
+  {
+    "number": 46,
+    "location": "§5.2, par. 1",
+    "excerpt": "F1, precisão, revocação e indicadores [...] CPU, RAM...",
+    "comment": "Algumas métricas anunciadas aqui não aparecem de forma efetiva nos resultados principais. Se CPU, RAM, precisão e revocação foram coletadas, apresentar. Se não foram analisadas, retirar da lista. Não declarar uma métrica que depois desaparece."
+  },
+  {
+    "number": 47,
+    "location": "§5.2, par. 1",
+    "excerpt": "e não de uma planilha distribuída aos avaliadores",
+    "comment": "Retirar. É uma observação estranha dentro de uma dissertação e parece responder a uma conversa externa que o leitor desconhece. Basta explicar que os valores foram derivados dos logs e artefatos persistidos."
+  },
+  {
+    "number": 48,
+    "location": "§5.2, par. 1",
+    "excerpt": "Essa escolha reforça o caráter reprodutível da análise",
+    "comment": "Logs por si só não tornam o experimento reprodutível. Reprodutibilidade depende também de código, configuração, versão, seeds, dados e ambiente. Eu escreveria que os logs 'fornecem rastreabilidade das medições'."
+  },
+  {
+    "number": 49,
+    "location": "§5.3, par. 2 / Figura 11",
+    "excerpt": "texto = 25.873; figura = 25.836",
+    "comment": "Corrigir imediatamente. Temos dois totais diferentes para o principal resultado da dissertação. Conferir a origem do dado e gerar novamente texto/figura a partir da mesma fonte."
+  },
+  {
+    "number": 50,
+    "location": "§5.3, par. 2",
+    "excerpt": "O ganho aproximado de 4,4 vezes está diretamente associado ao paralelismo",
+    "comment": "'Diretamente associado' é causal demais para o experimento atual. Primeiro precisamos controlar recursos/overhead. Por enquanto, dizer apenas que a configuração distribuída produziu aproximadamente 4,4x mais registros na janela observada."
+  },
+  {
+    "number": 51,
+    "location": "§5.3, pars. 2-3",
+    "excerpt": "soluções candidatas / registros",
+    "comment": "Definir rigorosamente o que está sendo contado. Um registro produzido por IG, depois refinado por IWSS, é a mesma unidade conceitual que uma solução produzida pelo monólito? Há duplicatas? O mesmo subconjunto pode aparecer em serviços diferentes? Para sustentar a comparação de vazão, precisamos contar unidades equivalentes ou apresentar também 'subconjuntos únicos'."
+  },
+  {
+    "number": 52,
+    "location": "§5.3 - Figuras 11 e 12",
+    "excerpt": "comparação end-to-end",
+    "comment": "Evitar somar atividades de estágios diferentes da arquitetura e comparar esse total diretamente com resultados end-to-end do monólito sem explicar a equivalência. Eu incluiria uma comparação pipeline completo contra pipeline completo, além da decomposição por serviço."
+  },
+  {
+    "number": 53,
+    "location": "§5.3 / §5.5 - comentário geral",
+    "excerpt": "tamanho do subconjunto de características",
+    "comment": "Para um trabalho de seleção de características está faltando uma métrica central: quantas características são selecionadas. Reportar tamanho do subconjunto, percentual de redução e, idealmente, qualidade versus número de características. F1 alto com 40 atributos e F1 alto com 5 atributos são resultados bastante diferentes."
+  },
+  {
+    "number": 54,
+    "location": "§5.3 / §5.5 - comentário geral",
+    "excerpt": "baseline com todas as características",
+    "comment": "Eu incluiria um baseline 'todas as características', além do GRASP-FS monolítico. Isso permite mostrar se a seleção mantém/melhora o desempenho e qual redução de dimensionalidade foi obtida."
+  },
+  {
+    "number": 55,
+    "location": "§5.4, par. 1",
+    "excerpt": "soluções que já podem ser consideradas prontas para uso",
+    "comment": "Retirar 'prontas para uso'. F1 >= 95% não estabelece prontidão operacional de um IDS. Usar 'soluções que atingem o limiar de qualidade definido no experimento'."
+  },
+  {
+    "number": 56,
+    "location": "§5.4 - Figura 13",
+    "excerpt": "F1 acima de 95",
+    "comment": "Padronizar a escala: F1 >= 0,95 ou F1 >= 95%. E justificar por que 95% foi escolhido. É um limiar proveniente de trabalho anterior, requisito de domínio ou apenas convenção do experimento?"
+  },
+  {
+    "number": 57,
+    "location": "§5.4, par. 2",
+    "excerpt": "primeiro F1 >= 95 obtido entre 0,30 e 0,68 min",
+    "comment": "Este resultado é interessante, mas precisa ser calculado por execução independente. 'Tempo até o primeiro sucesso' de uma única campanha muito paralela é extremamente sensível ao número de tentativas simultâneas. Reportar distribuição do time-to-target entre seeds/runs."
+  },
+  {
+    "number": 58,
+    "location": "§5.5, par. 2",
+    "excerpt": "concentram a massa de qualidade em faixas mais altas",
+    "comment": "'Massa de qualidade' não é uma expressão boa aqui. Dizer exatamente o que o gráfico mostra: mediana, distribuição, proporção acima do limiar etc."
+  },
+  {
+    "number": 59,
+    "location": "§5.5, par. 3",
+    "excerpt": "comparação dos violinos de microserviços com monólitos",
+    "comment": "Cuidado com pseudorreplicação. Milhares de candidatos de uma mesma execução não são milhares de experimentos independentes. O gráfico é válido para caracterizar a população de candidatos daquela campanha, mas não para inferir que uma estratégia é estatisticamente superior. A inferência deve usar as execuções independentes como amostra."
+  },
+  {
+    "number": 60,
+    "location": "§5.5 - Figuras 14 e 15",
+    "excerpt": "nível de comparação entre componentes e estratégias",
+    "comment": "Precisamos deixar claro se GR/SU/RF/IG/BF/IWSS/IWSSr representam componentes internos do G- FShield ou estratégias completas comparáveis ao monólito. Atualmente o gráfico visualmente coloca tudo no mesmo nível, embora sejam possivelmente unidades diferentes do pipeline."
+  },
+  {
+    "number": 61,
+    "location": "§5.6, par. 1",
+    "excerpt": "deixa de ser um job offline",
+    "comment": "Evitar 'job'. Usar 'tarefa offline' ou 'etapa offline'. Também cuidado com 'deixa de ser': a avaliação ainda usa um corpus pré-materializado, então o processo continua não sendo online no sentido de ingestão de fluxo."
+  },
+  {
+    "number": 62,
+    "location": "§5.6, par. 1",
+    "excerpt": "progressivamente útil",
+    "comment": "Muito aberto. Se a ideia é anytime behavior, vale usar esse conceito e mostrar formalmente que a melhor solução disponível melhora/estabiliza ao longo do tempo. Isso seria uma contribuição muito boa, inclusive mais forte do que simplesmente contar soluções."
+  },
+  {
+    "number": 63,
+    "location": "§5.6, par. 2",
+    "excerpt": "funcionalidade da camada web",
+    "comment": "A observabilidade é uma das contribuições centrais, mas a avaliação praticamente demonstra que a interface existe. Precisamos avaliar pelo menos algumas propriedades objetivas: latência evento->dashboard, completude dos eventos persistidos, overhead da instrumentação, capacidade de reconstruir uma execução ou cenário de recuperação/reprocessamento. Não precisa necessariamente estudo com usuários."
+  },
+  {
+    "number": 64,
+    "location": "§5.7, par. 1",
+    "excerpt": "a comparação é arquitetural por natureza: o sistema distribuído tem mais paralelismo",
+    "comment": "Este ponto não pode ficar apenas como ameaça à validade. É central para interpretar o 4,4x. A mitigação atual - mesma base, critério de parada e tempo - não controla quantidade de recursos. Precisamos tratar experimentalmente ou assumir explicitamente que o experimento mede scale-out sob mais recursos, não eficiência com recursos equivalentes."
+  },
+  {
+    "number": 65,
+    "location": "§5.7 - seção inteira",
+    "excerpt": "ameaças à validade",
+    "comment": "Ampliar bastante. Eu organizaria em validade interna, de construção, de conclusão e externa. Incluir pelo menos: diferenças de recursos; aleatoriedade; número de repetições; escolha do limiar F1; definição de 'solução'; uso de logs como instrumento de medição; único dataset; possível viés da implementação; generalização para outros CPSs; ausência de fluxo online; e influência do classificador."
+  },
+  {
+    "number": 66,
+    "location": "§6, par. 2",
+    "excerpt": "aumenta significativamente a vazão",
+    "comment": "Não usar 'significativamente' sem teste estatístico. Se fizermos as repetições e houver significância estatística, manter e informar o teste. Caso contrário, usar 'aumentou' ou 'apresentou maior vazão na configuração avaliada'."
+  },
+  {
+    "number": 67,
+    "location": "§6, par. 3",
+    "excerpt": "serviço operacional contínuo",
+    "comment": "Mesma inconsistência da Introdução. A conclusão deve respeitar a limitação reconhecida logo no parágrafo seguinte. Trocar 'contínuo' por 'persistente/observável' ou delimitar exatamente o sentido dado a 'contínuo'."
+  },
+  {
+    "number": 68,
+    "location": "§6, par. 6",
+    "excerpt": "uma forma mais escalável e transparente",
+    "comment": "'Mais escalável' exige uma avaliação de escalabilidade variando recursos/carga; 'transparente' exige uma operacionalização melhor do conceito. Enquanto esses experimentos não existirem, eu usaria 'uma arquitetura distribuída e observável'."
+  },
+  {
+    "number": 69,
+    "location": "Apêndice B, par. 1",
+    "excerpt": "Cópia local do vídeo: fig/front/site-walkthrough-hd.mp4",
+    "comment": "Retirar o caminho local do projeto. Isso não serve para quem recebe o PDF. Se quiser preservar o vídeo, apontar para repositório/artefato persistente e, se possível, registrar versão ou DOI."
+  },
+  {
+    "number": 70,
+    "location": "§1/§2.2 / Referências - HALL, 1999",
+    "excerpt": "Machine Learning, v. 20, n. 1-2, p. 1-31, 1999.",
+    "comment": "Esta referência está bibliograficamente errada. Correlation-based feature selection for machine learning é a tese de doutorado de Mark A. Hall, University of Waikato, 1999, e não um artigo no periódico Machine Learning. Corrigir o BibTeX."
+  },
+  {
+    "number": 71,
+    "location": "§1/§3.1 / Referências - ALCARAZ; LOPEZ",
+    "excerpt": "IEEE Transactions on Systems, Man, and Cybernetics: Systems, v. 49, n. 1, p. 72-85, 2019.",
+    "comment": "Metadados incorretos. O artigo é de 2010, IEEE Transactions on Systems, Man, and Cybernetics, Part C: Applications and Reviews, 40(4), 419-428, DOI 10.1109/TSMCC.2010.2045373."
+  },
+  {
+    "number": 72,
+    "location": "§1/§3.1 / Referências - CÁRDENAS; AMIN; SASTRY",
+    "excerpt": "HotSec, 2009.",
+    "comment": "Corrigir o ano para 2008. O trabalho foi publicado no 3rd USENIX Workshop on Hot Topics in Security (HotSec 08)."
+  },
+  {
+    "number": 73,
+    "location": "§3.4 / Referências - WU et al.",
+    "excerpt": "v. 35, n. 5, p. 1178-1192, 2012.",
+    "comment": "O DOI/artigo pode ter sido disponibilizado online em 2012, mas a referência final do periódico é IEEE TPAMI, 35(5), 1178-1192, 2013. Padronizar para a versão final."
+  },
+  {
+    "number": 74,
+    "location": "§2.3/§3.2 / Referências - QUINCOZES et al., On the Performance...",
+    "excerpt": "v. 19, n. 1, p. 614-626, 2021.",
+    "comment": "O DOI foi publicado online em 2021, mas a versão final correspondente a volume 19(1), páginas 614-626 é de 2022. Como estamos citando volume/páginas finais, usar 2022."
+  },
+  {
+    "number": 75,
+    "location": "§2.3/§3.2 / Referências - QUINCOZES et al., An extended assessment...",
+    "excerpt": "p. 1-15, 2022.",
+    "comment": "Atualizar para a referência final: Annals of Telecommunications, 77(7-8), 457-471, 2022, DOI 10.1007/s12243-022-00912-z."
+  },
+  {
+    "number": 76,
+    "location": "§3.3 / Referências - SILVA et al., GDLS-FS",
+    "excerpt": "Proceedings of the 37th ... [S.l.]: IEEE, 2023.",
+    "comment": "Corrigir editora/metadados. O trabalho está nos proceedings AINA 2023 publicados pela Springer, Volume 2, pp. 199-210, DOI 10.1007/978-3-031-28451-9_18."
+  },
+  {
+    "number": 77,
+    "location": "§2.1/§3.1 / Referências - IEC 61850",
+    "excerpt": "Communication Networks and Systems in Substations - ALL PARTS. [S.l.]: IET, 2003.",
+    "comment": "Esta referência precisa ser refeita. A série é publicada pela IEC, e 'ALL PARTS' não é uma referência bibliográfica adequada. Citar a parte/edição efetivamente utilizada."
+  },
+  {
+    "number": 78,
+    "location": "§2.4/§3.4 / Referências - LI; SUN, 2022",
+    "excerpt": "Research and design of docker technology based authority management system.",
+    "comment": "Remover esta referência. O artigo foi retraído em 2023 após investigação do publisher, que apontou problemas de integridade do processo de publicação. Além de retraído, ele é uma fonte fraca para justificar conteinerização. Substituir por documentação oficial do Docker e/ou literatura consolidada de containers/cloud- native."
+  },
+  {
+    "number": 79,
+    "location": "§3.2 / Referências - FRANCIS; SOURI; INANÇ, 2026",
+    "excerpt": "entrada bibliográfica de Francis, Souri e Inanç",
+    "comment": "A referência existe e o DOI está correto. Completar os metadados: Artificial Intelligence Review, volume 59, artigo 73, 2026. Também corrigir a grafia 'INç' que aparece quebrada no texto."
+  },
+  {
+    "number": 80,
+    "location": "§2.5/§3.4 / Referências - FASEEHA et al., 2025",
+    "excerpt": "entrada bibliográfica de Faseeha et al.",
+    "comment": "A referência existe. Completar a entrada com IEEE Access, vol. 13, pp. 72011-72039, DOI 10.1109/ACCESS.2025.3562125."
+  },
+  {
+    "number": 81,
+    "location": "§3.2 / Referências - TERMANINI et al., 2025",
+    "excerpt": "entrada bibliográfica de Termanini et al.",
+    "comment": "A referência existe. Completar a referência final: International Journal of Information Security, 24(1), artigo 20, DOI 10.1007/s10207-024-00916-x."
+  },
+  {
+    "number": 82,
+    "location": "Referências - comentário geral",
+    "excerpt": "arquivo .bib",
+    "comment": "Como encontramos vários erros de metadados em referências importantes, eu não corrigiria só estas entradas manualmente. Faria uma auditoria completa do .bib usando DOI/DBLP/página oficial do publisher. Há referências reais, mas claramente parte dos metadados foi importada de fontes secundárias ou incompletas."
+  }
+]

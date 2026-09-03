@@ -1,0 +1,696 @@
+{
+  "scope": "BibTeX entries effectively cited by the Portuguese and English dissertations",
+  "bib_file": "Dissertação_Nicolas\\gfshield-references.bib",
+  "cited_entry_count": 37,
+  "entries": [
+    {
+      "key": "aftab2020iec",
+      "type": "article",
+      "doi": "10.1016/j.ijepes.2020.106008",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1016/j.ijepes.2020.106008",
+        "title": "IEC 61850 based substation automation system: A survey",
+        "title_similarity": 1.0,
+        "years": [
+          2020
+        ],
+        "container_title": "International Journal of Electrical Power &amp; Energy Systems",
+        "volume": "120",
+        "issue": null,
+        "page": "106008",
+        "publisher": "Elsevier BV"
+      }
+    },
+    {
+      "key": "Alcaraz2019",
+      "type": "article",
+      "doi": "10.1109/TSMCC.2010.2045373",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1109/tsmcc.2010.2045373",
+        "title": "A Security Analysis for Wireless Sensor Mesh Networks in Highly Critical Systems",
+        "title_similarity": 1.0,
+        "years": [
+          2010
+        ],
+        "container_title": "IEEE Transactions on Systems, Man, and Cybernetics, Part C (Applications and Reviews)",
+        "volume": "40",
+        "issue": "4",
+        "page": "419-428",
+        "publisher": "Institute of Electrical and Electronics Engineers (IEEE)"
+      }
+    },
+    {
+      "key": "Anderson2015Docker",
+      "type": "article",
+      "doi": "10.1109/MS.2015.62",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1109/ms.2015.62",
+        "title": "Docker [Software engineering]",
+        "title_similarity": 1.0,
+        "years": [
+          2015
+        ],
+        "container_title": "IEEE Software",
+        "volume": "32",
+        "issue": "3",
+        "page": "102-c3",
+        "publisher": "Institute of Electrical and Electronics Engineers (IEEE)"
+      }
+    },
+    {
+      "key": "beyer2016site",
+      "type": "book",
+      "doi": null,
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "not_applicable_or_no_doi",
+        "official_url": null
+      }
+    },
+    {
+      "key": "Cardenas2009",
+      "type": "inproceedings",
+      "doi": null,
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "not_applicable_or_no_doi",
+        "official_url": "https://www.usenix.org/conference/hotsec-08/research-challenges-security-control-systems"
+      }
+    },
+    {
+      "key": "DuarteEtAl2018VND",
+      "type": "incollection",
+      "doi": "10.1007/978-3-319-07124-4_9",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1007/978-3-319-07124-4_9",
+        "title": "Variable Neighborhood Descent",
+        "title_similarity": 1.0,
+        "years": [
+          2018
+        ],
+        "container_title": "Handbook of Heuristics",
+        "volume": null,
+        "issue": null,
+        "page": "341-367",
+        "publisher": "Springer International Publishing"
+      }
+    },
+    {
+      "key": "esseghir2010effective",
+      "type": "inproceedings",
+      "doi": null,
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "not_applicable_or_no_doi",
+        "official_url": "https://proceedings.mlr.press/v10/esseghir10a.html"
+      }
+    },
+    {
+      "key": "Faseeha2025MicroservicesObs",
+      "type": "article",
+      "doi": "10.1109/ACCESS.2025.3562125",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1109/access.2025.3562125",
+        "title": "Observability in Microservices: An In-Depth Exploration of Frameworks, Challenges, and Deployment Paradigms",
+        "title_similarity": 1.0,
+        "years": [
+          2025
+        ],
+        "container_title": "IEEE Access",
+        "volume": "13",
+        "issue": null,
+        "page": "72011-72039",
+        "publisher": "Institute of Electrical and Electronics Engineers (IEEE)"
+      }
+    },
+    {
+      "key": "Francis2026MFSReview",
+      "type": "article",
+      "doi": "10.1007/s10462-025-11473-7",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1007/s10462-025-11473-7",
+        "title": "A systematic review of metaheuristic based feature selection strategies for cyber-attack detection in the IIoT",
+        "title_similarity": 1.0,
+        "years": [
+          2026
+        ],
+        "container_title": "Artificial Intelligence Review",
+        "volume": "59",
+        "issue": "2",
+        "page": "73",
+        "publisher": "Springer Science and Business Media LLC"
+      }
+    },
+    {
+      "key": "guyon2003introduction",
+      "type": "article",
+      "doi": null,
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "not_applicable_or_no_doi",
+        "official_url": "https://www.jmlr.org/papers/v3/guyon03a.html"
+      }
+    },
+    {
+      "key": "Hall1999",
+      "type": "phdthesis",
+      "doi": null,
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "not_applicable_or_no_doi",
+        "official_url": "https://hdl.handle.net/10289/15043"
+      }
+    },
+    {
+      "key": "iec61850",
+      "type": "manual",
+      "doi": null,
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "not_applicable_or_no_doi",
+        "official_url": "https://webstore.iec.ch/en/publication/6015"
+      }
+    },
+    {
+      "key": "kononenko1994estimating",
+      "type": "inproceedings",
+      "doi": "10.1007/3-540-57868-4_57",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1007/3-540-57868-4_57",
+        "title": "Estimating attributes: Analysis and extensions of RELIEF",
+        "title_similarity": 1.0,
+        "years": [
+          1994,
+          2005,
+          2012
+        ],
+        "container_title": "Lecture Notes in Computer Science",
+        "volume": null,
+        "issue": null,
+        "page": "171-182",
+        "publisher": "Springer Berlin Heidelberg"
+      }
+    },
+    {
+      "key": "Kreps2011",
+      "type": "inproceedings",
+      "doi": null,
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "not_applicable_or_no_doi",
+        "official_url": null
+      }
+    },
+    {
+      "key": "mackiewicz2006overview",
+      "type": "inproceedings",
+      "doi": "10.1109/PES.2006.1709546",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1109/pes.2006.1709546",
+        "title": "Overview of IEC 61850 and benefits",
+        "title_similarity": 1.0,
+        "years": [
+          2006,
+          2008
+        ],
+        "container_title": "2006 IEEE Power Engineering Society General Meeting",
+        "volume": null,
+        "issue": null,
+        "page": "8 pp.",
+        "publisher": "IEEE"
+      }
+    },
+    {
+      "key": "mateus2021security",
+      "type": "article",
+      "doi": "10.1016/j.procs.2021.01.320",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1016/j.procs.2021.01.320",
+        "title": "Security in Microservices Architectures",
+        "title_similarity": 1.0,
+        "years": [
+          2021
+        ],
+        "container_title": "Procedia Computer Science",
+        "volume": "181",
+        "issue": null,
+        "page": "1225-1236",
+        "publisher": "Elsevier BV"
+      }
+    },
+    {
+      "key": "Mitchell2014",
+      "type": "article",
+      "doi": "10.1145/2542049",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1145/2542049",
+        "title": "A survey of intrusion detection techniques for cyber-physical systems",
+        "title_similarity": 1.0,
+        "years": [
+          2014
+        ],
+        "container_title": "ACM Computing Surveys",
+        "volume": "46",
+        "issue": "4",
+        "page": "1-29",
+        "publisher": "Association for Computing Machinery (ACM)"
+      }
+    },
+    {
+      "key": "MladenovicHansen1997VNS",
+      "type": "article",
+      "doi": "10.1016/S0305-0548(97)00031-2",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1016/s0305-0548(97)00031-2",
+        "title": "Variable neighborhood search",
+        "title_similarity": 1.0,
+        "years": [
+          1997,
+          2003
+        ],
+        "container_title": "Computers &amp; Operations Research",
+        "volume": "24",
+        "issue": "11",
+        "page": "1097-1100",
+        "publisher": "Elsevier BV"
+      }
+    },
+    {
+      "key": "Naves2023DRG",
+      "type": "inproceedings",
+      "doi": "10.5753/sbseg.2023.232948",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.5753/sbseg.2023.232948",
+        "title": "Microsserviços para Geração de RCLs no GRASP-FS: Uma Abordagem Escalável para Seleção de Features na Detecção de Intrusões em Sistemas Ciber-Físicos",
+        "title_similarity": 0.9766,
+        "years": [
+          2023,
+          2024
+        ],
+        "container_title": "Anais do XXIII Simpósio Brasileiro de Segurança da Informação e de Sistemas Computacionais (SBSeg 2023)",
+        "volume": null,
+        "issue": null,
+        "page": "55-68",
+        "publisher": "Sociedade Brasileira de Computação - SBC"
+      }
+    },
+    {
+      "key": "Newman2021",
+      "type": "book",
+      "doi": null,
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "not_applicable_or_no_doi",
+        "official_url": null
+      }
+    },
+    {
+      "key": "quincozes2020grasp",
+      "type": "inproceedings",
+      "doi": "10.1109/CIoT50422.2020.9244207",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1109/ciot50422.2020.9244207",
+        "title": "GRASP-based Feature Selection for Intrusion Detection in CPS Perception Layer",
+        "title_similarity": 1.0,
+        "years": [
+          2020
+        ],
+        "container_title": "2020 4th Conference on Cloud and Internet of Things (CIoT)",
+        "volume": null,
+        "issue": null,
+        "page": "41-48",
+        "publisher": "IEEE"
+      }
+    },
+    {
+      "key": "quincozes2021performance",
+      "type": "article",
+      "doi": "10.1109/TNSM.2021.3088763",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1109/tnsm.2021.3088763",
+        "title": "On the Performance of GRASP-Based Feature Selection for CPS Intrusion Detection",
+        "title_similarity": 1.0,
+        "years": [
+          2021,
+          2022
+        ],
+        "container_title": "IEEE Transactions on Network and Service Management",
+        "volume": "19",
+        "issue": "1",
+        "page": "614-626",
+        "publisher": "Institute of Electrical and Electronics Engineers (IEEE)"
+      }
+    },
+    {
+      "key": "quincozes2021survey",
+      "type": "article",
+      "doi": "10.1016/j.comnet.2020.107679",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1016/j.comnet.2020.107679",
+        "title": "A survey on intrusion detection and prevention systems in digital substations",
+        "title_similarity": 1.0,
+        "years": [
+          2020,
+          2021
+        ],
+        "container_title": "Computer Networks",
+        "volume": "184",
+        "issue": null,
+        "page": "107679",
+        "publisher": "Elsevier BV"
+      }
+    },
+    {
+      "key": "quincozes2022ereno",
+      "type": "inproceedings",
+      "doi": "10.5753/sbseg_estendido.2022.224642",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.5753/sbseg_estendido.2022.224642",
+        "title": "ERENO: An Extensible Tool For Generating Realistic IEC-61850 Intrusion Detection Datasets",
+        "title_similarity": 1.0,
+        "years": [
+          2022
+        ],
+        "container_title": "Anais Estendidos do XXII Simpósio Brasileiro de Segurança da Informação e de Sistemas Computacionais (SBSeg Estendido 2022)",
+        "volume": null,
+        "issue": null,
+        "page": "1-8",
+        "publisher": "Sociedade Brasileira de Computação - SBC"
+      }
+    },
+    {
+      "key": "quincozes2022extended",
+      "type": "article",
+      "doi": "10.1007/s12243-022-00912-z",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1007/s12243-022-00912-z",
+        "title": "An extended assessment of metaheuristics-based feature selection for intrusion detection in CPS perception layer",
+        "title_similarity": 1.0,
+        "years": [
+          2022
+        ],
+        "container_title": "Annals of Telecommunications",
+        "volume": "77",
+        "issue": "7-8",
+        "page": "457-471",
+        "publisher": "Springer Science and Business Media LLC"
+      }
+    },
+    {
+      "key": "Quinlan1986InformationGain",
+      "type": "article",
+      "doi": "10.1007/BF00116251",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1007/bf00116251",
+        "title": "Induction of decision trees",
+        "title_similarity": 1.0,
+        "years": [
+          1986,
+          2004
+        ],
+        "container_title": "Machine Learning",
+        "volume": "1",
+        "issue": "1",
+        "page": "81-106",
+        "publisher": "Springer Science and Business Media LLC"
+      }
+    },
+    {
+      "key": "Quinlan1993C45",
+      "type": "book",
+      "doi": null,
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "not_applicable_or_no_doi",
+        "official_url": "https://www.sciencedirect.com/book/9780080500584/c4-5"
+      }
+    },
+    {
+      "key": "ResendeRibeiro2010",
+      "type": "book",
+      "doi": "10.1007/978-1-4939-6530-4",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1007/978-1-4939-6530-4",
+        "title": "Optimization by GRASP",
+        "title_similarity": 1.0,
+        "years": [
+          2016
+        ],
+        "container_title": "",
+        "volume": null,
+        "issue": null,
+        "page": null,
+        "publisher": "Springer New York"
+      }
+    },
+    {
+      "key": "robnik2003theoretical",
+      "type": "article",
+      "doi": "10.1023/A:1025667309714",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1023/a:1025667309714",
+        "title": "Theoretical and Empirical Analysis of ReliefF and RReliefF",
+        "title_similarity": 1.0,
+        "years": [
+          2003
+        ],
+        "container_title": "Machine Learning",
+        "volume": "53",
+        "issue": "1-2",
+        "page": "23-69",
+        "publisher": "Springer Science and Business Media LLC"
+      }
+    },
+    {
+      "key": "Saeys2007",
+      "type": "article",
+      "doi": "10.1093/bioinformatics/btm344",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1093/bioinformatics/btm344",
+        "title": "A review of feature selection techniques in bioinformatics",
+        "title_similarity": 1.0,
+        "years": [
+          2007
+        ],
+        "container_title": "Bioinformatics",
+        "volume": "23",
+        "issue": "19",
+        "page": "2507-2517",
+        "publisher": "Oxford University Press (OUP)"
+      }
+    },
+    {
+      "key": "Silva2023GDLSFS",
+      "type": "inproceedings",
+      "doi": "10.1007/978-3-031-28451-9_18",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1007/978-3-031-28451-9_18",
+        "title": "GDLS-FS: Scaling Feature Selection for Intrusion Detection with GRASP-FS and Distributed Local Search",
+        "title_similarity": 1.0,
+        "years": [
+          2023
+        ],
+        "container_title": "Lecture Notes in Networks and Systems",
+        "volume": null,
+        "issue": null,
+        "page": "199-210",
+        "publisher": "Springer International Publishing"
+      }
+    },
+    {
+      "key": "SUBRAMANIAN20101899",
+      "type": "article",
+      "doi": "10.1016/j.cor.2009.10.011",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1016/j.cor.2009.10.011",
+        "title": "A parallel heuristic for the Vehicle Routing Problem with Simultaneous Pickup and Delivery",
+        "title_similarity": 1.0,
+        "years": [
+          2009,
+          2010
+        ],
+        "container_title": "Computers &amp; Operations Research",
+        "volume": "37",
+        "issue": "11",
+        "page": "1899-1911",
+        "publisher": "Elsevier BV"
+      }
+    },
+    {
+      "key": "Tanenbaum2007Distributed",
+      "type": "book",
+      "doi": null,
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "not_applicable_or_no_doi",
+        "official_url": null
+      }
+    },
+    {
+      "key": "Termanini2025Survey",
+      "type": "article",
+      "doi": "10.1007/s10207-024-00916-x",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1007/s10207-024-00916-x",
+        "title": "Using machine learning to detect network intrusions in industrial control systems: a survey",
+        "title_similarity": 1.0,
+        "years": [
+          2024,
+          2025
+        ],
+        "container_title": "International Journal of Information Security",
+        "volume": "24",
+        "issue": "1",
+        "page": "20",
+        "publisher": "Springer Science and Business Media LLC"
+      }
+    },
+    {
+      "key": "usman2022observabilitysurvey",
+      "type": "article",
+      "doi": "10.1109/ACCESS.2022.3193102",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1109/access.2022.3193102",
+        "title": "A Survey on Observability of Distributed Edge &amp; Container-Based Microservices",
+        "title_similarity": 0.974,
+        "years": [
+          2022
+        ],
+        "container_title": "IEEE Access",
+        "volume": "10",
+        "issue": null,
+        "page": "86904-86919",
+        "publisher": "Institute of Electrical and Electronics Engineers (IEEE)"
+      }
+    },
+    {
+      "key": "wu2012online",
+      "type": "article",
+      "doi": "10.1109/TPAMI.2012.197",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1109/tpami.2012.197",
+        "title": "Online Feature Selection with Streaming Features",
+        "title_similarity": 1.0,
+        "years": [
+          2012,
+          2013
+        ],
+        "container_title": "IEEE Transactions on Pattern Analysis and Machine Intelligence",
+        "volume": "35",
+        "issue": "5",
+        "page": "1178-1192",
+        "publisher": "Institute of Electrical and Electronics Engineers (IEEE)"
+      }
+    },
+    {
+      "key": "yusta2009different",
+      "type": "article",
+      "doi": "10.1016/j.patrec.2008.11.012",
+      "status": "verified",
+      "issues": [],
+      "registry": {
+        "status": "verified",
+        "doi": "10.1016/j.patrec.2008.11.012",
+        "title": "Different metaheuristic strategies to solve the feature selection problem",
+        "title_similarity": 1.0,
+        "years": [
+          2008,
+          2009
+        ],
+        "container_title": "Pattern Recognition Letters",
+        "volume": "30",
+        "issue": "5",
+        "page": "525-534",
+        "publisher": "Elsevier BV"
+      }
+    }
+  ]
+}

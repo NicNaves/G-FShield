@@ -1,0 +1,25 @@
+\chapter{Conclusion}
+\label{chapter:conclusao}
+
+This dissertation presented \textit{G-FShield}, a distributed, event-driven, observable architecture for GRASP-FS in \acp{ids} applied to \acp{cps}. The implementation separates rankings and initial construction, neighborhood control, local-search operators, verification, and monitoring; Apache Kafka integrates the stages, while the backend and interface expose persisted execution signals.
+
+The formal campaign answered RQ1 with common end-to-end units. It evaluated 24 G-FShield arms, two monoliths, and an all-features baseline, each under eight independent seeds. RF--VND--IWSSR was selected on validation and obtained median test macro-F1 0.9448 with 11 of 51 predictors, a 78.4\% reduction. The baseline obtained 0.9378, Monolith~1 0.9397, and Monolith~2 0.8411. The difference from the baseline is descriptive; none of the 72 exploratory Holm-adjusted comparisons had $p<0.05$.
+
+For RQ2, distributed-configuration medians ranged from 0.8671 to 0.9448. VND--BF combinations remained below those that explored IWSS/IWSSR in this protocol, but all 208 searches stopped at the time limit, so there is no evidence of convergence. Time to macro-F1 0.95 cannot be derived from the legacy internal score, which uses a different aggregation. For RQ3, the common ceiling was eight CPUs and 16~GiB: distributed runs consumed global medians of 3.56 cores and 5,317~MiB, above the monoliths, without this proving architectural efficiency or inefficiency.
+
+For RQ4, the manifest, resolved commands, hashes, campaign and run identifiers, seeds, states, stop reasons, timestamps, messages, internal CSV files, logs, final metrics, and telemetry reconstruct what was captured. The application also persists events by seed and stage. Telemetry completeness and cost, loss and duplication under failure, recovery time, and reprocessing were not measured; resilience, fault tolerance, and scalability remain design objectives.
+
+The principal remaining threat is algorithmic: G-FShield selects candidates with legacy binary F1 and \texttt{normalClass=0}, although ARFF index 0 is \textit{grayhole}; the monoliths use macro-F1 during search. The common final evaluation makes final results comparable, but the objective mismatch prevents attributing them solely to architecture. Evidence is also limited to one server, one corpus, one split, J48, and eight seeds.
+
+Future work should:
+
+\begin{itemize}
+  \item correct class mapping by label and use the same multiclass objective in every executor;
+  \item increase the number of seeds and preregister adequately powered confirmatory comparisons;
+  \item evaluate intermediate candidates on common validation data to measure time to target without consulting test data;
+  \item run scale-out studies that vary replicas and concurrency and report throughput per cost;
+  \item measure telemetry completeness, overhead, recovery, and reprocessing;
+  \item repeat the protocol with other corpora, classifiers, splits, and hardware.
+\end{itemize}
+
+In summary, G-FShield demonstrates a distributed and traceable GRASP-FS integration and produces an auditable experimental dataset. Its quantitative results delimit observed quality, dimensionality reduction, and resource consumption without extrapolating to statistical significance, architectural causality, or operational readiness.

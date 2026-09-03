@@ -1,0 +1,476 @@
+%% Copyright 2012-2018 by UNIPAMPA LaTeX group at https://bitbucket.org/unipampaalegrete/monografias-cc-es-repo/
+%%
+%% This work may be distributed and/or modified under the conditions of the LaTeX Project Public
+%% License, either version 1.3 of this license or (at your option) any later version.
+%% The latest version of this license is in
+%%   http://www.latex-project.org/lppl.txt
+%% and version 1.3 or later is part of all distributions of LaTeX version 2005/12/01 or later.
+%%
+%% Based on the example file abtex2-modelo-trabalho-academico.tex of the abntex2 package
+%% (http://abntex2.googlecode.com/) and on the ppgccufmg 1.45beta2 class
+%% (http://vilarneto.com/ppgccufmg,
+%% http://www.dcc.ufmg.br/pos/alunos/modelodisstese.php
+%% and http://www.dcc.ufmg.br/~mirella).
+%%
+%% Adapted for the Computer Science program at UNIPAMPA (http://www.unipampa.edu.br)
+%% by Fabio Kepler (fabio@kepler.pro.br) and Jean Cheiran (jeancheiran@unipampa.edu.br).
+%
+%% Version 2.5 - 2018/08
+%% Version 2.4 - 2017/05
+%% Version 2.3 - 2013/03
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Este modelo utiliza o pacote abnTeX2. Veja como instalá-lo em seu ambiente em
+% http://abntex2.googlecode.com/.
+% ---------------------------------------------------------------------
+% abnTeX2: Modelo de Trabalho Acadêmico (tese de doutorado, dissertação de
+% mestrado e trabalhos monográficos em geral) em conformidade com
+% ABNT NBR 14724:2011: Informação e documentação - Trabalhos acadêmicos -
+% Apresentação
+% ---------------------------------------------------------------------
+% Normas institucionais utilizadas:
+% http://porteiras.r.unipampa.edu.br/portais/sisbi/programa-de-capacitacao/
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+\pdfminorversion=7
+\documentclass[12pt,
+               oneside,
+               a4paper,
+               brazil,
+               chapter=TITLE,
+               table]{abntex2}    % frente e verso
+%\documentclass[12pt,oneside,a4paper]{abntex2}            % apenas frente
+\setlength{\emergencystretch}{3em} % evita estouro de margem em termos técnicos longos
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% PACOTES
+% ---------------------------------------------------------------------
+% Pacotes fundamentais
+\usepackage{cmap}           % Mapeamento de caracteres especiais no PDF
+\usepackage{lmodern}        % Usa fonte Latin Modern
+\usepackage[T1]{fontenc}    % Seleção de codificação de fonte
+\usepackage[utf8]{inputenc} % Codificação do arquivo (conversão automática dos acentos)
+\usepackage[brazil]{babel}  % Idioma para hifenização e tradução de vários elementos
+\usepackage{makeidx}        % Criação de índice
+\usepackage{hyperref}       % Formatação do índice
+\usepackage{lastpage}       % Usado pela Ficha catalográfica
+\usepackage{indentfirst}    % Indenta o primeiro parágrafo de cada seção
+\usepackage[usenames,dvipsnames]{xcolor}  % Controle das cores (com nomes)
+\usepackage{graphicx}       % Inclusão de gráficos
+\usepackage{amsmath}        % Equações das métricas de seleção
+\usepackage{booktabs}       % Formatação de tabelas
+\usepackage{makecell}       % Formatação de tabelas - combinar várias linhas de texto em uma única célula de tabela
+\usepackage{url}            % Formatação de tabelas - url
+\usepackage{pdflscape}
+%\usepackage[table,xcdraw]%{xcolor} % Formatação de tabelas
+\usepackage{colortbl}
+\definecolor{gray}{gray}{.8}
+\usepackage{multirow} %tabelas multilinhas / colunas
+\usepackage[utf8]{inputenc} %formatação com reconhecimento de caracteres especiais - overleaf informou que se deve declarar neste arquivo
+% ---------------------------------------------------------------------
+% Para citações
+\usepackage[brazilian,hyperpageref]{backref} % Páginas com as citações na bibliografia
+\usepackage[alf,abnt-emphasize=bf]{abntex2cite} % Citações padrão ABNT (alfanumérico)
+%\usepackage{natbib} % Citações com páginas no texto
+% ---------------------------------------------------------------------
+% Pacotes opcionais
+%\usepackage[table]{xcolor} %tabela com quebra de linha automática
+\usepackage{tabularx} %tabela com quebra de linha automática
+\usepackage{booktabs} %tabela
+%\usepackage{cite} % Se necessário
+%\usepackage{hyperref} % Se necessário
+\usepackage{appendix} %Para os apêndices, https://www.youtube.com/watch?v=2X-yz800GJ4
+
+\usepackage{nomencl}        % Para criar uma lista de símbolos
+%\usepackage{acro}           % Para usar acrônimos e abreviaturas
+\usepackage{tikz}           % Para fazer figuras, diagramas e gráficos integrados e elegantes
+\usepackage{pgfplots}       % Usa o pacote tikz para fazer gráficos muito melhores que os do Excel
+\usepackage{pgfplotstable}  % Para gerar tabelas automaticamente a partir de arquivos com dados
+%\usepackage{filecontents}   % Para colocar o conteúdo de um arquivo dentro de um arquivo tex
+
+\setlength {\marginparwidth }{2cm} % Warning do Todonotes
+\usepackage{todonotes}      % Para criar anotações durante o desenvolvimento do texto
+%\usepackage{multirow}       % Permite fazer tabelas com múltiplas linhas
+%\let\newfloat=\undefined    % Workaround para usar o pacote algorithm
+%\usepackage{algorithm}      % Para escrever algoritmos
+%\usepackage{clrscode}       % Para escrever algoritmos
+%\usepackage{clrscode3e}     % Para escrever algoritmos; mais simples que os pacotes acima
+%\usepackage{pdfpages}        % Para incluir a folha de aprovação assinada em PDF
+\usepackage{pdfpages}
+\usepackage{array,graphicx}
+\usepackage{booktabs}
+
+
+% Mk
+
+%\usepackage{minted}
+%\usepackage[nopostdot,nonumberlist]{glossaries}
+\usepackage{acro}[=v2.10]
+%\usepackage[version=2]{acro}
+
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.8}
+\usepgfplotslibrary{statistics}
+
+
+\colorlet{punct}{red!60!black}
+\definecolor{background}{HTML}{EEEEEE}
+\definecolor{delim}{RGB}{20,105,176}
+\colorlet{numb}{magenta!60!black}
+
+% Pacote para a criação da lista de abreviaturas e siglas:
+%\usepackage{acro}[=v3]
+  \NewAcroTemplate[list]{unipampa}{
+    \acroheading
+    \acropreamble
+    \begin{description}
+      \acronymsmapF{
+        \item \acrowrite{short}\acroifT{alt}{/\acrowrite{alt}}
+        \hspace{1pt}--\hspace{4pt}
+        \acrowrite{list}
+        \acroifanyT{foreign,extra}{ (}
+        \acroifT{foreign}{\acrowrite{foreign}\acroifT{extra}{, }}
+        \acroifT{extra}{\acrowrite{extra}}
+        \acroifanyT{foreign,extra}{)}
+        \acropagefill
+        \acropages
+          {\acrotranslate{page}\nobreakspace}
+          {\acrotranslate{pages}\nobreakspace}
+      }
+      {\item\AcroRerun}
+    \end{description}
+  }
+  \acsetup{first-style = long-short, subsequent-style = short, list/template = unipampa, list/display = used, pages/display = none}
+  \input{acronimos}
+
+
+% ---------------------------------------------------------------------
+% Configurações de pacotes
+% ---------------------------------------------------------------------
+\addto\captionsbrazil{
+  \renewcommand{\listfigurename}{Lista de Figuras}
+}
+
+\usepackage{listings}
+
+\usepackage{color}
+\definecolor{gray}{rgb}{0.4,0.4,0.4}
+\definecolor{darkblue}{rgb}{0.0,0.0,0.6}
+\definecolor{cyan}{rgb}{0.0,0.6,0.6}
+
+\lstset{
+  basicstyle=\ttfamily,
+  columns=fullflexible,
+  showstringspaces=false,
+  commentstyle=\color{gray}\upshape
+}
+
+\lstdefinelanguage{XML}
+{
+  morestring=[b]",
+  morestring=[s]{>}{<},
+  morecomment=[s]{<?}{?>},
+  stringstyle=\color{black},
+  identifierstyle=\color{darkblue},
+  keywordstyle=\color{cyan},
+  morekeywords={xmlns,version,type}% list your attributes here
+}
+
+\def\checkmark{\tikz\fill[scale=0.4](0,.35) -- (.25,0) -- (1,.7) -- (.25,.15) -- cycle;} 
+
+\newcommand*\rot{\rotatebox{45}}
+% ---------------------------------------------------------------------
+% Configurações do pacote backref
+% Usado sem a opção hyperpageref de backref
+\renewcommand{\backrefpagesname}{Citado na(s) página(s):~}
+% Texto padrão antes do número das páginas
+\renewcommand{\backref}{}
+% Define os textos da citação
+\renewcommand*{\backrefalt}[4]{
+    \ifcase #1 %
+        Nenhuma citação no texto.%
+    \or
+        Citado na página #2.%
+    \else
+        Citado #1 vezes nas páginas #2.%
+    \fi}%
+% ---------------------------------------------------------------------
+% Configurações de aparência do PDF final
+%\definecolor{blue}{RGB}{41,5,195}
+% \definecolor{webgreen}{rgb}{0,.5,0}
+% Metainformações do PDF e cores dos links
+
+\hypersetup{
+  portuguese,
+  %backref=true,
+  %pagebackref=true,
+  %bookmarks=true,             % show bookmarks bar?
+  %bookmarksnumbered=true,
+  bookmarksdepth=4,
+  %pdftitle={\meutitulo},
+  %pdfauthor={\meuautor},
+  %pdfsubject={\meuassunto},
+  pdfkeywords={G-FShield}{Engenharia de Software}{Seleção de Características}{Sistemas Ciber-Físicos}{abntex},
+  %pdfproducer={LaTeX with abnTeX2},     % producer of the document
+  %pdfcreator={\meuautor},
+  colorlinks=true,           % false: boxed links; true: colored links
+  linkcolor=black,            % color of internal links
+  citecolor=black,            % color of links to bibliography
+  filecolor=black,         % color of file links
+  urlcolor=black
+}
+%   linktocpage,
+%   colorlinks,
+%   citecolor=webgreen,
+%   urlcolor=Maroon,
+%   linkcolor=RoyalBlue,
+%   filecolor=black,
+% ---------------------------------------------------------------------
+% Espaçamentos entre linhas e parágrafos
+% O tamanho do parágrafo é dado por
+% \setlength{\parindent}{1.3cm}
+% Controle do espaçamento entre um parágrafo e outro
+% \setlength{\parskip}{0.2cm} % tente também \onelineskip
+% Controles do espaçamento entre linhas
+%\OnehalfSpacing       % espaçamento um e meio (padrão);
+%\DoubleSpacing        % espaçamento duplo
+%\SingleSpacing        % espaçamento simples
+
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0cm}
+
+\providecommand{\setlist}[1]{}
+\setlist{topsep=0cm,partopsep=0cm,parsep=0cm,itemsep=0cm,leftmargin=1.75cm}
+
+% ---------------------------------------------------------------------
+% Para o pacote de acrônimos
+% \acsetup{hyperref=true,index=true} %first-style=short}
+% ---------------------------------------------------------------------
+% Para o pacote tikz, pgfplots e pgfplotstable
+\usetikzlibrary{arrows,chains,matrix,positioning,decorations.pathreplacing,calc}
+% ---------------------------------------------------------------------
+% Para poder usar subfiguras e subtabelas
+\newsubfloat{figure}
+\newsubfloat{table}
+\providecommand*{\subfigureautorefname}{\figureautorefname}
+% ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+% ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Informações de dados para CAPA e FOLHA DE ROSTO
+% ---------------------------------------------------------------------
+
+\titulo{G-FShield: Seleção Distribuída e Observável de Características para Detecção de Intrusão em Sistemas Ciber-Físicos}
+\autor{Nícolas Naves Rezende Faria}
+\local{Alegrete}
+\data{2026}
+\orientador{Prof. Dr. Silvio E. Quincozes}
+% \coorientador{Tiago Gazzoni Soldá} % Se houver
+\instituicao{Universidade Federal do Pampa}
+%\tipotrabalho{Qualification~}
+\tipotrabalho{Dissertação}
+% O preambulo deve conter o tipo do trabalho, o objetivo, o nome da instituição e a área de concentração
+\preambulo{\imprimirtipotrabalho{} apresentada ao Programa de Pós-Graduação em Engenharia de Software (PPGES) como requisito parcial para a obtenção do título de Mestre em Engenharia de Software.}
+% ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+% ---------------------------------------------------------------------
+% Compila o indice
+\makeindex
+% Compila a lista de abreviaturas e siglas
+% Para funcionar, o seguinte comando deve ser executado:
+% makeindex ARQUIVO_PRINCIPAL.nlo -s nomencl.ist -o ARQUIVO_PRINCIPAL.nls
+\makenomenclature
+% ---------------------------------------------------------------------
+
+% Nomenclaturas/Símbolos
+% \nomenclature{$A_i$}{Área do $i^{esimo}$ componente}
+% \nomenclature{456}{Isto é um número}
+% \nomenclature{123}{Isto é outro número}
+% \nomenclature{$n$}{Tamanho da entrada}
+% \nomenclature{$V$}{Vetor de elementos}
+% \nomenclature{$\mathcal{T}$}{Conjunto de trabalhos de TCC}
+
+% ---------------------------------------------------------------------
+
+% Inclui alguns ajustes finos para que fique de acordo com o Manual de Normatização
+%\include{consertos}
+
+%\makeglossaries
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%\input{acronimos}
+
+% Correção de hifernização de determinadas palavras
+\hyphenation{ re-la-cio-na-dos }
+
+\usepackage{tablefootnote} % for table footnotes
+
+% **********************************************************************
+\begin{document}
+% **********************************************************************
+
+% Inclui alguns ajustes finos para que fique de acordo com o Manual de Normatização
+\include{consertos}
+
+% ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% ELEMENTOS PRÉ-TEXTUAIS
+% ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% \pretextual
+
+% -----------------------------------------------
+% Capa [OBRIGATÓRIO]
+% -----------------------------------------------
+\imprimircapa
+
+% -----------------------------------------------
+% Folha de rosto [OBRIGATÓRIO]
+% -----------------------------------------------
+% (ver documentação do abntex2 caso seja necessário haver ficha catalográfica)
+\imprimirfolhaderosto
+
+% FICHA CATALOGRAFICA
+%\includepdf[pages={1}]{pretextuais/E17i.pdf}
+
+% -----------------------------------------------
+% Ficha Catalográfica [OBRIGATÓRIO]
+% -----------------------------------------------
+% Veja alguns detalhes no arquivo.
+\input{pretextuais/fichacatalografica}
+
+% -----------------------------------------------
+% Folha de aprovação [OBRIGATÓRIO]
+% -----------------------------------------------
+% Veja alguns detalhes no arquivo.
+ \input{pretextuais/folhadeaprovacao}
+%\includepdf[pages={1,2}]{pretextuais/folha-aprovacao.pdf}
+
+% -----------------------------------------------
+% Dedicatória [OPCIONAL]
+% -----------------------------------------------
+
+% -----------------------------------------------
+% -----------------------------------------------
+
+% -----------------------------------------------
+% Epígrafe [OPCIONAL]
+% -----------------------------------------------
+
+% -----------------------------------------------
+% Resumo [OBRIGATÓRIO]
+\input{pretextuais/resumo}
+% -----------------------------------------------
+
+% -----------------------------------------------
+% Abstract (resumo em inglês) [OBRIGATÓRIO]
+% -----------------------------------------------
+\input{pretextuais/abstract}
+
+% -----------------------------------------------
+% Listas
+% -----------------------------------------------
+% Figuras/Ilustrações [OPCIONAL]
+\pdfbookmark[0]{\listfigurename}{lof}
+\listoffigures*
+\cleardoublepage
+% -----------------------------------------------
+% Tabelas [OPCIONAL]
+\pdfbookmark[0]{\listtablename}{lot}
+\listoftables*
+\cleardoublepage
+% -----------------------------------------------
+% % Lista de Abreviaturas e Siglas [OPCIONAL] (veja o pacote acro e os exemplo acima)
+%\listoffigures*
+\newcommand{\lobname}{Lista de Abreviaturas e Siglas}
+\pdfbookmark[0]{\lobname}{lob}
+\printacronyms[name=\lobname]
+\cleardoublepage
+% -----------------------------------------------
+% Sumário
+% -----------------------------------------------
+\pdfbookmark[0]{\contentsname}{toc}
+\tableofcontents*
+\cleardoublepage
+% -----------------------------------------------
+
+\begin{comment}
+  %cutter={M1234x}, % INFORMAÇÃO QUE VAI NA FICHA CATALOGRÁFICA
+  %cdu={100.0*01.10},  % Define o identificador CDU do documento, fornecido pela Secretaria do Curso (verificar se é necessário).
+  keywords={Modelo de texto, UNIPAMPA, Latex}, % Define as palavras-chave que deverão constar na Ficha Catalográfica, separadas por vírgulas.
+  firstcommitteemember={Nome membro da banca 1\\ UNIPAMPA},
+  secondcommitteemember={Nome membro da banca 2\\ Institution},
+\end{comment}
+
+
+
+% ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% ELEMENTOS TEXTUAIS
+% ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% É possível usar \textual ou \mainmatter, que é a macro padrão do memoir.
+\textual
+
+% Redefine a apresentação das siglas após o resumo
+\acresetall
+
+\input{textuais/introducao}
+
+\input{textuais/fundamentacao-teorica}
+
+\input{textuais/trabalhos-relacionados}
+
+\input{textuais/desenvolvimento}
+
+\input{textuais/avaliacao}
+
+\input{textuais/conclusao}
+
+%\input{textuais/trabalhos-futuros} %ocultado pois vai junto com a conclusão
+
+% ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% ELEMENTOS PÓS-TEXTUAIS
+% ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\postextual
+
+%\input{postextuais/anexos}
+% -----------------------------------------------
+% Bibliografia [OBRIGATORIO]
+% -----------------------------------------------
+% Nome(s) do(s) arquivo(s) .bib (sem a extensão)
+\bibliography{gfshield-references}
+
+% -----------------------------------------------
+% Apendices [OPCIONAL]
+% -----------------------------------------------
+
+\input{postextuais/apendices}
+
+%\begin{apendicesenv}
+
+%\partapendices
+
+%\input{postextuais/apendice_a_survey}
+
+%\input{postextuais/apendice_b_glossario_candidatos}
+
+%\input{postextuais/apendice_c_glossario_classes}
+
+%\input{postextuais/apendice_d_glossario_prop_classes}
+
+%\input{postextuais/apendice_e_dicionario}
+   
+%\end{apendicesenv}
+
+
+
+% -----------------------------------------------
+% Anexos [OPCIONAL]
+% -----------------------------------------------
+% \input{postextuais/anexos}
+
+% -----------------------------------------------
+% Índice Remissivo [OPCIONAL]
+% -----------------------------------------------
+% Veja o pacote makeindex para mais informações
+% \printindex
+
+
+\end{document}

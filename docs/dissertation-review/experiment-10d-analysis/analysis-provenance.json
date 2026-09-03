@@ -1,0 +1,22 @@
+{
+  "campaign_id": "gfshield-10d-2026-v1",
+  "valid_runs": 216,
+  "failed_attempts_excluded": 12,
+  "expected_seeds": [
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49
+  ],
+  "target_f1": 0.95,
+  "bootstrap_repetitions": 20000,
+  "bootstrap_seed": 20260902,
+  "cpu_budget_cores": 8.0,
+  "memory_budget_mib": 16384.0,
+  "manifest_sha256": "29fdc973ad6b243b297e34fcd539f5826aac4ce8a0870e8a5cea5caacfc9adc4",
+  "campaign_state_sha256": "e28790b2ae135b2f9037477fa0bc8e0535856766052e7509c6867db5c7eb06cd"
+}

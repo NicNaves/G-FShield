@@ -1,0 +1,25 @@
+\chapter{Conclusão}
+\label{chapter:conclusao}
+
+Esta dissertação apresentou o \textit{G-FShield}, uma arquitetura distribuída, orientada a eventos e observável para GRASP-FS em \acp{ids} aplicados a \acp{cps}. A implementação separa rankings e construção inicial, controle de vizinhanças, operadores de busca local, verificação e monitoramento; Apache Kafka integra os estágios, enquanto o backend e a interface permitem consultar sinais persistidos da execução.
+
+A campanha formal respondeu à RQ1 com unidades ponta a ponta comuns. Foram avaliados 24 braços G-FShield, dois monólitos e um baseline com todas as características, cada qual em oito sementes independentes. RF--VND--IWSSR foi escolhido pela validação e obteve F1 macro mediano de 0,9448 no teste com 11 dos 51 preditores, redução de 78,4\%. O baseline obteve 0,9378, o Monólito~1 0,9397 e o Monólito~2 0,8411. A diferença diante do baseline é descritiva; nenhuma das 72 comparações exploratórias ajustadas por Holm apresentou $p<0{,}05$.
+
+Para a RQ2, as medianas das configurações distribuídas variaram de 0,8671 a 0,9448. As combinações VND--BF ficaram abaixo das que exploraram IWSS/IWSSR neste protocolo, mas todas as 208 buscas terminaram pelo limite, e não há evidência de convergência. O tempo até F1 macro 0,95 não pode ser derivado do escore interno legado, que usa outra agregação. Para a RQ3, o teto de oito CPUs e 16~GiB foi comum: as execuções distribuídas consumiram medianas globais de 3,56 núcleos e 5.317~MiB, acima dos monólitos, sem que isso prove eficiência ou ineficiência arquitetural.
+
+Quanto à RQ4, manifesto, comandos resolvidos, hashes, identificadores de campanha e execução, sementes, estados, motivos de parada, timestamps, mensagens, CSVs internos, logs, métricas finais e telemetria permitem reconstruir o que foi capturado. A aplicação também persiste eventos por semente e estágio. Não foram medidos completude ou custo da telemetria, perda e duplicação sob falhas, tempo de recuperação ou reprocessamento; resiliência, tolerância a falhas e escalabilidade permanecem objetivos de projeto.
+
+A principal ameaça remanescente é algorítmica: o G-FShield escolhe candidatos com o F1 binário legado e \texttt{normalClass=0}, embora o índice 0 do ARFF seja \textit{grayhole}; os monólitos usam F1 macro durante a busca. A avaliação final comum torna os resultados finais comparáveis, mas a diferença de objetivo impede atribuí-los somente à arquitetura. A evidência também se limita a um servidor, um corpus, um particionamento, J48 e oito sementes.
+
+Como trabalhos futuros:
+
+\begin{itemize}
+  \item corrigir o mapeamento da classe pelo rótulo e usar a mesma função objetivo multiclasse em todos os executores;
+  \item aumentar o número de sementes e pré-registrar comparações confirmatórias com poder adequado;
+  \item avaliar candidatos intermediários na validação comum para medir tempo até o alvo sem consultar o teste;
+  \item executar estudos de \textit{scale-out} que variem réplicas e concorrência e relatem vazão por custo;
+  \item medir completude, \textit{overhead}, recuperação e reprocessamento da telemetria;
+  \item repetir o protocolo com outros corpora, classificadores, particionamentos e hardware.
+\end{itemize}
+
+Em síntese, o G-FShield demonstra uma integração distribuída e rastreável de GRASP-FS e produz um conjunto experimental auditável. Seus resultados quantitativos delimitam qualidade, redução dimensional e consumo observados, sem extrapolá-los para significância estatística, causalidade arquitetural ou prontidão operacional.

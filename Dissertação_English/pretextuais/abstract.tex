@@ -1,0 +1,12 @@
+\begin{resumo}[Abstract]
+
+Feature selection reduces the dimensionality of data used by intrusion detection systems, but sequential implementations make it difficult to distribute search and inspect intermediate results. This dissertation introduces \textit{G-FShield}, a distributed, event-driven architecture for GRASP-FS applied to cyber-physical systems. It separates restricted-candidate-list generation from local search, uses Apache Kafka for communication, and persists events, metrics, states, identifiers, and timestamps queried through a web layer.
+
+A reproducible campaign, bounded to ten days, evaluated 24 G-FShield configurations, two monoliths, and an all-51-feature baseline. Each arm used eight independent seeds, the same stratified training/validation/test split, Weka J48 3.8.6 as the final evaluator, and an aggregate ceiling of eight CPUs and 16~GiB. The campaign produced 216 valid runs. The validation-selected ReliefF--VND--IWSSR configuration achieved median test macro-F1 0.9448 with 11 features, a 78.4\% dimensionality reduction; the baseline achieved 0.9378. None of the 72 exploratory Holm-adjusted comparisons had $p<0.05$.
+
+The results demonstrate architectural integration, experimental traceability, and descriptive differences, not architectural causality, scalability, or fault tolerance. G-FShield's legacy internal objective still differs from the macro-F1 used by the monoliths during search, and the \textit{grayhole} and \textit{normal} classes remain harder. Telemetry completeness and cost, recovery, reprocessing, horizontal scaling, and generalization to other data and classifiers require dedicated experiments.
+
+\noindent
+\textbf{Keywords}: feature selection, intrusion detection, cyber-physical systems, GRASP-FS, distributed systems, observability.
+
+\end{resumo}

@@ -1,0 +1,86 @@
+% Pequenos consertos e ajustes para que fique de acordo com o Manual de Normatização 2011.
+
+\setlength{\ABNTEXsignwidth}{12cm}
+
+% ---
+% Impressão da Capa
+\renewcommand{\imprimircapa}{%
+  \begin{capa}%
+    \center
+    {\ABNTEXchapterfont\large\MakeUppercase\imprimirinstituicao}
+
+    \vspace*{\fill}
+    {\ABNTEXchapterfont\large\imprimirautor}
+
+    \vspace*{\fill}
+    {\ABNTEXchapterfont\bfseries\Large\imprimirtitulo}
+
+    \vspace*{\fill}
+    ~
+    \vspace*{\fill}
+
+    {\large\bfseries\imprimirlocal}
+    \par
+    {\large\bfseries\imprimirdata}
+
+    \vspace*{1cm}
+  \end{capa}
+}
+% ---
+
+
+% ---
+% Impressão da Folha de Rosto
+\makeatletter
+\renewcommand{\folhaderostocontent}{
+  \begin{center}
+
+    {\ABNTEXchapterfont\large\imprimirautor}
+
+    \vspace*{\fill}%\vspace*{\fill}
+    {\ABNTEXchapterfont\bfseries\Large\imprimirtitulo}
+    \vspace*{\fill}
+
+    \abntex@ifnotempty{\imprimirpreambulo}{%
+      \hspace{.45\textwidth}
+      \begin{minipage}{.5\textwidth}
+        {\SingleSpacing
+        \imprimirpreambulo}
+
+        \vspace*{1em}
+        \imprimirorientadorRotulo~\imprimirorientador\par
+
+        \abntex@ifnotempty{\imprimircoorientador}{%
+          \vspace*{1em}
+          \imprimircoorientadorRotulo~\imprimircoorientador%
+        }%
+
+      \end{minipage}%
+      \vspace*{\fill}
+    }%
+
+    {\large\bfseries\imprimirlocal}
+    \par
+    {\large\bfseries\imprimirdata}
+    \vspace*{1cm}
+
+  \end{center}
+}
+\makeatother
+% ---
+
+% ---
+\renewcommand{\ABNTEXchapterfont}{\rmfamily\bfseries}
+\setsecheadstyle{\rmfamily\bfseries}
+\renewcommand{\ABNTEXchapterfontsize}{\normalsize}
+\renewcommand{\ABNTEXsectionfontsize}{\normalsize}
+\renewcommand{\ABNTEXsubsectionfontsize}{\normalsize}
+\renewcommand{\ABNTEXsubsubsectionfontsize}{\normalsize}
+\renewcommand{\ABNTEXsubsubsubsectionfontsize}{\normalsize}
+
+% Espaçamento entre título e texto
+\setlength\afterchapskip{\lineskip}
+
+% Espaçamento entre parágrafos
+\setlength{\parskip}{0.cm}
+

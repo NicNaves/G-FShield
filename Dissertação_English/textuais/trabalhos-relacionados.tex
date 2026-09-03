@@ -1,0 +1,55 @@
+\chapter{Related Work}
+\label{chapter:relacionados}
+
+This chapter positions \textit{G-FShield} in the literature on \acp{ids} for \acp{cps}, GRASP-FS, distributed architectures, and observability.
+
+\section{Intrusion Detection in Cyber-Physical Systems}
+
+\citeonline{Cardenas2009}, \citeonline{Mitchell2014}, and \citeonline{Alcaraz2019} show that CPS security must consider the coupling of software, networks, and physical assets. In digital substations, the \ac{iec} literature discusses specific traffic and timing requirements \cite{iec61850,mackiewicz2006overview,aftab2020iec}. \citeonline{quincozes2021survey} and \citeonline{quincozes2022ereno} stress the importance of realistic corpora for IDS evaluation.
+
+\section{Feature Selection and GRASP-FS}
+
+\citeonline{Hall1999,Saeys2007,guyon2003introduction} present feature selection as a technique for reducing redundancy and processing cost. Outside the specific lineage of this dissertation, \citeonline{yusta2009different} compares metaheuristic strategies for feature selection, and \citeonline{esseghir2010effective} combines filters and wrappers in a GRASP scheme. These works address search design but not operation of an observable distributed pipeline.
+
+GRASP is grounded by \citeonline{ResendeRibeiro2010}; its use for IDS feature selection is investigated by \citeonline{quincozes2020grasp,quincozes2021performance,quincozes2022extended}. Recent surveys indicate that metaheuristics remain relevant to attack detection in industrial and IIoT environments \cite{Termanini2025Survey,Francis2026MFSReview}. This trajectory supports the algorithmic components reused by G-FShield, not a claim of a new algorithm.
+
+\section{Distributed Architectures and Observability}
+
+Earlier work explored parallelism in parts of GRASP-FS. \citeonline{Silva2023GDLSFS} distributes local search, whereas \citeonline{Naves2023DRG} distributes restricted-candidate-list generation. In metaheuristics from another domain, \citeonline{SUBRAMANIAN20101899} exemplifies parallel search but does not address feature selection or the operational integration studied here.
+
+In another line of work, distributed-systems research grounds component decoupling \cite{Tanenbaum2007Distributed}. Service decomposition is discussed by \citeonline{Newman2021}, and messaging logs by \citeonline{Kreps2011}. Site-reliability work addresses operational telemetry \cite{beyer2016site,mateus2021security}. Observability surveys discuss diagnosis in service architectures \cite{usman2022observabilitysurvey,Faseeha2025MicroservicesObs}. \citeonline{wu2012online}, in turn, addresses feature selection from streaming features. That is a different problem: the evaluated G-FShield receives a pre-materialized corpus and does not perform online selection. Among the works examined, none combines DRG, DLS, event persistence, and operational queries in a GRASP-FS flow; because the search was not systematic, this conclusion is limited to the set actually analyzed.
+
+\section{Identified Gap}
+
+\textit{G-FShield} integrates distributed generation, distributed local search, result persistence, and telemetry visualization in one architecture. Its central contribution is architectural and software-engineering-oriented: end-to-end integration, orchestration, and process traceability. DRG and DLS build on prior work and are not presented as a new search algorithm.
+
+\section{Comparative Table}
+
+Table~\ref{tab:related_work_gfshield} summarizes the discussed capabilities. ``Distributed construction'' means distributing initial-solution formation; ``distributed refinement'', distributing local search; ``E2E integration'', connecting both in one flow; and ``telemetry'', persisting signals that can reconstruct an execution. The table does not attribute online selection to G-FShield.
+
+\begin{landscape}
+\begin{table}[p]
+\centering
+\scriptsize
+\caption{Summary of related work cited in this manuscript.}
+\label{tab:related_work_gfshield}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{.20\linewidth}*{6}{>{\centering\arraybackslash}p{.105\linewidth}}}
+\toprule
+\textbf{Reference} & \textbf{CPS/ IDS} & \textbf{GRASP- FS} & \shortstack{\textbf{Distributed}\\\textbf{construction}} & \shortstack{\textbf{Distributed}\\\textbf{refinement}} & \shortstack{\textbf{E2E}\\\textbf{integration}} & \textbf{Telemetry} \\
+\midrule
+Resende and Ribeiro (2016) & -- & \checkmark & -- & -- & -- & -- \\
+Yusta (2009); Esseghir et al. (2010) & -- & Partial & -- & -- & -- & -- \\
+Quincozes et al. (2020--2022) & \checkmark & \checkmark & -- & -- & -- & -- \\
+Silva et al. (2023) & \checkmark & \checkmark & -- & \checkmark & Partial & -- \\
+Faria et al. (2023) & \checkmark & \checkmark & \checkmark & -- & Partial & -- \\
+Beyer et al. (2016); Usman et al. (2022) & -- & -- & -- & -- & -- & \checkmark \\
+Wu et al. (2013) & -- & -- & -- & -- & -- & -- \\
+\textbf{This work (G-FShield)} & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{landscape}
+
+The table therefore supports an architectural distinction: G-FShield connects feature-selection stages and their operational signals. A claim of exhaustive literature coverage would require a systematic review or a documented bibliographic strategy.

@@ -1,0 +1,23 @@
+\chapter{Introdução}
+\label{chapter:introducao}
+
+Sistemas ciber-físicos (CPS) conectam software, redes e processos físicos em ambientes nos quais desempenho e confiabilidade precisam coexistir. Em infraestruturas críticas, uma falha de segurança pode afetar sistemas computacionais, ativos físicos e continuidade de serviço \cite{Cardenas2009,Mitchell2014,Alcaraz2019}. Sistemas de detecção de intrusão (IDS) precisam, portanto, lidar com dados de alta dimensionalidade, restrições de tempo e necessidade de rastreabilidade operacional.
+
+A seleção de características reduz a dimensionalidade e a redundância antes da classificação \cite{Hall1999,Saeys2007,guyon2003introduction}. O GRASP original combina construção gulosa-randômica e busca local \cite{ResendeRibeiro2010}. A adaptação GRASP-FS para seleção de características é tratada por \citeonline{quincozes2020grasp,quincozes2021performance,quincozes2022extended}. Nas implementações monolíticas estudadas, ranking, construção, refinamento e registro da execução permanecem no mesmo processo, o que restringe a separação de responsabilidades e a inspeção de etapas.
+
+Esta dissertação propõe o \textit{G-FShield}, uma arquitetura distribuída e orientada a eventos para GRASP-FS em \acp{ids} aplicados a \acp{cps}. A \ac{drg} calcula quatro rankings independentes e constrói soluções iniciais; a \ac{dls} combina VND ou RVND com Bit-Flip, IWSS e IWSSR para refiná-las. Apache Kafka conecta os estágios, e uma camada web consulta eventos, métricas, estados, identificadores, timestamps e resultados intermediários persistidos. Observabilidade, aqui, significa inspecionar o estado externo registrado da busca, não explicar causalmente a decisão do classificador.
+
+O objetivo geral é projetar, implementar e avaliar essa decomposição distribuída sob um protocolo rastreável. Os objetivos específicos são:
+
+\begin{itemize}
+  \item separar geração de candidatos, controle de vizinhanças, busca local, verificação e monitoramento;
+  \item disponibilizar uma camada web para acompanhar execuções e artefatos persistidos;
+  \item comparar qualidade, redução dimensional, tempo e recursos com monólitos e um baseline sob dados, avaliador e teto computacional comuns;
+  \item preservar proveniência suficiente para reconstruir as execuções e explicitar propriedades ainda não medidas.
+\end{itemize}
+
+A avaliação é orientada por quatro perguntas. \textbf{RQ1}: sob o protocolo comum, quais qualidade preditiva e redução dimensional são obtidas pelas configurações G-FShield, pelos monólitos e pelo baseline com todas as características? \textbf{RQ2}: como ranking da RCL, controlador de vizinhança e preferência de busca local se relacionam descritivamente com a solução final e com o tempo limitado de busca? \textbf{RQ3}: quais CPU e memória são observadas em cada arquitetura sob o mesmo teto agregado, sem confundir consumo com eficiência? \textbf{RQ4}: quais eventos, identificadores, métricas e artefatos permitem reconstruir uma execução, e quais propriedades de observabilidade e recuperação permanecem não avaliadas?
+
+A contribuição inclui a arquitetura implementada e uma campanha formal com 27 braços, oito sementes por braço, divisão estratificada de treino/validação/teste, avaliador final comum e manifesto verificável. A independência de corpus é arquitetural, não um resultado experimental: a entrada deve ser tabular, rotulada e compatível com o contrato dos serviços. A avaliação cobre apenas o corpus ERENO e o classificador J48.
+
+O restante da dissertação está organizado da seguinte forma. O Capítulo~\ref{chapter:fundamentacao} apresenta os fundamentos; o Capítulo~\ref{chapter:relacionados} discute trabalhos relacionados; o Capítulo~\ref{chapter:desenvolvimento} descreve arquitetura e implementação; o Capítulo~\ref{chapter:avaliacao} detalha protocolo e resultados; e o Capítulo~\ref{chapter:conclusao} sintetiza conclusões, limitações e trabalhos futuros.

@@ -1,0 +1,124 @@
+\chapter{Evaluation}
+\label{chapter:avaliacao}
+
+This chapter presents the formal experimental campaign, bounded to ten days, run on the same server for G-FShield, both monoliths, and an all-features baseline. The single source for this analysis is the result set identified by the manifest whose SHA-256 is:
+\begin{center}
+\small\texttt{29fdc973ad6b243b297e34fcd539f5826aac4ce8a0870e8a5cea5caacfc9adc4}.
+\end{center}
+The historical CSV files in \texttt{tmp\_metrics/}, which contained the discrepancy between 25,873 raw lines and 25,836 lines with valid F1, are not combined with the new campaign. Neither count is therefore used as a comparative result.
+
+\section{Experimental Protocol}
+
+The preserved ERENO corpus contains 199,998 instances, 51 predictors, and nine classes. A stratified split, frozen before the searches with seed 20260825, produced 119,998 training, 40,000 validation, and 40,000 test instances. The SHA-256 prefixes for the source, training, validation, and test data are \texttt{60ebfcdc9c20}, \texttt{5876bf5570b7}, \texttt{c44a00ca554c}, and \texttt{05d393c5881a}; the full values are in the manifest. The test set remained unavailable to the search and was evaluated once after validation selected the solution.
+
+Every final solution was reevaluated by the same image with Weka J48 3.8.6, a pruned tree, confidence factor 0.25, and a minimum of two instances per leaf. The primary metric is macro-F1 on the 0--1 scale; macro precision and recall, weighted F1, accuracy, and per-class F1 were preserved as complementary measures.
+
+The matrix has 27 arms: 24 distributed configurations, two monoliths, and the baseline. Each arm uses independent seeds 42--49, totaling 216 valid runs. Distributed configurations cross four RCL rankings (IG, GR, SU, and ReliefF), two controllers (VND and RVND), and three initial local-search preferences (BF, IWSS, and IWSSR). All three operators remain enabled in each controller's portfolio. ReliefF uses 1,000 reference instances selected reproducibly from training with the run seed; classifier training, validation, and testing use the full splits.
+
+Each algorithmic run received at most 3,000 s, including a 300-s reserve for shutdown and final evaluation. Search could also stop after 500 accepted improvements, with a minimum improvement of 0.0001. G-FShield uses cutoff 30, an initial solution of five features, and 100 iterations per operator. Monolith~1 runs GR followed by Bit-Flip, with cutoff 30, five features, and 100 local iterations. Monolith~2 runs GR followed by IWSS under VND, with the same cutoff and initial size and 100 local iterations. The baseline only trains and evaluates J48 with all 51 predictors. In every case, training fits the model, validation selects the best solution, and testing provides the common final measure.
+
+All arms were confined to logical processors 8--15 on NUMA node~1, with an aggregate ceiling of eight CPUs and 16~GiB. Containers were sampled every 30 s with \texttt{docker stats}; CPU is summed in cores and memory is summed across containers belonging to the run. Other containers present on the host were recorded separately and are excluded from these sums. The campaign started on August 25, 2026 at 08:32 UTC and finished on September 1, 2026 at 03:36 UTC, before the ten-day limit, with no supervisor restart.
+
+Twelve distributed attempts ended without a complete solution (\path{NO_COMPLETE_SOLUTION}) and were rejected by the artifact contract. The orchestrator reran only missing seed--arm combinations until each arm had eight valid results. There were consequently 228 attempts and 216 valid runs. All 208 search runs stopped at the time limit; the eight baseline runs exited normally.
+
+In this chapter, a \emph{run} is one valid, independent replicate of an arm and seed. A \emph{final solution} is the subset selected on validation and evaluated once on test. An \emph{internal record} is a candidate row or event generated within that run; internal records are correlated and are not treated as replicates or end-to-end solutions.
+
+\section{Predictive Quality and Dimensionality Reduction}
+
+Table~\ref{tab:resultados-formais} summarizes the G-FShield configuration selected by the highest median validation macro-F1, both monoliths, and the baseline. Each arm uses eight runs. RF--VND--IWSSR obtained median test macro-F1 0.9448, interquartile range 0.9441--0.9449, 11 features, and 78.4\% reduction. The all-features baseline obtained 0.9378. The paired median difference was 0.0069 in favor of the selected configuration; this is a descriptive result, not demonstrated statistical superiority.
+
+\begin{landscape}
+\begin{table}[p]
+\centering
+\scriptsize
+\caption{Final held-out test results and observed resources (medians of eight runs).}
+\label{tab:resultados-formais}
+\resizebox{.96\linewidth}{!}{%
+\begin{tabular}{lrrrrrrrrrr}
+\toprule
+\textbf{Arm} & \textbf{Macro-F1} & \textbf{Precision} & \textbf{Recall} & \textbf{Accuracy} & \textbf{$|S|$} & \textbf{Reduction (\%)} & \textbf{Time (s)} & \textbf{CPU (cores)} & \textbf{Median RAM (MiB)} & \textbf{Peak RAM (MiB)} \\
+\midrule
+RF--VND--IWSSR & 0.9448 & 0.9463 & 0.9432 & 0.9343 & 11 & 78.4 & 2,815.3 & 2.104 & 4,726.0 & 5,858.3 \\
+Monolith 1 (GR--BF) & 0.9397 & 0.9399 & 0.9396 & 0.9293 & 5 & 90.2 & 2,712.5 & 1.069 & 1,531.4 & 1,959.4 \\
+Monolith 2 (GR--IWSS) & 0.8411 & 0.8571 & 0.8454 & 0.8412 & 5 & 90.2 & 2,725.9 & 1.003 & 1,394.7 & 1,788.9 \\
+All 51 features & 0.9378 & 0.9402 & 0.9358 & 0.9272 & 51 & 0.0 & 72.5 & 1.044 & 748.4 & 820.0 \\
+\bottomrule
+\end{tabular}}
+
+\vspace{0.4em}
+\parbox{.96\linewidth}{\footnotesize F1, precision, and recall are macro averages. CPU is the temporal median of the sum across run containers and then the median across seeds. Median and peak RAM use the same boundary. Time is end-to-end, including startup, search, validation selection, controlled shutdown, and final evaluation.}
+\end{table}
+\end{landscape}
+
+Monolith~1 obtained median F1 0.9397; Monolith~2 had median 0.8411 and high dispersion (mean 0.7343; standard deviation 0.2013). The baseline is deterministic under the adopted setup and repeated 0.9378 for all eight seeds. Across the 24 distributed configurations, median F1 ranged from 0.8671 to 0.9448; the median across configurations was 0.9418. Every configuration produced eight distinct final subsets. Median subset size ranged from 5 to 17 features, corresponding to reductions from 90.2\% to 66.7\%.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=.94\linewidth,height=.80\textheight,keepaspectratio]{fig/gfshield/campaign-test-f1.pdf}
+  \caption{Test macro-F1 distributions for all 27 arms and eight seeds per arm.}
+  \label{fig:campaign-test-f1}
+\end{figure}
+
+\begin{landscape}
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=.96\linewidth,height=.80\textheight,keepaspectratio]{fig/gfshield/campaign-configuration-heatmap.pdf}
+  \caption{Median test macro-F1 for the 24 distributed configurations.}
+  \label{fig:campaign-heatmap}
+\end{figure}
+\end{landscape}
+
+Figure~\ref{fig:campaign-heatmap} shows that the four VND--BF combinations remained below configurations that effectively explored IWSS/IWSSR. This outcome depends on the protocol and the implemented search objective; it does not establish that an operator is universally inferior. Figure~\ref{fig:campaign-quality-reduction} presents the quality--reduction relationship. RF--VND--IWSSR descriptively exceeds the baseline's F1 with 40 fewer features, while Monolith~1 uses only five features and preserves F1 close to the baseline.
+
+\begin{landscape}
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=.96\linewidth,height=.80\textheight,keepaspectratio]{fig/gfshield/campaign-quality-reduction.pdf}
+  \caption{Trade-off between median macro-F1 and dimensionality reduction of final solutions.}
+  \label{fig:campaign-quality-reduction}
+\end{figure}
+\end{landscape}
+
+Per-class performance (Figure~\ref{fig:campaign-per-class}) exposes information hidden by the average: for RF--VND--IWSSR, median F1 is 0.7179 for \textit{grayhole}, 0.8451 for \textit{normal}, and at least 0.9565 for the other seven classes. Macro-F1 close to 0.945 therefore does not imply uniform performance across attacks.
+
+\begin{landscape}
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=.97\linewidth,height=.80\textheight,keepaspectratio]{fig/gfshield/campaign-per-class-f1.pdf}
+  \caption{Median per-class test F1 for the validation-selected distributed configuration and comparators.}
+  \label{fig:campaign-per-class}
+\end{figure}
+\end{landscape}
+
+\section{Time, Resources, and Statistical Interpretation}
+
+Because all 208 searches stopped at the same limit, median end-to-end time ranged from 2,706 to 2,847 s by configuration. These values do not demonstrate faster convergence. None of the 24 distributed configurations reached internal F1 $\geq 0.95$. Moreover, G-FShield's internal score is the Java code's legacy binary aggregation, whereas the common final evaluation uses multiclass macro-F1. Time to macro-F1 0.95 cannot therefore be computed from internal events. Measuring it requires evaluating intermediate candidates with the common evaluator, without consulting the test set, and recording the first threshold crossing with a monotonic clock.
+
+Under the same aggregate ceiling, distributed runs used a global median of 3.56 cores and median peak of 5.45, compared with approximately 1.07/1.83 for Monolith~1 and 1.00/1.82 for Monolith~2. Distributed memory had a global median of 5,317~MiB and median peak of 6,757~MiB, compared with median peaks of 1,959 and 1,789~MiB for the monoliths. This quantifies observed consumption but does not prove efficiency: the distributed pipeline aggregates multiple Java processes and messaging infrastructure, and the algorithms' internal objectives are not identical.
+
+\begin{landscape}
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=.96\linewidth,height=.80\textheight,keepaspectratio]{fig/gfshield/campaign-resources.pdf}
+  \caption{Observed CPU and memory by architecture under the common aggregate ceiling of eight CPUs and 16~GiB.}
+  \label{fig:campaign-resources}
+\end{figure}
+\end{landscape}
+
+As an exploratory analysis, each distributed configuration was paired by seed with each comparator using a two-sided exact sign-flip test and paired rank-biserial effect size. Holm correction was applied separately to each comparator's family of 24 tests. RF--VND--IWSSR recorded seven wins and one loss against the baseline and eight wins against each monolith; all three adjusted $p$-values were 0.1875. None of the 72 adjusted comparisons was below 0.05. With eight seeds, intervals and tests have low power; the results support descriptive differences, not claims of significance or architectural causality.
+
+\section{Observability and Traceability}
+
+Each run preserves \texttt{campaign\_id}, \texttt{run\_id}, arm, seed, parameters, data hashes, resolved command, states, stop reason, UTC and monotonic timestamps, selected solution, final metrics, best-solution messages, internal CSV files, logs, and container telemetry. A checksum manifest for every run detects artifact changes, and campaign state reconstructs attempts, rejections, and retries.
+
+In the application, the backend persists events for initial solution, neighborhood restart, search progress, refined solution, and best solution, plus topic, partition, offset, state, \texttt{seedId}, timestamps, and JSON content when available. The formal campaign adds \texttt{campaign\_id}, \texttt{run\_id}, and \texttt{request\_id} to its experimental flows, removing ambiguity among concurrent runs within this protocol. Event completeness, instrumentation overhead, loss/duplication under failure, recovery time, and reprocessing success were not measured. Fault tolerance and resilience therefore remain design objectives.
+
+\section{Threats to Validity}
+
+\textbf{Internal validity.} CPU, memory, CPU set, data, seeds, time limit, and final evaluator were controlled. G-FShield nevertheless selects candidates with the legacy binary F1 and \texttt{normalClass=0}; in the ARFF, index 0 is \textit{grayhole}, while \textit{normal} is index 1. The monoliths use the common macro-F1 during search. This objective mismatch prevents attributing differences solely to architecture. The 12 attempts without a complete solution were rejected and retried; this mechanism may favor runs that can initialize, although it preserves the valid seed matrix.
+
+\textbf{Construct validity.} The primary measure is macro-F1 on held-out test data, and runs, final solutions, and internal records are separated. The median per arm reduces the influence of extremes but does not summarize the full distribution. CPU and memory measure containers, not energy or monetary cost. The 0.95 threshold is an analytical convention, not an operational requirement.
+
+\textbf{Conclusion validity.} Pairing by seed and Holm correction avoid treating internal candidates as independent observations and limit false positives in the tested family. Nevertheless, eight seeds provide low power, the baseline is deterministic, and selecting the best configuration by median validation performance introduces selection among 24 alternatives. Statistical significance is not claimed.
+
+\textbf{External validity.} Evidence covers one server, one IEC~61850 corpus, one split, and J48. It does not demonstrate generalization to other corpora, classifiers, concurrent loads, replica counts, hardware, failures, or continuous ingestion. Future work should repeat the protocol on multiple datasets and evaluate scaling and recovery separately.

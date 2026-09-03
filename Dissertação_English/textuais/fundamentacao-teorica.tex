@@ -1,0 +1,45 @@
+\chapter{Theoretical Background}
+\label{chapter:fundamentacao}
+
+This chapter presents the concepts that support \textit{G-FShield}: \acp{cps}, \acp{ids}, feature selection, \ac{graspfs}, distributed orchestration, and observability.
+
+\section{Cyber-Physical Systems and Intrusion Detection}
+
+\acp{cps} integrate computing components, sensors, actuators, and communication networks into tightly coupled systems \cite{Cardenas2009,Mitchell2014}. In digital substations and industrial automation, standards such as the \ac{iec} 61850 series support interoperable communication but expand the attack surface \cite{iec61850,mackiewicz2006overview,aftab2020iec}. Therefore, \acp{ids} must respond to malicious events without compromising the protected environment.
+
+\section{Feature Selection}
+
+Feature selection seeks attribute subsets that preserve discriminative power and reduce computational cost \cite{Hall1999,Saeys2007,guyon2003introduction}. Let $X$ be an attribute, $Y$ the class, and $H(Z)=-\sum_z p(z)\log_2p(z)$ the entropy. Information Gain is
+\begin{equation}
+  \operatorname{IG}(X;Y)=H(Y)-H(Y\mid X),
+\end{equation}
+the reduction in class uncertainty after observing $X$ \cite{Quinlan1986InformationGain}. Gain Ratio normalizes that gain by the intrinsic information of the attribute,
+\begin{equation}
+  \operatorname{GR}(X;Y)=\frac{\operatorname{IG}(X;Y)}{H(X)},
+\end{equation}
+reducing preference for attributes with many values \cite{Quinlan1993C45}. Symmetrical Uncertainty makes the dependence symmetric and bounded:
+\begin{equation}
+  \operatorname{SU}(X,Y)=2\,\frac{\operatorname{IG}(X;Y)}{H(X)+H(Y)}.
+\end{equation}
+This normalized form is used in correlation-based selection \cite{Hall1999}.
+Finally, ReliefF updates the weight $W_j$ of each attribute from differences to near neighbors of the same class (a \textit{hit}) and different classes (a \textit{miss}):
+\begin{equation}
+ \Delta W_j=-\frac{\operatorname{diff}(x_j,H_j)}{mk}+\sum_{c\neq y}\frac{p(c)}{1-p(y)}\frac{\operatorname{diff}(x_j,M_{j,c})}{mk},
+\end{equation}
+where $m$ is the number of samples and $k$ the number of neighbors \cite{kononenko1994estimating,robnik2003theoretical}. These four metrics produce independent rankings used to build restricted candidate lists.
+
+\section{\ac{graspfs}}
+
+GRASP alternates greedy randomized construction and local search \cite{ResendeRibeiro2010}. During construction, a restricted candidate list (RCL) contains well-ranked alternatives; one is selected at random to form an initial solution. Local search then applies neighborhoods to improve that solution. GRASP-FS adapts this procedure to feature selection by using relevance criteria to form the RCL and search operators to refine the subset \cite{quincozes2020grasp,quincozes2021performance,quincozes2022extended}.
+
+\section{Distribution and Orchestration}
+
+Distributed architectures decompose responsibilities into smaller units and can isolate failures and permit independent scale when deployment configures them accordingly \cite{Tanenbaum2007Distributed,Newman2021}. In event-driven systems, \ac{kafka} provides a durable distributed log that decouples producers and consumers \cite{Kreps2011}. Combined with containerization, this model makes service dependencies and deployment explicit \cite{Anderson2015Docker}.
+
+\section{Observability}
+
+Observability is the ability to infer system state from emitted signals such as events, metrics, logs, and temporal traces \cite{beyer2016site,usman2022observabilitysurvey}. In \textit{G-FShield}, services record execution events, metrics, states, run identifiers, and timestamps. These signals are persisted and queried through the API; the web interface is thus a visualization of the telemetry rather than observability itself. This arrangement makes it possible to reconstruct an execution and relate intermediate results to the components that produced them.
+
+\section{Synthesis}
+
+The problem combines solution-quality requirements, architectural scalability, and operational observability in \acp{ids} for \acp{cps}. The next chapters position the proposal in the literature, describe its implementation decisions, and delimit the available experimental evidence.
