@@ -13,9 +13,12 @@ it does not assume that the distributed deployment will win.
 
 The 30 seeds form paired blocks. Execution order alternates between
 distributed-first and monolith-first to limit thermal and temporal drift. The
-primary outcome is the end-to-end time at which an internally evaluated
-candidate first reaches validation macro-F1 0.94, censored at the 2,700-second
-selection deadline. Candidate-level instrumentation is used in both arms, so
+primary outcome is the request-to-candidate time at which an internally
+evaluated candidate first reaches validation macro-F1 0.94, censored at the
+2,700-second selection deadline. The distributed clock and resource sampler
+start only after the services are ready and immediately before the request;
+deployment/cold-start time is retained as a separate descriptive measure.
+Candidate-level instrumentation is used in both arms, so
 the result does not favor the distributed arm merely because it publishes
 intermediate solutions to Kafka. Held-out
 macro-F1 is a non-inferiority guardrail evaluated only after validation-only
@@ -46,7 +49,7 @@ Example formal launch on the target host:
 ```sh
 python3 experiments/architecture-causal-campaign/run_campaign.py \
   --protocol experiments/architecture-causal-campaign/protocol.json \
-  --campaign-tag experiment-architecture-causal-v6 \
+  --campaign-tag experiment-architecture-causal-v7 \
   --image-tag causal-COMMIT \
   --state experiments/architecture-causal-campaign/state/campaign-state.json \
   --results experiments/architecture-causal-campaign/results

@@ -566,8 +566,10 @@ def normalized_result(
 
 
 def run_distributed(args: argparse.Namespace) -> int:
-    started_monotonic = time.monotonic()
-    started_monotonic_ns = time.monotonic_ns()
+    runner_started_monotonic = time.monotonic()
+    runner_started_monotonic_ns = time.monotonic_ns()
+    measurement_started_monotonic = runner_started_monotonic
+    measurement_start_offset_ms = 0
     result_dir = args.output_dir.resolve()
     result_dir.mkdir(parents=True, exist_ok=True)
     compose = Path(__file__).with_name("docker-compose.campaign.yml").resolve()
@@ -581,9 +583,17 @@ def run_distributed(args: argparse.Namespace) -> int:
         raise ValueError("maximum accepted improvements must be positive")
     if args.relieff_sample_size <= 0:
         raise ValueError("ReliefF sample size must be positive")
-    absolute_deadline = started_monotonic + args.run_timeout_seconds
-    selection_deadline = absolute_deadline - args.finalization_reserve_seconds
-    deadline_epoch_ms = int((time.time() + max(0.0, selection_deadline - time.monotonic())) * 1000)
+    selection_duration_seconds = args.run_timeout_seconds - args.finalization_reserve_seconds
+    # Containers need a provisional deadline at creation time. The supervisor
+    # applies the exact request-relative deadline after the warm stack is ready;
+    # this later service-side deadline only prevents premature self-termination.
+    selection_deadline = (
+        runner_started_monotonic + args.startup_timeout_seconds + selection_duration_seconds
+    )
+    absolute_deadline = selection_deadline + args.finalization_reserve_seconds
+    deadline_epoch_ms = int(
+        (time.time() + args.startup_timeout_seconds + selection_duration_seconds) * 1000
+    )
     environment = os.environ.copy()
     environment.update(
         {
@@ -595,7 +605,7 @@ def run_distributed(args: argparse.Namespace) -> int:
             "CAMPAIGN_REQUEST_ID": request_id,
             "CAMPAIGN_RANDOM_SEED": str(args.seed),
             "CAMPAIGN_DEADLINE_EPOCH_MS": str(deadline_epoch_ms),
-            "CAMPAIGN_START_MONOTONIC_NS": str(started_monotonic_ns),
+            "CAMPAIGN_START_MONOTONIC_NS": str(runner_started_monotonic_ns),
             "CAMPAIGN_RCL_HOST_PORT": str(port),
             "CAMPAIGN_CPUSET": args.cpuset,
             "CAMPAIGN_IMAGE_TAG": args.image_tag,
@@ -660,7 +670,6 @@ def run_distributed(args: argparse.Namespace) -> int:
         startup_deadline = time.monotonic() + args.startup_timeout_seconds
         wait_for_port(port, startup_deadline)
         wait_for_http_service(port, route, startup_deadline)
-        sampler.start()
         stdout_handle = raw_messages.open("w", encoding="utf-8", newline="\n")
         stderr_handle = raw_consumer_log.open("w", encoding="utf-8", newline="\n")
         consumer = subprocess.Popen(
@@ -697,8 +706,18 @@ def run_distributed(args: argparse.Namespace) -> int:
             f"http://127.0.0.1:{port}{route}?{query}",
             method="POST",
         )
+        sampler.start()
+        measurement_started_monotonic = time.monotonic()
+        measurement_start_offset_ms = max(
+            0,
+            int(round((measurement_started_monotonic - runner_started_monotonic) * 1000.0)),
+        )
+        selection_deadline = measurement_started_monotonic + selection_duration_seconds
+        absolute_deadline = measurement_started_monotonic + args.run_timeout_seconds
         with urllib.request.urlopen(request, timeout=30) as response:
             launch = json.loads(response.read().decode("utf-8"))
+        launch["measurement_definition"] = "request_to_result_after_service_readiness"
+        launch["measurement_start_offset_ms"] = measurement_start_offset_ms
         atomic_json(result_dir / "launch.json", launch)
 
         while True:
@@ -740,8 +759,13 @@ def run_distributed(args: argparse.Namespace) -> int:
     best = best_message(messages)
     if best is None:
         result = normalized_result(
-            args, None, None, None, started_monotonic, stop_reason,
+            args, None, None, None, measurement_started_monotonic, stop_reason,
             "cancelled" if stop_reason == "cancelled" else "failed", len(messages), "NO_COMPLETE_SOLUTION",
+        )
+        result["measurement_definition"] = "request_to_result_after_service_readiness"
+        result["measurement_start_offset_ms"] = measurement_start_offset_ms
+        result["cold_start_end_to_end_time_ms"] = int(
+            round((time.monotonic() - runner_started_monotonic) * 1000.0)
         )
         atomic_json(result_dir / "final-result.json", result)
         return 1
@@ -749,16 +773,39 @@ def run_distributed(args: argparse.Namespace) -> int:
         validation, test = evaluate_selected_features(
             args, list(best["solutionFeatures"]), absolute_deadline)
         status = "timeout" if stop_reason == "run_timeout" else "completed"
-        result = normalized_result(args, best, validation, test, started_monotonic, stop_reason, status, len(messages))
+        result = normalized_result(
+            args, best, validation, test, measurement_started_monotonic,
+            stop_reason, status, len(messages),
+        )
         result["candidate_count"] = metric_evaluation_count(result_dir / "metrics")
-        result["validation_time_to_targets_ms"] = validation_times_to_targets_ms(messages)
+        raw_target_times = validation_times_to_targets_ms(messages)
+        result["validation_time_to_targets_ms"] = {
+            target: (
+                max(0, elapsed_ms - measurement_start_offset_ms)
+                if elapsed_ms is not None else None
+            )
+            for target, elapsed_ms in raw_target_times.items()
+        }
         result["validation_time_to_target_ms"] = result["validation_time_to_targets_ms"]["0.95"]
+        result["measurement_definition"] = "request_to_result_after_service_readiness"
+        result["measurement_start_offset_ms"] = measurement_start_offset_ms
+        result["cold_start_end_to_end_time_ms"] = int(
+            round((time.monotonic() - runner_started_monotonic) * 1000.0)
+        )
         atomic_json(result_dir / "selected-validation-solution.json", best)
         atomic_json(result_dir / "final-result.json", result)
         return 0
     except Exception as error:
         atomic_json(result_dir / "final-evaluation-error.json", {"timestamp_utc": utc_now(), "error": repr(error)})
-        result = normalized_result(args, best, None, None, started_monotonic, "final_evaluation_failed", "failed", len(messages), "FINAL_EVALUATION_FAILED")
+        result = normalized_result(
+            args, best, None, None, measurement_started_monotonic,
+            "final_evaluation_failed", "failed", len(messages), "FINAL_EVALUATION_FAILED",
+        )
+        result["measurement_definition"] = "request_to_result_after_service_readiness"
+        result["measurement_start_offset_ms"] = measurement_start_offset_ms
+        result["cold_start_end_to_end_time_ms"] = int(
+            round((time.monotonic() - runner_started_monotonic) * 1000.0)
+        )
         atomic_json(result_dir / "final-result.json", result)
         return 1
 

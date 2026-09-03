@@ -196,6 +196,18 @@ def read_best_trace(run_dir: Path, architecture: str) -> list[tuple[float, float
                 points.append((float(elapsed) / 1000.0, float(score)))
             except (KeyError, TypeError, ValueError, json.JSONDecodeError):
                 continue
+    offset_seconds = 0.0
+    if architecture == "distributed":
+        result_path = run_dir / "final-result.json"
+        if result_path.exists():
+            try:
+                result = json.loads(result_path.read_text(encoding="utf-8"))
+                offset_seconds = max(
+                    0.0, float(result.get("measurement_start_offset_ms", 0.0)) / 1000.0,
+                )
+            except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                offset_seconds = 0.0
+    points = [(max(0.0, elapsed - offset_seconds), score) for elapsed, score in points]
     points.sort()
     best = 0.0
     monotonic = []
@@ -234,9 +246,16 @@ def anytime_metrics(points: list[tuple[float, float]]) -> dict[str, float | bool
     return result
 
 
-def load_runs(state_path: Path) -> pd.DataFrame:
+def load_runs(
+    state_path: Path,
+    allow_pilot: bool = False,
+    results_root: Path | None = None,
+) -> pd.DataFrame:
     state = json.loads(state_path.read_text(encoding="utf-8"))
-    if state.get("state") != "CAMPAIGN_COMPLETED":
+    accepted_states = {"CAMPAIGN_COMPLETED"}
+    if allow_pilot:
+        accepted_states.add("PILOT_COMPLETED")
+    if state.get("state") not in accepted_states:
         raise RuntimeError(f"campaign is not complete: {state.get('state')}")
     repo_root = Path(__file__).resolve().parents[2]
     parse_resources = load_resource_parser(repo_root)
@@ -244,6 +263,16 @@ def load_runs(state_path: Path) -> pd.DataFrame:
     checksum_errors = []
     for completed in state["completed"]:
         result_path = Path(completed["result_path"])
+        if not result_path.exists() and results_root is not None:
+            result_path = (
+                results_root
+                / completed["architecture"]
+                / f"seed-{int(completed['seed'])}"
+                / completed["run_id"]
+                / "final-result.json"
+            )
+        if not result_path.exists():
+            raise RuntimeError(f"missing result file {result_path}")
         run_dir = result_path.parent
         checksum_path = run_dir / "checksums.sha256"
         if sha256_file(checksum_path) != completed["checksums_sha256"]:
@@ -491,9 +520,23 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--allow-pilot", action="store_true",
+        help="analyze a completed diagnostic pilot without treating it as inferential evidence",
+    )
+    parser.add_argument(
+        "--results-root", type=Path,
+        help="relocated results directory used when state paths refer to the acquisition host",
+    )
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    runs = load_runs(args.state)
+    state_kind = json.loads(args.state.read_text(encoding="utf-8")).get("state")
+    pilot_analysis = state_kind == "PILOT_COMPLETED"
+    runs = load_runs(
+        args.state,
+        allow_pilot=args.allow_pilot,
+        results_root=args.results_root,
+    )
     summary = summarize(runs)
     tests = comparisons(runs)
     runs.to_csv(args.output / "run-level-results.csv", index=False)
@@ -525,13 +568,19 @@ def main() -> int:
         runs.architecture == "monolith", "local_search_overlap_percent"
     ].median()
     mechanism_supported = overlap_distributed > overlap_monolith
-    conclusion = (
-        "The prespecified evidence supports the architectural speed advantage."
-        if speed_supported and quality_supported and mechanism_supported
-        else "The prespecified evidence does not establish the architectural speed advantage."
-    )
+    if pilot_analysis:
+        conclusion = (
+            "Diagnostic pilot only; inferential claims are disabled regardless of effect direction."
+        )
+    else:
+        conclusion = (
+            "The prespecified evidence supports the architectural speed advantage."
+            if speed_supported and quality_supported and mechanism_supported
+            else "The prespecified evidence does not establish the architectural speed advantage."
+        )
     report = [
-        "# Causal architecture campaign analysis",
+        "# Causal architecture campaign analysis"
+        + (" (diagnostic pilot)" if pilot_analysis else ""),
         "",
         f"- Complete paired seeds: {runs['seed'].nunique()}.",
         f"- Distributed median test macro-F1: {runs.loc[runs.architecture == 'distributed', 'test_f1_macro'].median():.6f}.",
@@ -557,6 +606,7 @@ def main() -> int:
         "state_sha256": sha256_file(args.state),
         "run_count": len(runs),
         "paired_seed_count": int(runs["seed"].nunique()),
+        "analysis_scope": "diagnostic_pilot" if pilot_analysis else "formal_campaign",
     }
     (args.output / "analysis-provenance.json").write_text(
         json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8",

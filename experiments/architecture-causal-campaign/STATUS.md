@@ -22,9 +22,9 @@ IWSSR. Isso comprova o mecanismo no piloto, mas ainda não comprova uma vantagem
 estatística de velocidade ou eficiência.
 
 Nenhuma conclusão final de superioridade deve ser escrita na dissertação antes
-da conclusão e análise da campanha v6.
+da conclusão e análise da campanha v7.
 
-## Desenho formal congelado para a v6
+## Desenho formal congelado para a v7
 
 - 30 sementes pareadas: 42 a 71.
 - Ordem AB/BA alternada: 15 pares começam pelo distribuído e 15 pelo monólito.
@@ -42,6 +42,9 @@ da conclusão e análise da campanha v6.
   seleção por validação.
 - Cache de treino habilitado no DLS para equivaler à carga única do monólito;
   isso não altera candidatos, classificadores ou transições.
+- A janela primária começa no envio da requisição, depois de os serviços
+  distribuídos estarem prontos. O tempo de implantação/cold start é preservado
+  separadamente, mas não integra o teste do efeito de pipeline em regime ativo.
 
 ## Desfechos
 
@@ -118,6 +121,32 @@ e limites de validade devem acompanhar os valores de p.
   prazo antes de fechar o buffer. A revisão posterior força `flush` após cada
   avaliação concluída para que a contagem de trabalho não seja subestimada.
 
+## Evidência e correção metodológica do piloto v6
+
+- Commit/tag: `4589edc`, `experiment-architecture-causal-v6`.
+- As seis imagens foram compiladas; a troca de `PreDestroy` por `DisposableBean`
+  resolveu a incompatibilidade do IWSSR com Spring Boot 2.7.5.
+- Todos os tópicos relevantes tinham três partições, e as três threads IWSSR
+  receberam partições diferentes e processaram sementes distintas.
+- Em uma amostra simultânea, o RCL utilizou 99,56% de um núcleo e o IWSSR
+  298,23% (aproximadamente três núcleos), confirmando execução concorrente.
+- O CSV IWSSR observado tinha 27 linhas, todas com os mesmos 16 campos; o CSV
+  ReliefF continha dados além do cabeçalho. Não houve corrupção estrutural.
+- Resultado diagnóstico distribuído: F1 macro de validação 0,922302, teste
+  0,922115 e 35 candidatos registrados.
+- Resultado diagnóstico monolítico: F1 macro de validação 0,944231, teste
+  0,944685, 68 candidatos e primeiro F1 de validação >= 0,94 em 394,031 s.
+- Esses tempos não podem entrar na campanha formal. O relógio distribuído
+  começava antes da implantação e aguardava Kafka/serviços ficarem saudáveis,
+  enquanto o monólito iniciava quase imediatamente. Isso consumiu cerca de três
+  minutos da janela distribuída e confundiu cold start com efeito de pipeline.
+- A v7 corrige a origem temporal para o envio da requisição após prontidão,
+  inicia a amostragem de recursos nesse ponto, ajusta timestamps internos pelo
+  offset medido e registra o cold start em campo separado.
+- O piloto v6 permanece preservado em
+  `/home/idscps/nicolas/experiment-artifacts/architecture-causal/pilot-v6` e é
+  evidência diagnóstica, não evidência inferencial de superioridade.
+
 ## Identificadores e caminhos
 
 Worktree local:
@@ -135,8 +164,10 @@ Histórico relevante:
 - `fcff0f5`: pipeline concorrente e telemetria interna equivalente;
 - `0275cce`: identidade v4 e primeira versão deste relatório;
 - `b3bc392`: persistência imediata das métricas RCL e identidade v5;
-- a revisão seguinte troca `jakarta.annotation.PreDestroy`, incompatível com
-  Spring Boot 2.7.5, por `DisposableBean` e congela a identidade/tag v6.
+- `4589edc`: troca `jakarta.annotation.PreDestroy`, incompatível com Spring
+  Boot 2.7.5, por `DisposableBean` e congela a identidade/tag v6;
+- a revisão seguinte corrige a origem temporal da janela causal e congela a
+  identidade/tag v7.
 
 Servidor autorizado pelo usuário:
 
@@ -145,31 +176,32 @@ Servidor autorizado pelo usuário:
 - worktree isolado: `/home/idscps/nicolas/G-FShield-architecture-causal`;
 - artefatos: `/home/idscps/nicolas/experiment-artifacts/architecture-causal`;
 - piloto v2: `/home/idscps/nicolas/experiment-artifacts/architecture-causal/pilot-v2`.
+- piloto v6: `/home/idscps/nicolas/experiment-artifacts/architecture-causal/pilot-v6`.
 
 As credenciais do servidor não devem ser registradas no repositório.
 
 ## Estado de versionamento
 
-`b3bc392` contém a persistência imediata das métricas de construção. A
-primeira compilação da v5 no servidor falhou antes do piloto porque o módulo
-IWSSR usa Spring Boot 2.7.5 e não fornece `jakarta.annotation.PreDestroy`. A v6
-substitui essa anotação pela interface Spring `DisposableBean`, preservando o
-fechamento seguro do escritor e a gravação sincronizada por registro.
+`4589edc` compila as seis imagens e preserva a telemetria sincronizada. A v7
+separa explicitamente tempo de implantação e tempo requisição--resultado, que é
+a janela causal apropriada para testar o efeito de sobreposição em serviços já
+ativos. O analisador aceita pilotos somente com a opção explícita
+`--allow-pilot`, evitando tratá-los acidentalmente como evidência inferencial.
 
 Os bundles locais `architecture-causal-*.bundle` são artefatos temporários e
 não devem ser adicionados ao Git.
 
 ## Próximos passos obrigatórios
 
-1. Executar os 49 testes locais novamente.
-2. Criar o commit e a tag `experiment-architecture-causal-v6`.
+1. Executar os 51 testes locais novamente.
+2. Criar o commit e a tag `experiment-architecture-causal-v7`.
 3. Gerar e enviar um novo bundle ao servidor.
 4. Fazer fast-forward do worktree isolado; não tocar no repositório principal
    sujo nem nos contêineres de produção.
 5. Validar `docker compose config`, conferindo três partições/consumidores e a
    soma de 6 CPUs/12 GiB.
-6. Recompilar as seis imagens com um sufixo derivado do commit v6.
-7. Executar novo piloto pareado em diretório `pilot-v6` separado.
+6. Recompilar as seis imagens com um sufixo derivado do commit v7.
+7. Executar novo piloto pareado em diretório `pilot-v7` separado.
 8. Confirmar no piloto:
    - três buscas IWSSR simultâneas com seeds/candidatos distintos;
    - ausência de corrupção no CSV;
@@ -178,7 +210,7 @@ não devem ser adicionados ao Git.
    - presença de `campaignElapsedMs`, intervalos de fase, resultados finais,
      amostras de recursos e checksums;
    - nenhuma exceção, OOM, reinício ou timeout de polling Kafka.
-9. Somente depois iniciar a campanha formal v6 em `tmux`, com estado/resultados
+9. Somente depois iniciar a campanha formal v7 em `tmux`, com estado/resultados
    separados e retomáveis.
 10. Ao terminar, baixar uma cópia dos artefatos, verificar checksums, executar
     `analyze_results.py` e interpretar o critério pré-especificado.

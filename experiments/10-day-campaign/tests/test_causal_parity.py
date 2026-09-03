@@ -5,6 +5,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
 MONOLITH_PATH = REPO / "experiments/monoliths/monolith2-graspy/main.py"
+RUN_ARM_PATH = REPO / "experiments/10-day-campaign/run_arm.py"
+CAUSAL_ANALYSIS_PATH = REPO / "experiments/architecture-causal-campaign/analyze_results.py"
+RESULT_SCHEMA_PATH = REPO / "experiments/10-day-campaign/result-schema.json"
 
 
 def load_java_random():
@@ -67,6 +70,27 @@ class CausalParityTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("writer.newLine();\n        // The supervisor", source)
         self.assertIn("writer.flush();", source)
+
+    def test_distributed_measurement_starts_after_service_readiness(self):
+        source = RUN_ARM_PATH.read_text(encoding="utf-8")
+        readiness = source.index("wait_for_http_service(port, route, startup_deadline)")
+        measurement = source.index("measurement_started_monotonic = time.monotonic()")
+        request = source.index("with urllib.request.urlopen(request, timeout=30)")
+        self.assertLess(readiness, measurement)
+        self.assertLess(measurement, request)
+        self.assertIn('"measurement_start_offset_ms"', source)
+        self.assertIn('"cold_start_end_to_end_time_ms"', source)
+        schema = RESULT_SCHEMA_PATH.read_text(encoding="utf-8")
+        self.assertIn('"measurement_definition"', schema)
+        self.assertIn('"measurement_start_offset_ms"', schema)
+        self.assertIn('"cold_start_end_to_end_time_ms"', schema)
+
+    def test_pilot_analysis_requires_explicit_opt_in(self):
+        source = CAUSAL_ANALYSIS_PATH.read_text(encoding="utf-8")
+        self.assertIn('parser.add_argument(\n        "--allow-pilot"', source)
+        self.assertIn('if allow_pilot:\n        accepted_states.add("PILOT_COMPLETED")', source)
+        self.assertIn('"--results-root", type=Path', source)
+        self.assertIn('/ completed["run_id"]\n                / "final-result.json"', source)
 
 
 if __name__ == "__main__":
