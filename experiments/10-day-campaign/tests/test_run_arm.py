@@ -1,6 +1,7 @@
 import base64
 import importlib.util
 import tempfile
+from argparse import Namespace
 import unittest
 from pathlib import Path
 
@@ -75,6 +76,34 @@ class RunArmResultTest(unittest.TestCase):
         self.assertIn("CAMPAIGN_RELIEFF_SAMPLE_SIZE", compose)
         self.assertIn("evaluator.setSampleSize(reliefSampleSize)", relief)
         self.assertIn("evaluator.setSeed(seed)", relief)
+
+    def test_causal_campaign_can_select_a_single_operator(self):
+        args = Namespace(local_search="iwssr", enabled_local_searches="iwssr")
+        self.assertEqual(("IWSSR",), RUN_ARM.enabled_local_searches(args))
+        args.enabled_local_searches = None
+        self.assertEqual(
+            ("IWSSR", "BIT_FLIP", "IWSS"),
+            RUN_ARM.enabled_local_searches(args),
+        )
+
+    def test_metric_evaluation_count_excludes_headers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "construction.csv").write_text("header\na\nb\n", encoding="utf-8")
+            (root / "iwssr.csv").write_text("header\nc\n", encoding="utf-8")
+            self.assertEqual(3, RUN_ARM.metric_evaluation_count(root))
+
+    def test_time_to_target_uses_common_macro_score_messages(self):
+        messages = [
+            {"f1Score": 0.94, "monotonicElapsedMs": 100},
+            {"f1Score": 0.95, "monotonicElapsedMs": 300},
+            {"f1Score": 0.96, "monotonicElapsedMs": 500},
+        ]
+        self.assertEqual(300, RUN_ARM.validation_time_to_target_ms(messages))
+        self.assertEqual(
+            {"0.93": 100, "0.94": 100, "0.945": 300, "0.95": 300},
+            RUN_ARM.validation_times_to_targets_ms(messages),
+        )
 
 
 if __name__ == "__main__":

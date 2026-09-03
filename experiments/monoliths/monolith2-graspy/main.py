@@ -46,6 +46,41 @@ ACCEPTED_IMPROVEMENTS = 0
 CANDIDATE_COUNT = 0
 WEKA_EVALUATOR = None
 WEKA_SPLIT_BY_OBJECT_ID = {}
+CONSTRUCTION_RANDOM = None
+RUN_STARTED_MONOTONIC = None
+VALIDATION_THRESHOLDS = (0.93, 0.94, 0.945, 0.95)
+VALIDATION_TARGET_TIMES_MS = {}
+
+
+class JavaRandom:
+    """java.util.Random-compatible generator used for paired construction."""
+
+    _MULTIPLIER = 0x5DEECE66D
+    _ADDEND = 0xB
+    _MASK = (1 << 48) - 1
+
+    def __init__(self, seed):
+        self.seed = (int(seed) ^ self._MULTIPLIER) & self._MASK
+
+    def _next(self, bits):
+        self.seed = (self.seed * self._MULTIPLIER + self._ADDEND) & self._MASK
+        return self.seed >> (48 - bits)
+
+    def next_int(self, bound):
+        if bound <= 0:
+            raise ValueError("bound must be positive")
+        if bound & (bound - 1) == 0:
+            return (bound * self._next(31)) >> 31
+        while True:
+            bits = self._next(31)
+            value = bits % bound
+            if bits - value + (bound - 1) < (1 << 31):
+                return value
+
+    def discard_uuid(self):
+        # The distributed generator consumes two nextLong() calls before sampling.
+        for _ in range(4):
+            self._next(32)
 
 
 class WekaEvaluatorClient:
@@ -103,6 +138,14 @@ class WekaEvaluatorClient:
             "confusion_matrix": confusion_matrix,
         }
 
+    def rank_relief(self, sample_size, seed):
+        self.process.stdin.write(f"rank-relieff\t{int(sample_size)}\t{int(seed)}\n")
+        self.process.stdin.flush()
+        response = self._readline().strip().split("\t")
+        if len(response) != 3 or response[0] != "RANK_OK":
+            raise RuntimeError("Weka ReliefF ranking failed: " + "\t".join(response))
+        return [int(value) for value in response[1].split(",") if value]
+
     def _readline(self):
         remaining = self.deadline - time.monotonic()
         if remaining <= 0:
@@ -127,6 +170,55 @@ def stop_requested() -> bool:
         time.monotonic() >= RUN_DEADLINE
         or ACCEPTED_IMPROVEMENTS >= MAX_ACCEPTED_IMPROVEMENTS
     )
+
+
+def record_global_best(features, metrics, seed_id):
+    if RUN_STARTED_MONOTONIC is None:
+        raise RuntimeError("run start was not initialized")
+    elapsed_ms = int((time.monotonic() - RUN_STARTED_MONOTONIC) * 1000.0)
+    score = float(metrics["f1"])
+    for threshold in VALIDATION_THRESHOLDS:
+        if score >= threshold and threshold not in VALIDATION_TARGET_TIMES_MS:
+            VALIDATION_TARGET_TIMES_MS[threshold] = elapsed_ms
+    record = {
+        "validation_f1_macro": score,
+        "validation_precision_macro": float(metrics["prec"]),
+        "validation_recall_macro": float(metrics["rec"]),
+        "accuracy": float(metrics["acc"]),
+        "selected_features": list(features),
+        "subset_size": len(features),
+        "seed_id": seed_id,
+        "candidate_count": CANDIDATE_COUNT,
+        "accepted_improvement_count": ACCEPTED_IMPROVEMENTS,
+        "monotonic_elapsed_ms": elapsed_ms,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+    }
+    with open("logs/best-solution-trace.jsonl", "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def record_phase(phase, seed_id, started_monotonic, finished_monotonic):
+    """Persist phase intervals used to verify the monolith is sequential."""
+    if RUN_STARTED_MONOTONIC is None:
+        raise RuntimeError("run start was not initialized")
+    record = {
+        "phase": phase,
+        "seed_id": seed_id,
+        "started_elapsed_ms": int(
+            (started_monotonic - RUN_STARTED_MONOTONIC) * 1000.0
+        ),
+        "finished_elapsed_ms": int(
+            (finished_monotonic - RUN_STARTED_MONOTONIC) * 1000.0
+        ),
+        "duration_ms": int((finished_monotonic - started_monotonic) * 1000.0),
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+    }
+    with open("logs/phase-events.jsonl", "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
 
 
 def sha256_file(path: str) -> str:
@@ -325,8 +417,22 @@ def _mutual_info(X: pd.DataFrame, y: pd.Series) -> np.ndarray:
     return mutual_info_classif(X_.to_numpy(), y_codes, discrete_features=discrete_mask, random_state=0)
 
 
-def rank_features(X: pd.DataFrame, y: pd.Series, fs_algo: str) -> List[Tuple[int, float]]:
+def rank_features(
+    X: pd.DataFrame,
+    y: pd.Series,
+    fs_algo: str,
+    relief_sample_size: int = 1000,
+    seed: int = 42,
+) -> List[Tuple[int, float]]:
     fs = fs_algo.lower()
+    if fs == "relieff":
+        if WEKA_EVALUATOR is None:
+            raise RuntimeError("ReliefF parity requires the common Weka evaluator")
+        ranking = WEKA_EVALUATOR.rank_relief(relief_sample_size, seed)
+        return [
+            (feature, float(len(ranking) - position))
+            for position, feature in enumerate(ranking)
+        ]
     mi = _mutual_info(X, y)
     if fs == "ig":
         scores = mi
@@ -341,7 +447,7 @@ def rank_features(X: pd.DataFrame, y: pd.Series, fs_algo: str) -> List[Tuple[int
         denom = Hx + (Hy if Hy > 0 else 1e-12)
         scores = 2.0 * mi / denom
     else:
-        raise ValueError("fs_algo inválido (use su|ig|gr)")
+        raise ValueError("fs_algo inválido (use su|ig|gr|relieff)")
     ranked = sorted([(i, float(scores[i])) for i in range(X.shape[1])], key=lambda t: t[1], reverse=True)
     return ranked
 
@@ -356,11 +462,22 @@ def construct_initial_solution(
     Xtr, ytr, Xte, yte, clf_name: str,
     writer, classifier_name: str, train_name: str, test_name: str,
     seed_id: str, log_sys_metrics: bool
-) -> Tuple[List[int], List[int]]:
+) -> Tuple[List[int], List[int], dict]:
     rcl = [i for i, _ in ranked[:max(1, rcl_size)]]
     universe = list(range(Xtr.shape[1]))
 
-    if len(rcl) >= subset_size:
+    if CONSTRUCTION_RANDOM is not None:
+        CONSTRUCTION_RANDOM.discard_uuid()
+        candidates = rcl[:]
+        S = []
+        for _ in range(min(subset_size, len(candidates))):
+            S.append(candidates.pop(CONSTRUCTION_RANDOM.next_int(len(candidates))))
+        if len(S) < subset_size:
+            remainder = [feature for feature in universe if feature not in S]
+            while len(S) < subset_size and remainder:
+                S.append(remainder.pop(CONSTRUCTION_RANDOM.next_int(len(remainder))))
+        S = sorted(S)
+    elif len(rcl) >= subset_size:
         S = sorted(random.sample(rcl, subset_size))
     else:
         S = rcl[:]
@@ -385,7 +502,90 @@ def construct_initial_solution(
         run_ms, cpu, mem, memp,
         classifier_name, train_name, test_name, seed_id
     ])
-    return S, R
+    return S, R, met_S
+
+
+def java_iwssr_once(
+    S, R, Xtr, ytr, Xte, yte, clf_name, max_iterations, writer,
+    neighborhood, cycle, train_name, test_name, seed_id, log_sys_metrics,
+    initial_metrics,
+):
+    """Mirror the Java IWSSR add-then-best-removal implementation."""
+    add_solution = list(S)
+    remaining = list(R)
+    best_solution = list(S)
+    best_metrics = initial_metrics
+    iterations = min(max_iterations, len(remaining))
+
+    for iteration in range(iterations):
+        if stop_requested() or not remaining:
+            break
+        started = time.perf_counter()
+        feature = remaining.pop(0)
+        if feature not in add_solution:
+            add_solution.append(feature)
+        add_metrics = evaluate_subset(Xtr, ytr, Xte, yte, add_solution, clf_name)
+        cpu, mem, memp = get_system_metrics(log_sys_metrics)
+        writer.writerow([
+            str(add_solution), f"{add_metrics['f1']:.6f}", f"{add_metrics['acc']:.6f}",
+            f"{add_metrics['prec']:.6f}", f"{add_metrics['rec']:.6f}", neighborhood,
+            cycle, "IWSSR_ADD", iteration,
+            int((time.perf_counter() - started) * 1000.0), cpu, mem, memp,
+            clf_name.upper(), train_name, test_name, seed_id,
+        ])
+
+        cycle_solution = list(add_solution)
+        cycle_metrics = add_metrics
+        for position in range(len(add_solution)):
+            if stop_requested():
+                break
+            candidate_started = time.perf_counter()
+            candidate = add_solution[:position] + add_solution[position + 1:]
+            candidate_metrics = evaluate_subset(Xtr, ytr, Xte, yte, candidate, clf_name)
+            cpu, mem, memp = get_system_metrics(log_sys_metrics)
+            writer.writerow([
+                str(candidate), f"{candidate_metrics['f1']:.6f}",
+                f"{candidate_metrics['acc']:.6f}", f"{candidate_metrics['prec']:.6f}",
+                f"{candidate_metrics['rec']:.6f}", neighborhood, cycle,
+                "IWSSR_REPLACE", iteration,
+                int((time.perf_counter() - candidate_started) * 1000.0), cpu, mem, memp,
+                clf_name.upper(), train_name, test_name, seed_id,
+            ])
+            if candidate_metrics["f1"] > cycle_metrics["f1"]:
+                cycle_solution = candidate
+                cycle_metrics = candidate_metrics
+
+        if cycle_metrics["f1"] > best_metrics["f1"]:
+            best_solution = list(cycle_solution)
+            best_metrics = cycle_metrics
+
+    return best_solution, best_metrics
+
+
+def java_single_iwssr_vnd(
+    S0, original_rcl, Xtr, ytr, Xte, yte, clf_name, local_iterations,
+    vnd_cycles, writer, train_name, test_name, seed_id, log_sys_metrics,
+    initial_metrics,
+):
+    """Run singleton VND cycles with the Java IWSSR state transitions."""
+    global ACCEPTED_IMPROVEMENTS
+    best_solution = list(S0)
+    best_metrics = initial_metrics
+    for cycle in range(1, vnd_cycles + 1):
+        if stop_requested():
+            break
+        remaining = [feature for feature in original_rcl if feature not in best_solution]
+        candidate, metrics = java_iwssr_once(
+            best_solution, remaining, Xtr, ytr, Xte, yte, clf_name,
+            local_iterations, writer, "VND", cycle, train_name, test_name,
+            seed_id, log_sys_metrics, best_metrics,
+        )
+        if metrics["f1"] <= best_metrics["f1"]:
+            break
+        best_solution = list(candidate)
+        best_metrics = metrics
+        ACCEPTED_IMPROVEMENTS += 1
+    return best_solution, best_metrics
 
 
 # =============================================================================
@@ -646,7 +846,7 @@ def parse_args():
     p.add_argument("--validation", required=True, help="Dataset used only for model selection")
     p.add_argument("-ts", "--test", required=True, help="Untouched holdout dataset")
     p.add_argument("--classifier", choices=["CART", "J48", "NB", "RF"], default="CART")
-    p.add_argument("--fs_algos", default="ig,gr,su", help="Lista: su,ig,gr")
+    p.add_argument("--fs_algos", default="ig,gr,su", help="Lista: su,ig,gr,relieff")
     p.add_argument("--neighborhoods", default="vnd,rvnd", help="Lista: rvnd,vnd")
     p.add_argument("--ls_ops", default="iwss,iwssr,bitflip", help="bitflip,iwss,iwssr (ordem no VND)")
 
@@ -655,6 +855,10 @@ def parse_args():
 
     p.add_argument("--ls_iters", type=int, default=50, help="iterações por operador")
     p.add_argument("--bitflip_tries", type=int, default=100, help="tentativas por iteração no bitflip (0=desliga)")
+    p.add_argument("--relief_sample_size", type=int, default=1000)
+    p.add_argument("--vnd_cycles", type=int, default=100)
+    p.add_argument("--java_iwssr_semantics", type=int, choices=[0, 1], default=0)
+    p.add_argument("--java_compatible_rng", type=int, choices=[0, 1], default=0)
 
     p.add_argument("--build_restarts", type=int, default=3000, help="soluções iniciais por FS×Neighborhood")
 
@@ -684,11 +888,14 @@ def parse_args():
 # =============================================================================
 def main():
     global RUN_DEADLINE, MAX_ACCEPTED_IMPROVEMENTS, MINIMUM_IMPROVEMENT
-    global WEKA_EVALUATOR, WEKA_SPLIT_BY_OBJECT_ID
+    global WEKA_EVALUATOR, WEKA_SPLIT_BY_OBJECT_ID, CONSTRUCTION_RANDOM
+    global RUN_STARTED_MONOTONIC, VALIDATION_TARGET_TIMES_MS
     args = parse_args()
     random.seed(args.seed)
     np.random.seed(args.seed)
     run_started = time.monotonic()
+    RUN_STARTED_MONOTONIC = run_started
+    VALIDATION_TARGET_TIMES_MS = {}
     if args.final_evaluation_reserve_seconds >= args.run_timeout_seconds:
         raise ValueError("final evaluation reserve must be shorter than the absolute run timeout")
     absolute_deadline = run_started + args.run_timeout_seconds
@@ -701,6 +908,7 @@ def main():
     RUN_DEADLINE = absolute_deadline - args.final_evaluation_reserve_seconds
     MAX_ACCEPTED_IMPROVEMENTS = args.max_accepted_improvements
     MINIMUM_IMPROVEMENT = args.minimum_improvement
+    CONSTRUCTION_RANDOM = JavaRandom(args.seed) if args.java_compatible_rng else None
 
     ensure_logs_dir()
 
@@ -773,7 +981,13 @@ def main():
         if stop_requested():
             break
         try:
-            ranked = rank_features(X_train, y_train, fs)
+            ranked = rank_features(
+                X_train,
+                y_train,
+                fs,
+                relief_sample_size=args.relief_sample_size,
+                seed=args.seed,
+            )
         except Exception as e:
             log_error(f"FS={fs}: rank_features falhou: {e}")
             continue
@@ -825,32 +1039,53 @@ def main():
 
                         try:
                             # 1) construção
-                            S0, R0 = construct_initial_solution(
+                            construction_started = time.monotonic()
+                            S0, R0, initial_metrics = construct_initial_solution(
                                 ranked, rcl_size, subset_size,
                                 X_train, y_train, X_validation, y_validation, args.classifier,
                                 construct_writer, args.classifier.upper(), train_name, validation_name,
                                 seed_id, bool(args.log_sys_metrics)
+                            )
+                            record_phase(
+                                "construction", seed_id, construction_started, time.monotonic()
                             )
 
                             # 2) “microserviços” no monolito: cada operador parte da mesma S0
                             # The controller receives all neighborhoods together.
                             # Invoking it once per operator makes VND and RVND
                             # degenerate to the same single-neighborhood search.
-                            candidate = local_search_loop(
-                                S0[:], R0[:], X_train, y_train, X_validation, y_validation, args.classifier,
-                                neighborhood=ngh, iters=args.ls_iters,
-                                bitflip_writer=bitflip_writer, iwss_writer=iwss_writer, iwssr_writer=iwssr_writer,
-                                train_name=train_name, test_name=validation_name, seed_id=seed_id,
-                                iterNeighborhood=b,
-                                ls_ops=ops_list,
-                                bitflip_tries=args.bitflip_tries,
-                                subset_size=subset_size,
-                                log_all_iters=bool(args.log_all_iters),
-                                log_sys_metrics=bool(args.log_sys_metrics)
-                            )
-                            validation_metrics = evaluate_subset(
-                                X_train, y_train, X_validation, y_validation,
-                                candidate, args.classifier
+                            local_search_started = time.monotonic()
+                            if args.java_iwssr_semantics:
+                                if ngh != "vnd" or ops_list != ["iwssr"]:
+                                    raise ValueError(
+                                        "Java IWSSR parity requires neighborhoods=vnd and ls_ops=iwssr"
+                                    )
+                                candidate, validation_metrics = java_single_iwssr_vnd(
+                                    S0[:], [feature for feature, _ in ranked[:rcl_size]],
+                                    X_train, y_train, X_validation, y_validation, args.classifier,
+                                    args.ls_iters, args.vnd_cycles, iwssr_writer,
+                                    train_name, validation_name, seed_id,
+                                    bool(args.log_sys_metrics), initial_metrics,
+                                )
+                            else:
+                                candidate = local_search_loop(
+                                    S0[:], R0[:], X_train, y_train, X_validation, y_validation, args.classifier,
+                                    neighborhood=ngh, iters=args.ls_iters,
+                                    bitflip_writer=bitflip_writer, iwss_writer=iwss_writer, iwssr_writer=iwssr_writer,
+                                    train_name=train_name, test_name=validation_name, seed_id=seed_id,
+                                    iterNeighborhood=b,
+                                    ls_ops=ops_list,
+                                    bitflip_tries=args.bitflip_tries,
+                                    subset_size=subset_size,
+                                    log_all_iters=bool(args.log_all_iters),
+                                    log_sys_metrics=bool(args.log_sys_metrics)
+                                )
+                                validation_metrics = evaluate_subset(
+                                    X_train, y_train, X_validation, y_validation,
+                                    candidate, args.classifier
+                                )
+                            record_phase(
+                                "local_search", seed_id, local_search_started, time.monotonic()
                             )
                             if (
                                 best_validation is None
@@ -863,6 +1098,7 @@ def main():
                                     "neighborhood_controller": ngh,
                                     "local_search": ops_list,
                                 }
+                                record_global_best(candidate, validation_metrics, seed_id)
 
                         except Exception as e_build:
                             log_error(f"FS={fs} NGH={ngh} build #{b} falhou: {e_build}")
@@ -884,6 +1120,9 @@ def main():
         raise RuntimeError("No candidate completed before the selection deadline")
 
     # Evaluate the untouched holdout exactly once, after every selection choice.
+    # Keep the selection-work counter separate from this final test-only call so
+    # it has the same meaning as the distributed service CSV count.
+    selection_candidate_count = CANDIDATE_COUNT
     holdout_started = time.perf_counter()
     holdout_metrics = evaluate_subset(
         X_train, y_train, X_holdout, y_holdout,
@@ -964,7 +1203,12 @@ def main():
         "end_to_end_time_ms": elapsed_ms,
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "monotonic_elapsed_ms": elapsed_ms,
-        "candidate_count": CANDIDATE_COUNT,
+        "validation_time_to_target_ms": VALIDATION_TARGET_TIMES_MS.get(0.95),
+        "validation_time_to_targets_ms": {
+            str(threshold): VALIDATION_TARGET_TIMES_MS.get(threshold)
+            for threshold in VALIDATION_THRESHOLDS
+        },
+        "candidate_count": selection_candidate_count,
         "accepted_improvement_count": ACCEPTED_IMPROVEMENTS,
         "process_cpu_percent": float(process.cpu_percent(interval=None)),
         "container_cpu_percent": None,

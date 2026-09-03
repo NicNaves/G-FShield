@@ -51,6 +51,8 @@ experiments/10-day-campaign/results/
 experiments/10-day-campaign/state/
 experiments/10-day-campaign/checkpoints/
 experiments/10-day-campaign/logs/
+experiments/architecture-causal-campaign/results/
+experiments/architecture-causal-campaign/state/
 
 # Cache local de npm em container (scripts dev)
 **/.docker-home/

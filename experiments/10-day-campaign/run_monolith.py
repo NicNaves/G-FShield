@@ -132,6 +132,31 @@ def monolith_arguments(args: argparse.Namespace) -> tuple[str, str, list[str]]:
                 "--dataset-hash", args.dataset_hash,
             ],
         )
+    if args.matched_architecture:
+        return (
+            f"gfshield-campaign-monolith2:{args.image_tag}",
+            "/app/logs",
+            [
+                "-tr", train, "--validation", validation, "-ts", test,
+                "--classifier", "J48", "--fs_algos", "relieff",
+                "--neighborhoods", "vnd", "--ls_ops", "iwssr",
+                "--rcl_size", "30", "--subset_size", "5",
+                "--ls_iters", "100", "--vnd_cycles", "100",
+                "--bitflip_tries", "0", "--relief_sample_size", "1000",
+                "--java_iwssr_semantics", "1", "--java_compatible_rng", "1",
+                "--build_restarts", "2147483647",
+                "--seed", str(args.seed), "--delimiter", ";", "--fsync_logs", "0",
+                "--log_flush_every", "50", "--log_all_iters", "1",
+                "--log_sys_metrics", "1",
+                "--run_timeout_seconds", str(args.run_timeout_seconds),
+                "--final_evaluation_reserve_seconds", str(args.finalization_reserve_seconds),
+                "--max_accepted_improvements", str(args.max_accepted_improvements),
+                "--minimum_improvement", str(args.minimum_improvement),
+                "--campaign_id", args.campaign_id, "--arm_id", args.arm_id,
+                "--run_id", args.run_id, "--final_metrics_file", "/app/logs/final-result.json",
+                "--dataset_hash", args.dataset_hash,
+            ],
+        )
     return (
         f"gfshield-campaign-monolith2:{args.image_tag}",
         "/app/logs",
@@ -223,6 +248,7 @@ def handle_termination(_signum: int, _frame: Any) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--monolith", choices=("monolith1", "monolith2"), required=True)
+    parser.add_argument("--matched-architecture", action="store_true")
     parser.add_argument("--campaign-id", required=True)
     parser.add_argument("--arm-id", required=True)
     parser.add_argument("--run-id", required=True)
@@ -240,6 +266,8 @@ def main() -> int:
     parser.add_argument("--aggregate-memory", default="16g")
     parser.add_argument("--dataset-hash", required=True)
     args = parser.parse_args()
+    if args.matched_architecture and args.monolith != "monolith2":
+        parser.error("--matched-architecture requires --monolith monolith2")
     signal.signal(signal.SIGTERM, handle_termination)
     return execute(args)
 

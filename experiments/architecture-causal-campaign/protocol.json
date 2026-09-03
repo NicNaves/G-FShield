@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "campaign_id": "gfshield-architecture-causal-2026-v1",
+  "maximum_seconds": 864000,
+  "run_timeout_seconds": 3000,
+  "finalization_reserve_seconds": 300,
+  "startup_timeout_seconds": 300,
+  "graceful_shutdown_seconds": 300,
+  "maximum_attempts_per_cell": 3,
+  "seeds": [
+    42, 43, 44, 45, 46, 47, 48, 49, 50, 51,
+    52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
+    62, 63, 64, 65, 66, 67, 68, 69, 70, 71
+  ],
+  "paired_order": "alternating_ab_ba",
+  "architectures": [
+    "distributed",
+    "monolith"
+  ],
+  "algorithm": {
+    "feature_selector": "relieff",
+    "relieff_sample_size": 1000,
+    "rcl_cutoff": 30,
+    "initial_subset_size": 5,
+    "controller": "vnd",
+    "enabled_local_searches": ["iwssr"],
+    "neighborhood_cycles": 100,
+    "local_search_iterations": 100,
+    "minimum_improvement": 0.0001,
+    "maximum_accepted_improvements": 500,
+    "classifier": "Weka J48 3.8.6",
+    "classifier_parameters": {
+      "confidence_factor": 0.25,
+      "minimum_instances_per_leaf": 2,
+      "pruned": true
+    },
+    "selection_metric": "validation_macro_f1",
+    "holdout_policy": "test_once_after_validation_selection"
+  },
+  "resources": {
+    "cpuset": "8-15",
+    "numa_node": "1",
+    "aggregate_cpu_ceiling": 6,
+    "aggregate_memory": "12g",
+    "distributed_component_ceiling_sum": {
+      "rcl": {"cpu": 2.0, "memory_gib": 4},
+      "iwssr": {"cpu": 1.0, "memory_gib": 2},
+      "vnd": {"cpu": 1.0, "memory_gib": 2},
+      "verifier": {"cpu": 0.5, "memory_gib": 1},
+      "kafka": {"cpu": 1.0, "memory_gib": 2},
+      "zookeeper": {"cpu": 0.5, "memory_gib": 1}
+    }
+  },
+  "dataset": {
+    "split_manifest": "datasets/campaign-10d/split-manifest.json",
+    "source_sha256": "60ebfcdc9c209e5c760e2bdbf5be75dfe4d931b81442597b0ef32e2f5fe6c1f6",
+    "train_sha256": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
+    "validation_sha256": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a",
+    "test_sha256": "05d393c5881aec032664ef4a84e18337988e819edc74664fe1255757961cfab4"
+  },
+  "hypotheses": {
+    "quality_thresholds_validation_macro_f1": [0.93, 0.94, 0.945, 0.95],
+    "primary": "paired difference in time to validation macro-F1 0.94, censored at the 2700-second selection deadline",
+    "quality_guardrail": "the one-sided 95% bootstrap lower bound for the paired mean held-out macro-F1 difference (distributed minus monolith) must be at least -0.005",
+    "secondary": [
+      "normalized area under the validation best-so-far curve",
+      "candidate evaluations per second",
+      "CPU-hours per candidate evaluation",
+      "GiB-hours per candidate evaluation",
+      "CPU-core-seconds to validation macro-F1 0.94",
+      "percentage of local-search execution time overlapping RCL construction",
+      "time to validation macro-F1 0.93, 0.945, and 0.95",
+      "dimensionality reduction"
+    ],
+    "alpha": 0.05,
+    "multiplicity": "the sole primary outcome is tested at alpha 0.05; Holm correction is applied within the secondary outcome family"
+  }
+}

@@ -4,12 +4,16 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.IntStream;
+import weka.attributeSelection.ReliefFAttributeEval;
 import weka.classifiers.Evaluation;
 import weka.classifiers.trees.J48;
 import weka.core.Instances;
@@ -39,8 +43,26 @@ public final class WekaEvaluator {
             }
             try {
                 String[] fields = line.split("\\t", -1);
+                if (fields.length == 3 && fields[0].equals("rank-relieff")) {
+                    int sampleSize = Integer.parseInt(fields[1]);
+                    int seed = Integer.parseInt(fields[2]);
+                    long started = System.nanoTime();
+                    int[] ranking = rankReliefF(training, sampleSize, seed);
+                    long elapsedMs = (System.nanoTime() - started) / 1_000_000L;
+                    output.printf(
+                            Locale.ROOT,
+                            "RANK_OK\t%s\t%d%n",
+                            Arrays.stream(ranking)
+                                    .mapToObj(Integer::toString)
+                                    .reduce((left, right) -> left + "," + right)
+                                    .orElse(""),
+                            elapsedMs);
+                    continue;
+                }
                 if (fields.length != 2 || !evaluationSets.containsKey(fields[0])) {
-                    throw new IllegalArgumentException("expected: validation|test<TAB>zero-based-features");
+                    throw new IllegalArgumentException(
+                            "expected validation|test<TAB>zero-based-features or "
+                                    + "rank-relieff<TAB>sample-size<TAB>seed");
                 }
                 int[] features = fields[1].isBlank()
                         ? new int[0]
@@ -101,6 +123,26 @@ public final class WekaEvaluator {
         Instances reduced = Filter.useFilter(source, filter);
         reduced.setClassIndex(reduced.numAttributes() - 1);
         return reduced;
+    }
+
+    private static int[] rankReliefF(Instances training, int sampleSize, int seed) throws Exception {
+        if (sampleSize <= 0) {
+            throw new IllegalArgumentException("ReliefF sample size must be positive");
+        }
+        ReliefFAttributeEval evaluator = new ReliefFAttributeEval();
+        evaluator.setSampleSize(sampleSize);
+        evaluator.setSeed(seed);
+        evaluator.buildEvaluator(training);
+
+        List<FeatureScore> scores = new ArrayList<>();
+        for (int feature = 0; feature < training.classIndex(); feature++) {
+            scores.add(new FeatureScore(feature, evaluator.evaluateAttribute(feature)));
+        }
+        scores.sort(Comparator
+                .comparingDouble(FeatureScore::score)
+                .reversed()
+                .thenComparingInt(FeatureScore::feature));
+        return scores.stream().mapToInt(FeatureScore::feature).toArray();
     }
 
     private static Metrics evaluate(Instances training, Instances evaluationSet, int[] features) throws Exception {
@@ -176,4 +218,6 @@ public final class WekaEvaluator {
             String[] classLabels,
             double[][] perClass,
             double[][] confusionMatrix) {}
+
+    private record FeatureScore(int feature, double score) {}
 }

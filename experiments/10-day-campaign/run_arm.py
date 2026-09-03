@@ -296,6 +296,32 @@ def complete_record_count(path: Path) -> int:
         return sum(1 for line in handle if line.endswith(b"\n") and line.strip())
 
 
+def metric_evaluation_count(metrics_dir: Path) -> int:
+    """Count completed CSV data rows across services in one isolated run."""
+    total = 0
+    if not metrics_dir.exists():
+        return total
+    for path in metrics_dir.glob("*.csv"):
+        rows = complete_record_count(path)
+        if rows > 0:
+            total += rows - 1  # one header per service file
+    return total
+
+
+def enabled_local_searches(args: argparse.Namespace) -> tuple[str, ...]:
+    if not args.enabled_local_searches:
+        return LOCAL_SEARCH_ORDERS[args.local_search]
+    values = tuple(
+        value.strip().lower()
+        for value in args.enabled_local_searches.split(",")
+        if value.strip()
+    )
+    invalid = [value for value in values if value not in LOCAL_SEARCH_SERVICES]
+    if not values or invalid or len(values) != len(set(values)):
+        raise ValueError(f"invalid enabled local searches: {args.enabled_local_searches}")
+    return tuple(value.upper() for value in values)
+
+
 def parse_best_messages(path: Path, run_id: str) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
     if not path.exists():
@@ -350,6 +376,30 @@ def best_message(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
             int(item.get("_raw_line") or 2**63 - 1),
         ),
     )
+
+
+def validation_time_to_target_ms(
+    messages: list[dict[str, Any]], target: float = 0.95,
+) -> int | None:
+    elapsed = []
+    for message in messages:
+        try:
+            score = float(message.get("f1Score"))
+            time_ms = int(message.get("monotonicElapsedMs"))
+        except (TypeError, ValueError):
+            continue
+        if score >= target and time_ms >= 0:
+            elapsed.append(time_ms)
+    return min(elapsed, default=None)
+
+
+def validation_times_to_targets_ms(
+    messages: list[dict[str, Any]], targets: tuple[float, ...] = (0.93, 0.94, 0.945, 0.95),
+) -> dict[str, int | None]:
+    return {
+        str(target): validation_time_to_target_ms(messages, target)
+        for target in targets
+    }
 
 
 def parse_evaluator_line(line: str) -> dict[str, Any]:
@@ -554,8 +604,9 @@ def run_distributed(args: argparse.Namespace) -> int:
             "CAMPAIGN_RELIEFF_SAMPLE_SIZE": str(args.relieff_sample_size),
         }
     )
+    configured_searches = enabled_local_searches(args)
     rcl_service, _container_port, route = RCL_SERVICES[args.construction]
-    local_services = list(LOCAL_SEARCH_SERVICES.values())
+    local_services = [LOCAL_SEARCH_SERVICES[value.lower()] for value in configured_searches]
     controller_service = CONTROLLER_SERVICES[args.controller]
     algorithm_services = [rcl_service, *local_services, controller_service, "grasp-fs-dls-verify"]
     services = ["zookeeper", "kafka", *algorithm_services]
@@ -609,10 +660,7 @@ def run_distributed(args: argparse.Namespace) -> int:
                 "classifier": "J48",
                 "useTrainingCache": "false",
                 "neighborhoodStrategy": args.controller.upper(),
-                # All three services form the VND/RVND neighborhood portfolio.
-                # The arm's local-search factor defines the reproducible order
-                # (and therefore the initial VND neighborhood), not a singleton.
-                "localSearches": ",".join(LOCAL_SEARCH_ORDERS[args.local_search]),
+                "localSearches": ",".join(configured_searches),
                 "neighborhoodMaxIterations": args.neighborhood_iterations,
                 "bitFlipMaxIterations": args.local_search_iterations,
                 "iwssMaxIterations": args.local_search_iterations,
@@ -656,8 +704,10 @@ def run_distributed(args: argparse.Namespace) -> int:
             stdout_handle.close()
         if stderr_handle is not None:
             stderr_handle.close()
+        # Preserve RFC3339 timestamps so the causal analysis can reconstruct
+        # whether RCL construction and DLS processing were active concurrently.
         with (result_dir / "compose.log").open("w", encoding="utf-8", newline="\n") as compose_log:
-            stack.call("logs", "--no-color", stdout=compose_log, check=False)
+            stack.call("logs", "--no-color", "--timestamps", stdout=compose_log, check=False)
         stack.down()
 
     messages = parse_best_messages(raw_messages, args.run_id)
@@ -674,6 +724,9 @@ def run_distributed(args: argparse.Namespace) -> int:
             args, list(best["solutionFeatures"]), absolute_deadline)
         status = "timeout" if stop_reason == "run_timeout" else "completed"
         result = normalized_result(args, best, validation, test, started_monotonic, stop_reason, status, len(messages))
+        result["candidate_count"] = metric_evaluation_count(result_dir / "metrics")
+        result["validation_time_to_targets_ms"] = validation_times_to_targets_ms(messages)
+        result["validation_time_to_target_ms"] = result["validation_time_to_targets_ms"]["0.95"]
         atomic_json(result_dir / "selected-validation-solution.json", best)
         atomic_json(result_dir / "final-result.json", result)
         return 0
@@ -695,6 +748,10 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--construction", choices=tuple(RCL_SERVICES), required=True)
     result.add_argument("--controller", choices=tuple(CONTROLLER_SERVICES), required=True)
     result.add_argument("--local-search", choices=tuple(LOCAL_SEARCH_SERVICES), required=True)
+    result.add_argument(
+        "--enabled-local-searches",
+        help="comma-separated operator set; defaults to the three-operator campaign order",
+    )
     result.add_argument("--dataset-dir", required=True, type=Path)
     result.add_argument("--output-dir", required=True, type=Path)
     result.add_argument("--run-timeout-seconds", type=int, default=3600)
