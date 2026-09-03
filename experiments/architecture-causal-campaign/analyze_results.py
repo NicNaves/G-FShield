@@ -93,28 +93,65 @@ def intersection_duration(
 
 DOCKER_TIMESTAMP = re.compile(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z)")
 ELAPSED_MS = re.compile(r"elapsedMs=(\d+)")
+SEED_ID = re.compile(r"seedId=([^ ]+)")
 
 
 def distributed_phase_intervals(path: Path) -> tuple[list[tuple[float, float]], list[tuple[float, float]]]:
     construction: list[tuple[float, float]] = []
     local_search: list[tuple[float, float]] = []
+    active_searches: dict[str, float] = {}
+    last_search_activity: dict[str, float] = {}
     if not path.exists():
         return construction, local_search
     with path.open(encoding="utf-8", errors="replace") as handle:
         for line in handle:
             timestamp = DOCKER_TIMESTAMP.search(line)
-            elapsed = ELAPSED_MS.search(line)
-            if timestamp is None or elapsed is None:
+            if timestamp is None:
                 continue
             finished = datetime.fromisoformat(
                 timestamp.group(1).replace("Z", "+00:00")
             ).timestamp()
-            started = finished - float(elapsed.group(1)) / 1000.0
+            elapsed = ELAPSED_MS.search(line)
             if "rcl generation published algorithm=" in line:
-                construction.append((started, finished))
+                if elapsed is not None:
+                    construction.append(
+                        (finished - float(elapsed.group(1)) / 1000.0, finished)
+                    )
+            elif "dls start search=IWSSR" in line:
+                seed = SEED_ID.search(line)
+                if seed is not None:
+                    active_searches[seed.group(1)] = finished
+                    last_search_activity[seed.group(1)] = finished
+            elif "dls iteration search=IWSSR" in line:
+                seed = SEED_ID.search(line)
+                if seed is not None and seed.group(1) in active_searches:
+                    last_search_activity[seed.group(1)] = finished
             elif "dls completed search=IWSSR" in line:
-                local_search.append((started, finished))
+                seed = SEED_ID.search(line)
+                if elapsed is not None:
+                    local_search.append(
+                        (finished - float(elapsed.group(1)) / 1000.0, finished)
+                    )
+                if seed is not None:
+                    active_searches.pop(seed.group(1), None)
+                    last_search_activity.pop(seed.group(1), None)
+    for seed, started in active_searches.items():
+        finished = last_search_activity.get(seed, started)
+        if finished > started:
+            local_search.append((started, finished))
     return construction, local_search
+
+
+def clipped_intervals(
+    intervals: list[tuple[float, float]], start: float | None, end: float | None,
+) -> list[tuple[float, float]]:
+    if start is None or end is None:
+        return intervals
+    return [
+        (max(left, start), min(right, end))
+        for left, right in intervals
+        if min(right, end) > max(left, start)
+    ]
 
 
 def monolith_phase_intervals(path: Path) -> tuple[list[tuple[float, float]], list[tuple[float, float]]]:
@@ -139,9 +176,46 @@ def monolith_phase_intervals(path: Path) -> tuple[list[tuple[float, float]], lis
     return construction, local_search
 
 
-def pipeline_metrics(run_dir: Path, architecture: str) -> dict[str, float]:
+def pipeline_metrics(
+    run_dir: Path, architecture: str, selection_horizon_seconds: float,
+) -> dict[str, float]:
     if architecture == "distributed":
         construction, local_search = distributed_phase_intervals(run_dir / "compose.log")
+        measurement_start = selection_end = None
+        result_path = run_dir / "final-result.json"
+        if result_path.exists():
+            try:
+                result = json.loads(result_path.read_text(encoding="utf-8"))
+                measurement_start = datetime.fromisoformat(
+                    result["measurement_started_utc"].replace("Z", "+00:00")
+                ).timestamp()
+                selection_end = datetime.fromisoformat(
+                    result.get("selection_finished_utc", result["selection_deadline_utc"])
+                    .replace("Z", "+00:00")
+                ).timestamp()
+            except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+                measurement_start = selection_end = None
+            if measurement_start is None:
+                offset_seconds = max(
+                    0.0, float(result.get("measurement_start_offset_ms", 0.0)) / 1000.0,
+                )
+                with (run_dir / "compose.log").open(
+                    encoding="utf-8", errors="replace",
+                ) as handle:
+                    for line in handle:
+                        timestamp = DOCKER_TIMESTAMP.search(line)
+                        campaign_elapsed = re.search(r"campaignElapsedMs=(\d+)", line)
+                        if timestamp is None or campaign_elapsed is None:
+                            continue
+                        event_epoch = datetime.fromisoformat(
+                            timestamp.group(1).replace("Z", "+00:00")
+                        ).timestamp()
+                        runner_start = event_epoch - float(campaign_elapsed.group(1)) / 1000.0
+                        measurement_start = runner_start + offset_seconds
+                        selection_end = measurement_start + selection_horizon_seconds
+                        break
+        construction = clipped_intervals(construction, measurement_start, selection_end)
+        local_search = clipped_intervals(local_search, measurement_start, selection_end)
     else:
         construction, local_search = monolith_phase_intervals(run_dir / "phase-events.jsonl")
     construction_seconds = interval_duration(construction)
@@ -218,14 +292,17 @@ def read_best_trace(run_dir: Path, architecture: str) -> list[tuple[float, float
     return monotonic
 
 
-def anytime_metrics(points: list[tuple[float, float]]) -> dict[str, float | bool]:
-    horizon = SELECTION_HORIZON_SECONDS
+def anytime_metrics(
+    points: list[tuple[float, float]], horizon: float = SELECTION_HORIZON_SECONDS,
+) -> dict[str, float | bool]:
     previous_time = 0.0
     previous_score = 0.0
     area = 0.0
     target_times: dict[float, float] = {}
     for elapsed, score in points:
-        current_time = min(max(elapsed, 0.0), horizon)
+        if elapsed > horizon:
+            break
+        current_time = max(elapsed, 0.0)
         if current_time < previous_time:
             continue
         area += (current_time - previous_time) * previous_score
@@ -257,6 +334,17 @@ def load_runs(
         accepted_states.add("PILOT_COMPLETED")
     if state.get("state") not in accepted_states:
         raise RuntimeError(f"campaign is not complete: {state.get('state')}")
+    default_selection_horizon = SELECTION_HORIZON_SECONDS
+    manifest_path = state_path.parent / "frozen-manifest.json"
+    if manifest_path.exists():
+        try:
+            effective_protocol = json.loads(manifest_path.read_text(encoding="utf-8"))["protocol"]
+            default_selection_horizon = float(
+                effective_protocol["run_timeout_seconds"]
+                - effective_protocol["finalization_reserve_seconds"]
+            )
+        except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+            default_selection_horizon = SELECTION_HORIZON_SECONDS
     repo_root = Path(__file__).resolve().parents[2]
     parse_resources = load_resource_parser(repo_root)
     rows = []
@@ -283,9 +371,22 @@ def load_runs(
         trace = read_best_trace(run_dir, completed["architecture"])
         if not trace:
             raise RuntimeError(f"missing internal candidate trace in {run_dir}")
-        trace_metrics = anytime_metrics(trace)
-        phase_metrics = pipeline_metrics(run_dir, completed["architecture"])
+        selection_horizon_seconds = float(
+            result.get("selection_duration_ms", default_selection_horizon * 1000.0)
+        ) / 1000.0
+        trace_metrics = anytime_metrics(trace, selection_horizon_seconds)
+        phase_metrics = pipeline_metrics(
+            run_dir, completed["architecture"], selection_horizon_seconds,
+        )
         elapsed_seconds = float(result["end_to_end_time_ms"]) / 1000.0
+        selection_elapsed_seconds = float(
+            result.get(
+                "selection_elapsed_ms",
+                selection_horizon_seconds * 1000.0
+                if result.get("stop_reason") == "run_timeout"
+                else min(float(result["end_to_end_time_ms"]), selection_horizon_seconds * 1000.0),
+            )
+        ) / 1000.0
         candidates = int(result["candidate_count"])
         cpu_cores = float(resources.get("cpu_cores_median", math.nan))
         memory_mib = float(resources.get("memory_mib_median", math.nan))
@@ -306,15 +407,17 @@ def load_runs(
             "subset_size": int(result["subset_size"]),
             "reduction_percent": float(result["dimensionality_reduction_percent"]),
             "elapsed_seconds": elapsed_seconds,
+            "selection_elapsed_seconds": selection_elapsed_seconds,
             "candidate_count": candidates,
-            "candidates_per_second": candidates / elapsed_seconds,
+            "candidates_per_second": candidates / selection_elapsed_seconds,
             "cpu_cores_median": cpu_cores,
             "memory_mib_median": memory_mib,
-            "cpu_hours": cpu_cores * elapsed_seconds / 3600.0,
-            "memory_gib_hours": memory_mib / 1024.0 * elapsed_seconds / 3600.0,
-            "cpu_hours_per_candidate": cpu_cores * elapsed_seconds / 3600.0 / candidates,
-            "memory_gib_hours_per_candidate": memory_mib / 1024.0 * elapsed_seconds / 3600.0 / candidates,
+            "cpu_hours": cpu_cores * selection_elapsed_seconds / 3600.0,
+            "memory_gib_hours": memory_mib / 1024.0 * selection_elapsed_seconds / 3600.0,
+            "cpu_hours_per_candidate": cpu_cores * selection_elapsed_seconds / 3600.0 / candidates,
+            "memory_gib_hours_per_candidate": memory_mib / 1024.0 * selection_elapsed_seconds / 3600.0 / candidates,
             "stop_reason": result["stop_reason"],
+            "selection_horizon_seconds": selection_horizon_seconds,
         }
         row.update(trace_metrics)
         row.update(phase_metrics)
@@ -426,7 +529,7 @@ def summarize(runs: pd.DataFrame) -> pd.DataFrame:
     columns = [
         "test_f1_macro", "validation_f1_macro", "test_precision_macro",
         "test_recall_macro", "accuracy", "subset_size", "reduction_percent",
-        "elapsed_seconds", "candidate_count", "candidates_per_second",
+        "elapsed_seconds", "selection_elapsed_seconds", "candidate_count", "candidates_per_second",
         "cpu_cores_median", "memory_mib_median", "cpu_hours_per_candidate",
         "memory_gib_hours_per_candidate",
         "anytime_auc_normalized", "time_to_0_93_seconds_censored",
@@ -464,7 +567,8 @@ def plot_pairs(runs: pd.DataFrame, output: Path) -> None:
 
 
 def plot_anytime(runs: pd.DataFrame, output: Path) -> None:
-    grid = np.linspace(0.0, SELECTION_HORIZON_SECONDS, 181)
+    horizon = float(runs["selection_horizon_seconds"].max())
+    grid = np.linspace(0.0, horizon, 181)
     fig, ax = plt.subplots(figsize=(7.2, 4.8))
     colors = {"monolith": "#D97706", "distributed": "#2563EB"}
     labels = {"monolith": "Monolith", "distributed": "G-FShield"}
@@ -474,6 +578,8 @@ def plot_anytime(runs: pd.DataFrame, output: Path) -> None:
             points = read_best_trace(Path(row["run_dir"]), architecture)
             values = np.zeros_like(grid)
             for elapsed, score in points:
+                if elapsed > float(row["selection_horizon_seconds"]):
+                    break
                 values[grid >= elapsed] = np.maximum(values[grid >= elapsed], score)
             curves.append(values)
         matrix = np.asarray(curves)

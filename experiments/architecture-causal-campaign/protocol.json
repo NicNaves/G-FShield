@@ -1,11 +1,14 @@
 {
   "schema_version": 2,
-  "campaign_id": "gfshield-architecture-causal-2026-v7",
+  "campaign_id": "gfshield-architecture-causal-2026-v8",
   "maximum_seconds": 864000,
   "measurement_window": {
     "cold_start_reported_separately": true,
+    "final_evaluation_excluded_from_search_resource_costs": true,
+    "post_deadline_candidates_excluded": true,
     "primary_origin": "request_submission_after_distributed_service_readiness",
-    "resource_sampling_origin": "request_submission_after_distributed_service_readiness"
+    "resource_sampling_origin": "request_submission_after_distributed_service_readiness",
+    "unfinished_phase_intervals": "right_censored_at_last_observed_activity"
   },
   "run_timeout_seconds": 3000,
   "finalization_reserve_seconds": 300,

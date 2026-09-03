@@ -22,9 +22,9 @@ IWSSR. Isso comprova o mecanismo no piloto, mas ainda não comprova uma vantagem
 estatística de velocidade ou eficiência.
 
 Nenhuma conclusão final de superioridade deve ser escrita na dissertação antes
-da conclusão e análise da campanha v7.
+da conclusão e análise da campanha v8.
 
-## Desenho formal congelado para a v7
+## Desenho formal congelado para a v8
 
 - 30 sementes pareadas: 42 a 71.
 - Ordem AB/BA alternada: 15 pares começam pelo distribuído e 15 pelo monólito.
@@ -45,6 +45,8 @@ da conclusão e análise da campanha v7.
 - A janela primária começa no envio da requisição, depois de os serviços
   distribuídos estarem prontos. O tempo de implantação/cold start é preservado
   separadamente, mas não integra o teste do efeito de pipeline em regime ativo.
+- Candidatos concluídos depois do prazo, durante o desligamento, são excluídos.
+  Buscas ainda ativas são censuradas no último evento observado dentro da janela.
 
 ## Desfechos
 
@@ -147,6 +149,30 @@ e limites de validade devem acompanhar os valores de p.
   `/home/idscps/nicolas/experiment-artifacts/architecture-causal/pilot-v6` e é
   evidência diagnóstica, não evidência inferencial de superioridade.
 
+## Evidência e correções de censoramento do piloto v7
+
+- Commit/tag: `bccfb97`, `experiment-architecture-causal-v7`.
+- A prontidão consumiu 86,601 s e foi registrada separadamente. A janela de
+  seleção distribuída passou a ter os 600 s completos do piloto.
+- Resultado diagnóstico distribuído: F1 macro de validação 0,922302, teste
+  0,922115, 45 registros de candidatos brutos e nenhum alcance de 0,94.
+- Resultado diagnóstico monolítico: F1 macro de validação 0,944231, teste
+  0,944685, 69 candidatos e alcance de 0,94 em 386,771 s.
+- O piloto confirmou novamente buscas simultâneas, mas nenhuma busca IWSSR
+  terminou integralmente antes do prazo curto. O analisador antigo exigia um
+  evento `completed` e, por isso, não fechava os intervalos dessas buscas.
+- Durante o desligamento gracioso, algumas avaliações em curso terminaram após
+  o prazo. A contagem bruta e a curva antiga poderiam incluí-las no instante
+  censurado, embora não tenham causado alcance de 0,94 neste piloto.
+- A v8 conta e seleciona somente mensagens/candidatos com timestamp menor ou
+  igual ao prazo, ignora pontos posteriores na curva anytime, registra a janela
+  UTC exata e fecha buscas incompletas no último evento observado. Vazão e
+  custos estimados de CPU/memória usam apenas a duração da seleção, sem somar
+  a avaliação final em teste.
+- O piloto v7 permanece preservado em
+  `/home/idscps/nicolas/experiment-artifacts/architecture-causal/pilot-v7` e não
+  integra a inferência formal.
+
 ## Identificadores e caminhos
 
 Worktree local:
@@ -166,8 +192,9 @@ Histórico relevante:
 - `b3bc392`: persistência imediata das métricas RCL e identidade v5;
 - `4589edc`: troca `jakarta.annotation.PreDestroy`, incompatível com Spring
   Boot 2.7.5, por `DisposableBean` e congela a identidade/tag v6;
-- a revisão seguinte corrige a origem temporal da janela causal e congela a
-  identidade/tag v7.
+- `bccfb97`: corrige a origem temporal da janela causal e congela a identidade
+  v7;
+- a revisão seguinte aplica o censoramento estrito e congela a identidade v8.
 
 Servidor autorizado pelo usuário:
 
@@ -177,15 +204,15 @@ Servidor autorizado pelo usuário:
 - artefatos: `/home/idscps/nicolas/experiment-artifacts/architecture-causal`;
 - piloto v2: `/home/idscps/nicolas/experiment-artifacts/architecture-causal/pilot-v2`.
 - piloto v6: `/home/idscps/nicolas/experiment-artifacts/architecture-causal/pilot-v6`.
+- piloto v7: `/home/idscps/nicolas/experiment-artifacts/architecture-causal/pilot-v7`.
 
 As credenciais do servidor não devem ser registradas no repositório.
 
 ## Estado de versionamento
 
-`4589edc` compila as seis imagens e preserva a telemetria sincronizada. A v7
-separa explicitamente tempo de implantação e tempo requisição--resultado, que é
-a janela causal apropriada para testar o efeito de sobreposição em serviços já
-ativos. O analisador aceita pilotos somente com a opção explícita
+`bccfb97` separa tempo de implantação e tempo requisição--resultado. A v8
+acrescenta seleção, contagem e análise estritamente censuradas, inclusive para
+buscas incompletas. O analisador aceita pilotos somente com a opção explícita
 `--allow-pilot`, evitando tratá-los acidentalmente como evidência inferencial.
 
 Os bundles locais `architecture-causal-*.bundle` são artefatos temporários e
@@ -193,15 +220,15 @@ não devem ser adicionados ao Git.
 
 ## Próximos passos obrigatórios
 
-1. Executar os 51 testes locais novamente.
-2. Criar o commit e a tag `experiment-architecture-causal-v7`.
+1. Executar os 54 testes locais novamente.
+2. Criar o commit e a tag `experiment-architecture-causal-v8`.
 3. Gerar e enviar um novo bundle ao servidor.
 4. Fazer fast-forward do worktree isolado; não tocar no repositório principal
    sujo nem nos contêineres de produção.
 5. Validar `docker compose config`, conferindo três partições/consumidores e a
    soma de 6 CPUs/12 GiB.
-6. Recompilar as seis imagens com um sufixo derivado do commit v7.
-7. Executar novo piloto pareado em diretório `pilot-v7` separado.
+6. Recompilar as seis imagens com um sufixo derivado do commit v8.
+7. Executar novo piloto pareado em diretório `pilot-v8` separado.
 8. Confirmar no piloto:
    - três buscas IWSSR simultâneas com seeds/candidatos distintos;
    - ausência de corrupção no CSV;
@@ -210,7 +237,7 @@ não devem ser adicionados ao Git.
    - presença de `campaignElapsedMs`, intervalos de fase, resultados finais,
      amostras de recursos e checksums;
    - nenhuma exceção, OOM, reinício ou timeout de polling Kafka.
-9. Somente depois iniciar a campanha formal v7 em `tmux`, com estado/resultados
+9. Somente depois iniciar a campanha formal v8 em `tmux`, com estado/resultados
    separados e retomáveis.
 10. Ao terminar, baixar uma cópia dos artefatos, verificar checksums, executar
     `analyze_results.py` e interpretar o critério pré-especificado.

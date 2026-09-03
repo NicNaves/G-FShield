@@ -308,6 +308,24 @@ def metric_evaluation_count(metrics_dir: Path) -> int:
     return total
 
 
+INTERNAL_CANDIDATE_LOG = re.compile(
+    r"(?:rcl generation ready|dls iteration search=IWSSR).*?campaignElapsedMs=(\d+)"
+)
+
+
+def internal_candidate_count_before_deadline(path: Path, cutoff_elapsed_ms: int) -> int:
+    """Count completed internal evaluations whose timestamps are inside selection."""
+    if not path.exists():
+        return 0
+    count = 0
+    with path.open(encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            match = INTERNAL_CANDIDATE_LOG.search(line)
+            if match and int(match.group(1)) <= cutoff_elapsed_ms:
+                count += 1
+    return count
+
+
 def enabled_local_searches(args: argparse.Namespace) -> tuple[str, ...]:
     if not args.enabled_local_searches:
         return LOCAL_SEARCH_ORDERS[args.local_search]
@@ -340,6 +358,20 @@ def parse_best_messages(path: Path, run_id: str) -> list[dict[str, Any]]:
         message["_raw_line"] = line_number
         messages.append(message)
     return messages
+
+
+def messages_before_deadline(
+    messages: list[dict[str, Any]], cutoff_elapsed_ms: int,
+) -> list[dict[str, Any]]:
+    eligible = []
+    for message in messages:
+        try:
+            elapsed_ms = int(message.get("monotonicElapsedMs"))
+        except (TypeError, ValueError):
+            continue
+        if 0 <= elapsed_ms <= cutoff_elapsed_ms:
+            eligible.append(message)
+    return eligible
 
 
 def score_of(message: dict[str, Any]) -> float:
@@ -570,6 +602,13 @@ def run_distributed(args: argparse.Namespace) -> int:
     runner_started_monotonic_ns = time.monotonic_ns()
     measurement_started_monotonic = runner_started_monotonic
     measurement_start_offset_ms = 0
+    measurement_started_utc = utc_now()
+    selection_finished_utc = measurement_started_utc
+    selection_elapsed_ms = 0
+    selection_deadline_utc = datetime.fromtimestamp(
+        time.time() + args.run_timeout_seconds - args.finalization_reserve_seconds,
+        timezone.utc,
+    ).isoformat()
     result_dir = args.output_dir.resolve()
     result_dir.mkdir(parents=True, exist_ok=True)
     compose = Path(__file__).with_name("docker-compose.campaign.yml").resolve()
@@ -708,16 +747,26 @@ def run_distributed(args: argparse.Namespace) -> int:
         )
         sampler.start()
         measurement_started_monotonic = time.monotonic()
+        measurement_started_epoch = time.time()
+        measurement_started_utc = datetime.fromtimestamp(
+            measurement_started_epoch, timezone.utc,
+        ).isoformat()
         measurement_start_offset_ms = max(
             0,
             int(round((measurement_started_monotonic - runner_started_monotonic) * 1000.0)),
         )
         selection_deadline = measurement_started_monotonic + selection_duration_seconds
         absolute_deadline = measurement_started_monotonic + args.run_timeout_seconds
+        selection_deadline_utc = datetime.fromtimestamp(
+            measurement_started_epoch + selection_duration_seconds, timezone.utc,
+        ).isoformat()
         with urllib.request.urlopen(request, timeout=30) as response:
             launch = json.loads(response.read().decode("utf-8"))
         launch["measurement_definition"] = "request_to_result_after_service_readiness"
         launch["measurement_start_offset_ms"] = measurement_start_offset_ms
+        launch["measurement_started_utc"] = measurement_started_utc
+        launch["selection_deadline_utc"] = selection_deadline_utc
+        launch["selection_duration_ms"] = int(selection_duration_seconds * 1000)
         atomic_json(result_dir / "launch.json", launch)
 
         while True:
@@ -735,6 +784,11 @@ def run_distributed(args: argparse.Namespace) -> int:
         atomic_json(result_dir / "runner-error.json", {"timestamp_utc": utc_now(), "error": repr(error)})
         stop_reason = "runner_error"
     finally:
+        selection_finished_utc = utc_now()
+        selection_elapsed_ms = min(
+            int(selection_duration_seconds * 1000),
+            max(0, int(round((time.monotonic() - measurement_started_monotonic) * 1000.0))),
+        )
         sampler.stop()
         stack.call("stop", "--timeout", "30", *algorithm_services, check=False, capture_output=True)
         time.sleep(3)
@@ -755,18 +809,30 @@ def run_distributed(args: argparse.Namespace) -> int:
             stack.call("logs", "--no-color", "--timestamps", stdout=compose_log, check=False)
         stack.down()
 
-    messages = parse_best_messages(raw_messages, args.run_id)
+    cutoff_elapsed_ms = measurement_start_offset_ms + selection_elapsed_ms
+    messages = messages_before_deadline(
+        parse_best_messages(raw_messages, args.run_id), cutoff_elapsed_ms,
+    )
+
+    def add_measurement_metadata(result: dict[str, Any]) -> None:
+        result["measurement_definition"] = "request_to_result_after_service_readiness"
+        result["measurement_start_offset_ms"] = measurement_start_offset_ms
+        result["measurement_started_utc"] = measurement_started_utc
+        result["selection_deadline_utc"] = selection_deadline_utc
+        result["selection_duration_ms"] = int(selection_duration_seconds * 1000)
+        result["selection_finished_utc"] = selection_finished_utc
+        result["selection_elapsed_ms"] = selection_elapsed_ms
+        result["cold_start_end_to_end_time_ms"] = int(
+            round((time.monotonic() - runner_started_monotonic) * 1000.0)
+        )
+
     best = best_message(messages)
     if best is None:
         result = normalized_result(
             args, None, None, None, measurement_started_monotonic, stop_reason,
             "cancelled" if stop_reason == "cancelled" else "failed", len(messages), "NO_COMPLETE_SOLUTION",
         )
-        result["measurement_definition"] = "request_to_result_after_service_readiness"
-        result["measurement_start_offset_ms"] = measurement_start_offset_ms
-        result["cold_start_end_to_end_time_ms"] = int(
-            round((time.monotonic() - runner_started_monotonic) * 1000.0)
-        )
+        add_measurement_metadata(result)
         atomic_json(result_dir / "final-result.json", result)
         return 1
     try:
@@ -777,7 +843,9 @@ def run_distributed(args: argparse.Namespace) -> int:
             args, best, validation, test, measurement_started_monotonic,
             stop_reason, status, len(messages),
         )
-        result["candidate_count"] = metric_evaluation_count(result_dir / "metrics")
+        result["candidate_count"] = internal_candidate_count_before_deadline(
+            result_dir / "compose.log", cutoff_elapsed_ms,
+        )
         raw_target_times = validation_times_to_targets_ms(messages)
         result["validation_time_to_targets_ms"] = {
             target: (
@@ -787,11 +855,7 @@ def run_distributed(args: argparse.Namespace) -> int:
             for target, elapsed_ms in raw_target_times.items()
         }
         result["validation_time_to_target_ms"] = result["validation_time_to_targets_ms"]["0.95"]
-        result["measurement_definition"] = "request_to_result_after_service_readiness"
-        result["measurement_start_offset_ms"] = measurement_start_offset_ms
-        result["cold_start_end_to_end_time_ms"] = int(
-            round((time.monotonic() - runner_started_monotonic) * 1000.0)
-        )
+        add_measurement_metadata(result)
         atomic_json(result_dir / "selected-validation-solution.json", best)
         atomic_json(result_dir / "final-result.json", result)
         return 0
@@ -801,11 +865,7 @@ def run_distributed(args: argparse.Namespace) -> int:
             args, best, None, None, measurement_started_monotonic,
             "final_evaluation_failed", "failed", len(messages), "FINAL_EVALUATION_FAILED",
         )
-        result["measurement_definition"] = "request_to_result_after_service_readiness"
-        result["measurement_start_offset_ms"] = measurement_start_offset_ms
-        result["cold_start_end_to_end_time_ms"] = int(
-            round((time.monotonic() - runner_started_monotonic) * 1000.0)
-        )
+        add_measurement_metadata(result)
         atomic_json(result_dir / "final-result.json", result)
         return 1
 

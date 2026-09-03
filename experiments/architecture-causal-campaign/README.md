@@ -18,6 +18,10 @@ evaluated candidate first reaches validation macro-F1 0.94, censored at the
 2,700-second selection deadline. The distributed clock and resource sampler
 start only after the services are ready and immediately before the request;
 deployment/cold-start time is retained as a separate descriptive measure.
+Candidates completed during shutdown after the selection deadline are excluded,
+and unfinished phase intervals are right-censored at their last observed event.
+Candidate throughput and estimated CPU/memory costs use the measured selection
+duration, excluding the separate held-out final-evaluation interval.
 Candidate-level instrumentation is used in both arms, so
 the result does not favor the distributed arm merely because it publishes
 intermediate solutions to Kafka. Held-out
@@ -49,7 +53,7 @@ Example formal launch on the target host:
 ```sh
 python3 experiments/architecture-causal-campaign/run_campaign.py \
   --protocol experiments/architecture-causal-campaign/protocol.json \
-  --campaign-tag experiment-architecture-causal-v7 \
+  --campaign-tag experiment-architecture-causal-v8 \
   --image-tag causal-COMMIT \
   --state experiments/architecture-causal-campaign/state/campaign-state.json \
   --results experiments/architecture-causal-campaign/results
