@@ -7,6 +7,7 @@ import br.com.graspfs.ls.iwssr.machinelearning.MachineLearning;
 import br.com.graspfs.ls.iwssr.producer.KafkaSolutionsProducer;
 import br.com.graspfs.ls.iwssr.util.MachineLearningUtils;
 import br.com.graspfs.ls.iwssr.util.SystemMetricsUtils.MetricsCollector;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +22,7 @@ import java.io.BufferedWriter;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -47,8 +49,8 @@ public class IwssrService {
     @Value("${local.search.progress.every-n:10}")
     private int progressEveryN;
 
-    private BufferedWriter writer;
-    private boolean firstTime = true;
+    private final Object metricsLock = new Object();
+    private BufferedWriter metricsWriter;
 
     public void doIwssr(DataSolution seed) throws Exception {
         long startedAt = System.nanoTime();
@@ -74,28 +76,20 @@ public class IwssrService {
                 new FileInputStream(datasetsBasePath + data.getTestingFileName()));
         AbstractClassifier classifier = getClassifier(data.getClassfier());
 
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(metricsFileName, true))) {
-            this.writer = writer;
-            if (firstTime) {
-                writer.write("solutionFeatures;f1Score;accuracy;precision;recall;neighborhood;iterationNeighborhood;localSearch;iterationLocalSearch;runnigTime(ms);cpuUsage(%);memoryUsage(MB);memoryUsagePercent(%);classifier;trainingFileName;testingFileName");
-                writer.newLine();
-                firstTime = false;
-            }
-
-            DataSolution bestSolution = incrementalWrapperSequencialSearch(
-                    data, trainingDataset, testingDataset, classifier);
-            bestSolution = updateSolution(resetDataSolution(seed, bestSolution));
-            bestSolution.setStage("local_search_best");
-            stampEventTime(bestSolution);
-            log.info(
-                    "dls completed search=IWSSR seedId={} bestF1={} iterationLocalSearch={} elapsedMs={}",
-                    bestSolution.getSeedId(),
-                    bestSolution.getF1Score(),
-                    bestSolution.getIterationLocalSearch(),
-                    (System.nanoTime() - startedAt) / 1_000_000L
-            );
-            kafkaSolutionsProducer.send(bestSolution);
-        }
+        ensureMetricsWriter();
+        DataSolution bestSolution = incrementalWrapperSequencialSearch(
+                data, trainingDataset, testingDataset, classifier);
+        bestSolution = updateSolution(resetDataSolution(seed, bestSolution));
+        bestSolution.setStage("local_search_best");
+        stampEventTime(bestSolution);
+        log.info(
+                "dls completed search=IWSSR seedId={} bestF1={} iterationLocalSearch={} elapsedMs={}",
+                bestSolution.getSeedId(),
+                bestSolution.getF1Score(),
+                bestSolution.getIterationLocalSearch(),
+                (System.nanoTime() - startedAt) / 1_000_000L
+        );
+        kafkaSolutionsProducer.send(bestSolution);
     }
 
     public DataSolution incrementalWrapperSequencialSearch(
@@ -297,14 +291,15 @@ public class IwssrService {
         solution.setMemoryUsagePercent(Float.isFinite(avgMemoryPercent) ? avgMemoryPercent : 0.0F);
 
         log.info(
-                "dls iteration search=IWSSR seedId={} iteration={} f1={} featureCount={}",
+                "dls iteration search=IWSSR seedId={} iteration={} f1={} featureCount={} campaignElapsedMs={}",
                 solution.getSeedId(),
                 solution.getIterationLocalSearch(),
                 solution.getF1Score(),
-                solution.getSolutionFeatures().size()
+                solution.getSolutionFeatures().size(),
+                solution.getMonotonicElapsedMs()
         );
 
-        writer.write(String.join(";",
+        String row = String.join(";",
                 solution.getSolutionFeatures().toString(),
                 f1Formatted,
                 accFormatted,
@@ -321,8 +316,44 @@ public class IwssrService {
                 solution.getClassfier(),
                 solution.getTrainingFileName(),
                 solution.getTestingFileName()
-        ));
-        writer.newLine();
+        );
+        synchronized (metricsLock) {
+            ensureMetricsWriterLocked();
+            metricsWriter.write(row);
+            metricsWriter.newLine();
+            metricsWriter.flush();
+        }
+    }
+
+    private void ensureMetricsWriter() throws Exception {
+        synchronized (metricsLock) {
+            ensureMetricsWriterLocked();
+        }
+    }
+
+    private void ensureMetricsWriterLocked() throws Exception {
+        if (metricsWriter != null) {
+            return;
+        }
+        Path metricsPath = Path.of(metricsFileName);
+        boolean writeHeader = !Files.exists(metricsPath) || Files.size(metricsPath) == 0L;
+        metricsWriter = new BufferedWriter(new FileWriter(metricsFileName, true));
+        if (writeHeader) {
+            metricsWriter.write("solutionFeatures;f1Score;accuracy;precision;recall;neighborhood;iterationNeighborhood;localSearch;iterationLocalSearch;runnigTime(ms);cpuUsage(%);memoryUsage(MB);memoryUsagePercent(%);classifier;trainingFileName;testingFileName");
+            metricsWriter.newLine();
+            metricsWriter.flush();
+        }
+    }
+
+    @PreDestroy
+    public void closeMetricsWriter() throws Exception {
+        synchronized (metricsLock) {
+            if (metricsWriter != null) {
+                metricsWriter.flush();
+                metricsWriter.close();
+                metricsWriter = null;
+            }
+        }
     }
 
     private double publishProgressIfNeeded(

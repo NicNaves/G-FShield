@@ -24,6 +24,8 @@
     "initial_subset_size": 5,
     "controller": "vnd",
     "enabled_local_searches": ["iwssr"],
+    "pipeline_workers": 3,
+    "training_dataset_cache": true,
     "neighborhood_cycles": 100,
     "local_search_iterations": 100,
     "minimum_improvement": 0.0001,
@@ -43,12 +45,12 @@
     "aggregate_cpu_ceiling": 6,
     "aggregate_memory": "12g",
     "distributed_component_ceiling_sum": {
-      "rcl": {"cpu": 2.0, "memory_gib": 4},
-      "iwssr": {"cpu": 1.0, "memory_gib": 2},
-      "vnd": {"cpu": 1.0, "memory_gib": 2},
-      "verifier": {"cpu": 0.5, "memory_gib": 1},
-      "kafka": {"cpu": 1.0, "memory_gib": 2},
-      "zookeeper": {"cpu": 0.5, "memory_gib": 1}
+      "rcl": {"cpu": 1.0, "memory_gib": 3, "concurrency": 1},
+      "iwssr": {"cpu": 3.0, "memory_gib": 4, "concurrency": 3},
+      "vnd": {"cpu": 0.5, "memory_gib": 1, "concurrency": 3},
+      "verifier": {"cpu": 0.5, "memory_gib": 1, "concurrency": 3},
+      "kafka": {"cpu": 0.75, "memory_gib": 2, "partitions": 3},
+      "zookeeper": {"cpu": 0.25, "memory_gib": 1}
     }
   },
   "dataset": {
@@ -60,14 +62,15 @@
   },
   "hypotheses": {
     "quality_thresholds_validation_macro_f1": [0.93, 0.94, 0.945, 0.95],
-    "primary": "paired difference in time to validation macro-F1 0.94, censored at the 2700-second selection deadline",
+    "primary": "paired difference in time until an internally evaluated candidate first reaches validation macro-F1 0.94, censored at the 2700-second selection deadline",
     "quality_guardrail": "the one-sided 95% bootstrap lower bound for the paired mean held-out macro-F1 difference (distributed minus monolith) must be at least -0.005",
     "secondary": [
       "normalized area under the validation best-so-far curve",
       "candidate evaluations per second",
+      "median utilized CPU cores from 30-second Docker samples",
       "CPU-hours per candidate evaluation",
       "GiB-hours per candidate evaluation",
-      "CPU-core-seconds to validation macro-F1 0.94",
+      "estimated CPU-core-seconds to validation macro-F1 0.94 from median sampled utilization",
       "percentage of local-search execution time overlapping RCL construction",
       "time to validation macro-F1 0.93, 0.945, and 0.95",
       "dimensionality reduction"

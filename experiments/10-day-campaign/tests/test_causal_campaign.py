@@ -34,6 +34,12 @@ class CausalCampaignTest(unittest.TestCase):
                 {"distributed", "monolith"},
                 {architecture for row_seed, architecture in rows if row_seed == seed},
             )
+        limits = self.protocol["resources"]["distributed_component_ceiling_sum"]
+        self.assertEqual(
+            self.protocol["resources"]["aggregate_cpu_ceiling"],
+            sum(component["cpu"] for component in limits.values()),
+        )
+        self.assertEqual(12, sum(component["memory_gib"] for component in limits.values()))
 
     def test_execution_order_is_balanced(self):
         rows = CAMPAIGN.schedule(self.protocol)
@@ -58,6 +64,8 @@ class CausalCampaignTest(unittest.TestCase):
         monolith_text = " ".join(monolith)
         self.assertIn("--construction relieff", distributed_text)
         self.assertIn("--enabled-local-searches iwssr", distributed_text)
+        self.assertIn("--pipeline-workers 3", distributed_text)
+        self.assertIn("--use-training-cache", distributed_text)
         self.assertIn("--matched-architecture", monolith_text)
         for expected in ("--cpuset 8-15", "--aggregate-cpus 6", "--aggregate-memory 12g"):
             self.assertIn(expected, distributed_text)
@@ -82,13 +90,25 @@ class CausalCampaignTest(unittest.TestCase):
             path = Path(directory) / "compose.log"
             path.write_text(
                 "rcl | 2026-09-03T12:00:10.000000000Z rcl generation published "
-                "algorithm=RF requestId=x generation=1 seedId=a elapsedMs=4000\n"
+                "algorithm=RELIEF requestId=x generation=1 seedId=a elapsedMs=4000\n"
                 "iwssr | 2026-09-03T12:00:12.000000000Z dls completed "
                 "search=IWSSR seedId=a bestF1=0.94 iterationLocalSearch=1 elapsedMs=4000\n",
                 encoding="utf-8",
             )
             construction, local_search = ANALYSIS.distributed_phase_intervals(path)
             self.assertAlmostEqual(2.0, ANALYSIS.intersection_duration(construction, local_search))
+
+    def test_internal_candidate_trace_uses_common_monotonic_clock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "compose.log"
+            path.write_text(
+                'rcl | {"message":"rcl generation ready algorithm=RELIEF f1=0.91 campaignElapsedMs=1200"}\n'
+                'dls | {"message":"dls iteration search=IWSSR seedId=a iteration=1 f1=0.945 featureCount=6 campaignElapsedMs=2500"}\n',
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                [(1.2, 0.91), (2.5, 0.945)], ANALYSIS.distributed_candidate_trace(path)
+            )
 
 
 if __name__ == "__main__":

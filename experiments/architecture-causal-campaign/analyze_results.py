@@ -110,7 +110,7 @@ def distributed_phase_intervals(path: Path) -> tuple[list[tuple[float, float]], 
                 timestamp.group(1).replace("Z", "+00:00")
             ).timestamp()
             started = finished - float(elapsed.group(1)) / 1000.0
-            if "rcl generation published algorithm=RF" in line:
+            if "rcl generation published algorithm=" in line:
                 construction.append((started, finished))
             elif "dls completed search=IWSSR" in line:
                 local_search.append((started, finished))
@@ -158,13 +158,31 @@ def pipeline_metrics(run_dir: Path, architecture: str) -> dict[str, float]:
     }
 
 
+INTERNAL_CANDIDATE = re.compile(
+    r"(?:rcl generation ready|dls iteration search=IWSSR).*?f1=([-+0-9.Ee]+).*?campaignElapsedMs=(\d+)"
+)
+
+
+def distributed_candidate_trace(path: Path) -> list[tuple[float, float]]:
+    points: list[tuple[float, float]] = []
+    if not path.exists():
+        return points
+    with path.open(encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            match = INTERNAL_CANDIDATE.search(line)
+            if match:
+                points.append((float(match.group(2)) / 1000.0, float(match.group(1))))
+    return points
+
+
 def read_best_trace(run_dir: Path, architecture: str) -> list[tuple[float, float]]:
-    path = (
-        run_dir / "best-solution-messages.jsonl"
-        if architecture == "distributed"
-        else run_dir / "best-solution-trace.jsonl"
-    )
-    points = []
+    if architecture == "distributed":
+        points = distributed_candidate_trace(run_dir / "compose.log")
+        # Compatibility fallback for the pre-instrumentation pilot only.
+        path = run_dir / "best-solution-messages.jsonl"
+    else:
+        points = []
+        path = run_dir / "best-solution-trace.jsonl"
     if not path.exists():
         return points
     with path.open(encoding="utf-8", errors="replace") as handle:
@@ -233,12 +251,19 @@ def load_runs(state_path: Path) -> pd.DataFrame:
         checksum_errors.extend(verify_checksums(run_dir, checksum_path))
         result = json.loads(result_path.read_text(encoding="utf-8"))
         resources = parse_resources(run_dir / "resource-samples.jsonl")
-        trace_metrics = anytime_metrics(read_best_trace(run_dir, completed["architecture"]))
+        trace = read_best_trace(run_dir, completed["architecture"])
+        if not trace:
+            raise RuntimeError(f"missing internal candidate trace in {run_dir}")
+        trace_metrics = anytime_metrics(trace)
         phase_metrics = pipeline_metrics(run_dir, completed["architecture"])
         elapsed_seconds = float(result["end_to_end_time_ms"]) / 1000.0
         candidates = int(result["candidate_count"])
         cpu_cores = float(resources.get("cpu_cores_median", math.nan))
         memory_mib = float(resources.get("memory_mib_median", math.nan))
+        if not math.isfinite(cpu_cores) or not math.isfinite(memory_mib):
+            raise RuntimeError(f"missing resource samples in {run_dir}")
+        if phase_metrics["construction_active_seconds"] <= 0.0 or phase_metrics["local_search_active_seconds"] <= 0.0:
+            raise RuntimeError(f"missing construction/local-search intervals in {run_dir}")
         row = {
             "architecture": completed["architecture"],
             "seed": int(completed["seed"]),
@@ -264,7 +289,7 @@ def load_runs(state_path: Path) -> pd.DataFrame:
         }
         row.update(trace_metrics)
         row.update(phase_metrics)
-        row["cpu_core_seconds_to_0_94_censored"] = (
+        row["estimated_cpu_core_seconds_to_0_94_censored"] = (
             cpu_cores * float(row["time_to_0_94_seconds_censored"])
         )
         rows.append(row)
@@ -329,8 +354,12 @@ def comparisons(runs: pd.DataFrame) -> pd.DataFrame:
         ("time_to_0_94_seconds_censored", "lower", "primary"),
         ("test_f1_macro", "higher", "quality_guardrail"),
         ("anytime_auc_normalized", "higher", "secondary"),
+        ("time_to_0_93_seconds_censored", "lower", "secondary"),
+        ("time_to_0_945_seconds_censored", "lower", "secondary"),
+        ("time_to_0_95_seconds_censored", "lower", "secondary"),
         ("candidates_per_second", "higher", "secondary"),
-        ("cpu_core_seconds_to_0_94_censored", "lower", "secondary"),
+        ("cpu_cores_median", "higher", "secondary"),
+        ("estimated_cpu_core_seconds_to_0_94_censored", "lower", "secondary"),
         ("cpu_hours_per_candidate", "lower", "secondary"),
         ("memory_gib_hours_per_candidate", "lower", "secondary"),
         ("local_search_overlap_percent", "higher", "secondary"),
@@ -371,8 +400,10 @@ def summarize(runs: pd.DataFrame) -> pd.DataFrame:
         "elapsed_seconds", "candidate_count", "candidates_per_second",
         "cpu_cores_median", "memory_mib_median", "cpu_hours_per_candidate",
         "memory_gib_hours_per_candidate",
-        "anytime_auc_normalized", "time_to_0_94_seconds_censored",
-        "cpu_core_seconds_to_0_94_censored",
+        "anytime_auc_normalized", "time_to_0_93_seconds_censored",
+        "time_to_0_94_seconds_censored", "time_to_0_945_seconds_censored",
+        "time_to_0_95_seconds_censored",
+        "estimated_cpu_core_seconds_to_0_94_censored",
         "construction_active_seconds", "local_search_active_seconds",
         "construction_local_search_overlap_seconds", "local_search_overlap_percent",
     ]
@@ -508,6 +539,9 @@ def main() -> int:
         f"- Paired median time-to-0.94 difference (distributed minus monolith): {primary['paired_median_difference_distributed_minus_monolith']:.3f} s.",
         f"- Primary paired permutation p-value: {primary['p_permutation']:.6g}.",
         f"- One-sided 95% bootstrap lower bound for paired mean held-out macro-F1 difference: {quality_lower:.6f} (margin {NONINFERIORITY_MARGIN:.3f}).",
+        f"- Median utilized CPU cores: distributed {runs.loc[runs.architecture == 'distributed', 'cpu_cores_median'].median():.3f}; monolith {runs.loc[runs.architecture == 'monolith', 'cpu_cores_median'].median():.3f}.",
+        f"- Median candidate throughput: distributed {runs.loc[runs.architecture == 'distributed', 'candidates_per_second'].median():.4f}/s; monolith {runs.loc[runs.architecture == 'monolith', 'candidates_per_second'].median():.4f}/s.",
+        f"- Median estimated CPU-hours per candidate: distributed {runs.loc[runs.architecture == 'distributed', 'cpu_hours_per_candidate'].median():.6f}; monolith {runs.loc[runs.architecture == 'monolith', 'cpu_hours_per_candidate'].median():.6f}.",
         f"- Median local-search overlap: distributed {overlap_distributed:.2f}%; monolith {overlap_monolith:.2f}%.",
         f"- Conclusion: {conclusion}",
         "",

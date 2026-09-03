@@ -604,6 +604,32 @@ def run_distributed(args: argparse.Namespace) -> int:
             "CAMPAIGN_RELIEFF_SAMPLE_SIZE": str(args.relieff_sample_size),
         }
     )
+    if args.pipeline_workers > 1:
+        # Same six-core/12-GiB aggregate ceiling as the monolith, allocated to
+        # independent pipeline consumers instead of one sequential process.
+        environment.update(
+            {
+                "CAMPAIGN_RCL_CPUS": "1.0",
+                "CAMPAIGN_RCL_MEMORY": "3g",
+                "CAMPAIGN_RCL_JAVA_OPTS": "-Xms512m -Xmx2200m -XX:+UseContainerSupport -XX:+UseG1GC",
+                "CAMPAIGN_LOCAL_SEARCH_CPUS": "3.0",
+                "CAMPAIGN_LOCAL_SEARCH_MEMORY": "4g",
+                "CAMPAIGN_LOCAL_SEARCH_JAVA_OPTS": "-Xms512m -Xmx3200m -XX:+UseContainerSupport -XX:+UseG1GC",
+                "CAMPAIGN_LOCAL_SEARCH_CONCURRENCY": str(args.pipeline_workers),
+                "CAMPAIGN_CONTROLLER_CPUS": "0.5",
+                "CAMPAIGN_CONTROLLER_MEMORY": "1g",
+                "CAMPAIGN_CONTROLLER_JAVA_OPTS": "-Xms128m -Xmx700m -XX:+UseContainerSupport -XX:+UseG1GC",
+                "CAMPAIGN_CONTROLLER_CONCURRENCY": str(args.pipeline_workers),
+                "CAMPAIGN_VERIFY_CPUS": "0.5",
+                "CAMPAIGN_VERIFY_MEMORY": "1g",
+                "CAMPAIGN_VERIFY_CONCURRENCY": str(args.pipeline_workers),
+                "CAMPAIGN_KAFKA_CPUS": "0.75",
+                "CAMPAIGN_KAFKA_MEMORY": "2g",
+                "CAMPAIGN_KAFKA_PARTITIONS": str(args.pipeline_workers),
+                "CAMPAIGN_ZOOKEEPER_CPUS": "0.25",
+                "CAMPAIGN_ZOOKEEPER_MEMORY": "1g",
+            }
+        )
     configured_searches = enabled_local_searches(args)
     rcl_service, _container_port, route = RCL_SERVICES[args.construction]
     local_services = [LOCAL_SEARCH_SERVICES[value.lower()] for value in configured_searches]
@@ -658,7 +684,7 @@ def run_distributed(args: argparse.Namespace) -> int:
                 "datasetTrainingName": "campaign/erenoall-train.arff",
                 "datasetTestingName": "campaign/erenoall-validation.arff",
                 "classifier": "J48",
-                "useTrainingCache": "false",
+                "useTrainingCache": str(args.use_training_cache).lower(),
                 "neighborhoodStrategy": args.controller.upper(),
                 "localSearches": ",".join(configured_searches),
                 "neighborhoodMaxIterations": args.neighborhood_iterations,
@@ -763,6 +789,8 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--relieff-sample-size", type=int, default=1000)
     result.add_argument("--neighborhood-iterations", type=int, default=50)
     result.add_argument("--local-search-iterations", type=int, default=100)
+    result.add_argument("--pipeline-workers", type=int, default=1)
+    result.add_argument("--use-training-cache", action="store_true")
     result.add_argument("--minimum-improvement", type=float, default=0.0001)
     result.add_argument("--max-accepted-improvements", type=int, default=500)
     result.add_argument("--cpuset", default="8-15")
@@ -787,6 +815,8 @@ def main() -> int:
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, handle_termination)
     args = parser().parse_args()
+    if args.pipeline_workers <= 0:
+        raise SystemExit("--pipeline-workers must be positive")
     return run_distributed(args)
 
 

@@ -50,6 +50,7 @@ CONSTRUCTION_RANDOM = None
 RUN_STARTED_MONOTONIC = None
 VALIDATION_THRESHOLDS = (0.93, 0.94, 0.945, 0.95)
 VALIDATION_TARGET_TIMES_MS = {}
+OBSERVED_BEST_F1 = float("-inf")
 
 
 class JavaRandom:
@@ -173,10 +174,14 @@ def stop_requested() -> bool:
 
 
 def record_global_best(features, metrics, seed_id):
+    global OBSERVED_BEST_F1
     if RUN_STARTED_MONOTONIC is None:
         raise RuntimeError("run start was not initialized")
     elapsed_ms = int((time.monotonic() - RUN_STARTED_MONOTONIC) * 1000.0)
     score = float(metrics["f1"])
+    if score <= OBSERVED_BEST_F1:
+        return
+    OBSERVED_BEST_F1 = score
     for threshold in VALIDATION_THRESHOLDS:
         if score >= threshold and threshold not in VALIDATION_TARGET_TIMES_MS:
             VALIDATION_TARGET_TIMES_MS[threshold] = elapsed_ms
@@ -525,6 +530,7 @@ def java_iwssr_once(
         if feature not in add_solution:
             add_solution.append(feature)
         add_metrics = evaluate_subset(Xtr, ytr, Xte, yte, add_solution, clf_name)
+        record_global_best(add_solution, add_metrics, seed_id)
         cpu, mem, memp = get_system_metrics(log_sys_metrics)
         writer.writerow([
             str(add_solution), f"{add_metrics['f1']:.6f}", f"{add_metrics['acc']:.6f}",
@@ -542,6 +548,7 @@ def java_iwssr_once(
             candidate_started = time.perf_counter()
             candidate = add_solution[:position] + add_solution[position + 1:]
             candidate_metrics = evaluate_subset(Xtr, ytr, Xte, yte, candidate, clf_name)
+            record_global_best(candidate, candidate_metrics, seed_id)
             cpu, mem, memp = get_system_metrics(log_sys_metrics)
             writer.writerow([
                 str(candidate), f"{candidate_metrics['f1']:.6f}",
@@ -889,13 +896,14 @@ def parse_args():
 def main():
     global RUN_DEADLINE, MAX_ACCEPTED_IMPROVEMENTS, MINIMUM_IMPROVEMENT
     global WEKA_EVALUATOR, WEKA_SPLIT_BY_OBJECT_ID, CONSTRUCTION_RANDOM
-    global RUN_STARTED_MONOTONIC, VALIDATION_TARGET_TIMES_MS
+    global RUN_STARTED_MONOTONIC, VALIDATION_TARGET_TIMES_MS, OBSERVED_BEST_F1
     args = parse_args()
     random.seed(args.seed)
     np.random.seed(args.seed)
     run_started = time.monotonic()
     RUN_STARTED_MONOTONIC = run_started
     VALIDATION_TARGET_TIMES_MS = {}
+    OBSERVED_BEST_F1 = float("-inf")
     if args.final_evaluation_reserve_seconds >= args.run_timeout_seconds:
         raise ValueError("final evaluation reserve must be shorter than the absolute run timeout")
     absolute_deadline = run_started + args.run_timeout_seconds
@@ -1049,6 +1057,7 @@ def main():
                             record_phase(
                                 "construction", seed_id, construction_started, time.monotonic()
                             )
+                            record_global_best(S0, initial_metrics, seed_id)
 
                             # 2) “microserviços” no monolito: cada operador parte da mesma S0
                             # The controller receives all neighborhoods together.

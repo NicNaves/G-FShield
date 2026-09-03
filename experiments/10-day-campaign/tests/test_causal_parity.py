@@ -46,6 +46,16 @@ class CausalParityTest(unittest.TestCase):
         self.assertIn("evaluator.setSampleSize(sampleSize)", source)
         self.assertIn("evaluator.setSeed(seed)", source)
 
+    def test_parallel_iwssr_has_synchronized_metrics_output(self):
+        source = (
+            REPO
+            / "grasp-fs-distributed-ls/Local Search/IWSSR/grasp-fs-dls-iwr"
+            / "src/main/java/br/com/graspfs/ls/iwssr/service/IwssrService.java"
+        ).read_text(encoding="utf-8")
+        self.assertIn("synchronized (metricsLock)", source)
+        self.assertIn("campaignElapsedMs={}", source)
+        self.assertNotIn("private boolean firstTime", source)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,10 +12,10 @@ x-service-common: &service-common
 
 x-rcl: &rcl
   <<: *service-common
-  cpus: 2.0
-  mem_limit: 4g
+  cpus: ${CAMPAIGN_RCL_CPUS:-2.0}
+  mem_limit: ${CAMPAIGN_RCL_MEMORY:-4g}
   environment:
-    JAVA_OPTS: "-Xms512m -Xmx3072m -XX:+UseContainerSupport -XX:+UseG1GC"
+    JAVA_OPTS: ${CAMPAIGN_RCL_JAVA_OPTS:--Xms512m -Xmx3072m -XX:+UseContainerSupport -XX:+UseG1GC}
     CAMPAIGN_ID: ${CAMPAIGN_ID:?CAMPAIGN_ID is required}
     CAMPAIGN_ARM_ID: ${CAMPAIGN_ARM_ID:?CAMPAIGN_ARM_ID is required}
     CAMPAIGN_RUN_ID: ${CAMPAIGN_RUN_ID:?CAMPAIGN_RUN_ID is required}
@@ -33,11 +33,11 @@ x-rcl: &rcl
 
 x-local-search: &local-search
   <<: *service-common
-  cpus: 1.0
-  mem_limit: 2g
+  cpus: ${CAMPAIGN_LOCAL_SEARCH_CPUS:-1.0}
+  mem_limit: ${CAMPAIGN_LOCAL_SEARCH_MEMORY:-2g}
   environment:
-    JAVA_OPTS: "-Xms256m -Xmx1400m -XX:+UseContainerSupport -XX:+UseG1GC"
-    KAFKA_LISTENER_CONCURRENCY: "1"
+    JAVA_OPTS: ${CAMPAIGN_LOCAL_SEARCH_JAVA_OPTS:--Xms256m -Xmx1400m -XX:+UseContainerSupport -XX:+UseG1GC}
+    KAFKA_LISTENER_CONCURRENCY: ${CAMPAIGN_LOCAL_SEARCH_CONCURRENCY:-1}
     KAFKA_MAX_POLL_INTERVAL_MS: "14400000"
     CAMPAIGN_DEADLINE_EPOCH_MS: ${CAMPAIGN_DEADLINE_EPOCH_MS:?CAMPAIGN_DEADLINE_EPOCH_MS is required}
     CAMPAIGN_RANDOM_SEED: ${CAMPAIGN_RANDOM_SEED:?CAMPAIGN_RANDOM_SEED is required}
@@ -48,11 +48,11 @@ x-local-search: &local-search
 
 x-controller: &controller
   <<: *service-common
-  cpus: 1.0
-  mem_limit: 2g
+  cpus: ${CAMPAIGN_CONTROLLER_CPUS:-1.0}
+  mem_limit: ${CAMPAIGN_CONTROLLER_MEMORY:-2g}
   environment:
-    JAVA_OPTS: "-Xms256m -Xmx1536m -XX:+UseContainerSupport -XX:+UseG1GC"
-    KAFKA_LISTENER_CONCURRENCY: "1"
+    JAVA_OPTS: ${CAMPAIGN_CONTROLLER_JAVA_OPTS:--Xms256m -Xmx1536m -XX:+UseContainerSupport -XX:+UseG1GC}
+    KAFKA_LISTENER_CONCURRENCY: ${CAMPAIGN_CONTROLLER_CONCURRENCY:-1}
     CAMPAIGN_DEADLINE_EPOCH_MS: ${CAMPAIGN_DEADLINE_EPOCH_MS:?CAMPAIGN_DEADLINE_EPOCH_MS is required}
     CAMPAIGN_RANDOM_SEED: ${CAMPAIGN_RANDOM_SEED:?CAMPAIGN_RANDOM_SEED is required}
     CAMPAIGN_START_MONOTONIC_NS: ${CAMPAIGN_START_MONOTONIC_NS:?CAMPAIGN_START_MONOTONIC_NS is required}
@@ -138,11 +138,11 @@ services:
     build:
       context: ../../grasp-fs-distributed-ls/Verify/grasp-fs.dls.verify
       dockerfile: Dockerfile
-    cpus: 0.5
-    mem_limit: 1g
+    cpus: ${CAMPAIGN_VERIFY_CPUS:-0.5}
+    mem_limit: ${CAMPAIGN_VERIFY_MEMORY:-1g}
     environment:
       JAVA_OPTS: "-Xms128m -Xmx700m -XX:+UseContainerSupport -XX:+UseG1GC"
-      KAFKA_LISTENER_CONCURRENCY: "1"
+      KAFKA_LISTENER_CONCURRENCY: ${CAMPAIGN_VERIFY_CONCURRENCY:-1}
       CAMPAIGN_MINIMUM_IMPROVEMENT: ${CAMPAIGN_MINIMUM_IMPROVEMENT:-0.0001}
       CAMPAIGN_MAX_ACCEPTED_IMPROVEMENTS: ${CAMPAIGN_MAX_ACCEPTED_IMPROVEMENTS:-500}
       CAMPAIGN_DEADLINE_EPOCH_MS: ${CAMPAIGN_DEADLINE_EPOCH_MS:?CAMPAIGN_DEADLINE_EPOCH_MS is required}
@@ -155,8 +155,8 @@ services:
     restart: "no"
     image: confluentinc/cp-zookeeper:7.4.0@sha256:90631f224b4397ecfb4e824e43d93e0e42656841c6d55ef635c49df3975260ae
     cpuset: ${CAMPAIGN_CPUSET:-8-15}
-    cpus: 0.5
-    mem_limit: 1g
+    cpus: ${CAMPAIGN_ZOOKEEPER_CPUS:-0.5}
+    mem_limit: ${CAMPAIGN_ZOOKEEPER_MEMORY:-1g}
     environment:
       ZOOKEEPER_CLIENT_PORT: "2181"
       ZOOKEEPER_TICK_TIME: "2000"
@@ -174,8 +174,8 @@ services:
     restart: "no"
     image: confluentinc/cp-kafka:7.4.0@sha256:187dac6627e7906c350f5f8c982f80ce735ff1a0e571a20de6000a309a12ce63
     cpuset: ${CAMPAIGN_CPUSET:-8-15}
-    cpus: 1.0
-    mem_limit: 2g
+    cpus: ${CAMPAIGN_KAFKA_CPUS:-1.0}
+    mem_limit: ${CAMPAIGN_KAFKA_MEMORY:-2g}
     environment:
       KAFKA_HEAP_OPTS: "-Xms512m -Xmx1024m"
       KAFKA_BROKER_ID: "1"
@@ -184,7 +184,7 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://kafka:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
-      KAFKA_NUM_PARTITIONS: "1"
+      KAFKA_NUM_PARTITIONS: ${CAMPAIGN_KAFKA_PARTITIONS:-1}
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"

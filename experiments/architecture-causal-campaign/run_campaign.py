@@ -88,6 +88,21 @@ def validate_inputs(protocol: dict[str, Any], repo_root: Path, tag: str, image_t
         raise RuntimeError("the causal campaign requires at least 20 unique paired seeds")
     if protocol["maximum_seconds"] > 10 * 24 * 60 * 60:
         raise RuntimeError("campaign maximum exceeds ten days")
+    resources = protocol["resources"]
+    component_limits = resources["distributed_component_ceiling_sum"]
+    cpu_sum = sum(float(component["cpu"]) for component in component_limits.values())
+    memory_sum = sum(float(component["memory_gib"]) for component in component_limits.values())
+    expected_memory = float(str(resources["aggregate_memory"]).lower().removesuffix("g"))
+    if abs(cpu_sum - float(resources["aggregate_cpu_ceiling"])) > 1e-9:
+        raise RuntimeError("distributed component CPU limits do not equal the aggregate ceiling")
+    if abs(memory_sum - expected_memory) > 1e-9:
+        raise RuntimeError("distributed component memory limits do not equal the aggregate ceiling")
+    workers = int(protocol["algorithm"]["pipeline_workers"])
+    if workers < 2 or any(
+        int(component_limits[name].get("concurrency", workers)) != workers
+        for name in ("iwssr", "vnd", "verifier")
+    ) or int(component_limits["kafka"]["partitions"]) != workers:
+        raise RuntimeError("pipeline worker, consumer, and Kafka partition counts are inconsistent")
     head = checked("git", "rev-parse", "HEAD", cwd=repo_root)
     tag_commit = checked("git", "rev-list", "-n", "1", tag, cwd=repo_root)
     if head != tag_commit:
@@ -171,6 +186,8 @@ def common_arguments(
         *common,
         "--construction", "relieff", "--controller", "vnd",
         "--local-search", "iwssr", "--enabled-local-searches", "iwssr",
+        "--pipeline-workers", str(algorithm["pipeline_workers"]),
+        "--use-training-cache",
         "--startup-timeout-seconds", str(protocol["startup_timeout_seconds"]),
         "--max-generations", "2147483647",
         "--rcl-cutoff", str(algorithm["rcl_cutoff"]),
