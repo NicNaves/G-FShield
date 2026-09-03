@@ -41,6 +41,11 @@ class CausalCampaignTest(unittest.TestCase):
         self.assertEqual(15, sum(architecture == "distributed" for _, architecture in first_by_seed))
         self.assertEqual(15, sum(architecture == "monolith" for _, architecture in first_by_seed))
 
+    def test_dataset_paths_match_the_existing_campaign_mount_contract(self):
+        paths = CAMPAIGN.dataset_paths(REPO)
+        self.assertEqual(REPO / "datasets/campaign/erenoall-train.arff", paths["train"])
+        self.assertEqual("datasets/campaign/split-manifest.json", self.protocol["dataset"]["split_manifest"])
+
     def test_commands_freeze_the_same_algorithm_and_resources(self):
         output = Path("/tmp/result")
         distributed = CAMPAIGN.common_arguments(

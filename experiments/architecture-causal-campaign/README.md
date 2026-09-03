@@ -40,7 +40,7 @@ Example formal launch on the target host:
 ```sh
 python3 experiments/architecture-causal-campaign/run_campaign.py \
   --protocol experiments/architecture-causal-campaign/protocol.json \
-  --campaign-tag experiment-architecture-causal-v1 \
+  --campaign-tag experiment-architecture-causal-v2 \
   --image-tag causal-COMMIT \
   --state experiments/architecture-causal-campaign/state/campaign-state.json \
   --results experiments/architecture-causal-campaign/results

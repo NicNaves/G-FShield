@@ -75,7 +75,7 @@ def image_id(reference: str) -> str:
 
 
 def dataset_paths(repo_root: Path) -> dict[str, Path]:
-    root = repo_root / "datasets/campaign-10d"
+    root = repo_root / "datasets/campaign"
     return {
         "train": root / "erenoall-train.arff",
         "validation": root / "erenoall-validation.arff",
