@@ -7,10 +7,10 @@ import br.com.graspfs.ls.iwssr.machinelearning.MachineLearning;
 import br.com.graspfs.ls.iwssr.producer.KafkaSolutionsProducer;
 import br.com.graspfs.ls.iwssr.util.MachineLearningUtils;
 import br.com.graspfs.ls.iwssr.util.SystemMetricsUtils.MetricsCollector;
-import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.DisposableBean;
 import org.springframework.stereotype.Service;
 import weka.classifiers.AbstractClassifier;
 import weka.classifiers.bayes.NaiveBayes;
@@ -32,7 +32,7 @@ import java.util.UUID;
 
 @Service
 @Slf4j
-public class IwssrService {
+public class IwssrService implements DisposableBean {
 
     @Autowired
     private KafkaSolutionsProducer kafkaSolutionsProducer;
@@ -345,8 +345,8 @@ public class IwssrService {
         }
     }
 
-    @PreDestroy
-    public void closeMetricsWriter() throws Exception {
+    @Override
+    public void destroy() throws Exception {
         synchronized (metricsLock) {
             if (metricsWriter != null) {
                 metricsWriter.flush();

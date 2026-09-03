@@ -22,9 +22,9 @@ IWSSR. Isso comprova o mecanismo no piloto, mas ainda não comprova uma vantagem
 estatística de velocidade ou eficiência.
 
 Nenhuma conclusão final de superioridade deve ser escrita na dissertação antes
-da conclusão e análise da campanha v5.
+da conclusão e análise da campanha v6.
 
-## Desenho formal congelado para a v5
+## Desenho formal congelado para a v6
 
 - 30 sementes pareadas: 42 a 71.
 - Ordem AB/BA alternada: 15 pares começam pelo distribuído e 15 pelo monólito.
@@ -109,7 +109,7 @@ e limites de validade devem acompanhar os valores de p.
 - O piloto v2 terminou com duas células válidas. Em 600 s de seleção, o braço
   distribuído de um consumidor obteve F1 de validação 0,922230 (29 avaliações
   registradas) e o monólito obteve 0,944423 (67 avaliações). Esses números são
-  diagnósticos e não fazem parte da campanha formal v4/v5.
+  diagnósticos e não fazem parte da campanha formal.
 - A primeira trajetória teve paridade exata. O subconjunto distribuído de base
   1 `[2, 8, 24, 37, 48]` corresponde ao subconjunto monolítico de base 0
   `[1, 7, 23, 36, 47]`; a primeira adição também correspondeu (22 versus 21) e
@@ -134,8 +134,9 @@ Histórico relevante:
 - `dd6b4a7`: correção do caminho canônico dos dados;
 - `fcff0f5`: pipeline concorrente e telemetria interna equivalente;
 - `0275cce`: identidade v4 e primeira versão deste relatório;
-- a revisão seguinte adiciona persistência imediata das métricas RCL e congela
-  a identidade/tag v5.
+- `b3bc392`: persistência imediata das métricas RCL e identidade v5;
+- a revisão seguinte troca `jakarta.annotation.PreDestroy`, incompatível com
+  Spring Boot 2.7.5, por `DisposableBean` e congela a identidade/tag v6.
 
 Servidor autorizado pelo usuário:
 
@@ -149,24 +150,26 @@ As credenciais do servidor não devem ser registradas no repositório.
 
 ## Estado de versionamento
 
-`fcff0f5` contém a implementação concorrente e `0275cce` registra o contexto
-v4. A revisão corrente aponta para a v5, que acrescenta a persistência imediata
-das métricas de construção antes do desligamento no prazo.
+`b3bc392` contém a persistência imediata das métricas de construção. A
+primeira compilação da v5 no servidor falhou antes do piloto porque o módulo
+IWSSR usa Spring Boot 2.7.5 e não fornece `jakarta.annotation.PreDestroy`. A v6
+substitui essa anotação pela interface Spring `DisposableBean`, preservando o
+fechamento seguro do escritor e a gravação sincronizada por registro.
 
 Os bundles locais `architecture-causal-*.bundle` são artefatos temporários e
 não devem ser adicionados ao Git.
 
 ## Próximos passos obrigatórios
 
-1. Executar os 48 testes locais novamente.
-2. Criar o commit e a tag `experiment-architecture-causal-v5`.
+1. Executar os 49 testes locais novamente.
+2. Criar o commit e a tag `experiment-architecture-causal-v6`.
 3. Gerar e enviar um novo bundle ao servidor.
 4. Fazer fast-forward do worktree isolado; não tocar no repositório principal
    sujo nem nos contêineres de produção.
 5. Validar `docker compose config`, conferindo três partições/consumidores e a
    soma de 6 CPUs/12 GiB.
-6. Recompilar as seis imagens com um sufixo derivado do commit v4.
-7. Executar novo piloto pareado em diretório `pilot-v5` separado.
+6. Recompilar as seis imagens com um sufixo derivado do commit v6.
+7. Executar novo piloto pareado em diretório `pilot-v6` separado.
 8. Confirmar no piloto:
    - três buscas IWSSR simultâneas com seeds/candidatos distintos;
    - ausência de corrupção no CSV;
@@ -175,7 +178,7 @@ não devem ser adicionados ao Git.
    - presença de `campaignElapsedMs`, intervalos de fase, resultados finais,
      amostras de recursos e checksums;
    - nenhuma exceção, OOM, reinício ou timeout de polling Kafka.
-9. Somente depois iniciar a campanha formal v5 em `tmux`, com estado/resultados
+9. Somente depois iniciar a campanha formal v6 em `tmux`, com estado/resultados
    separados e retomáveis.
 10. Ao terminar, baixar uma cópia dos artefatos, verificar checksums, executar
     `analyze_results.py` e interpretar o critério pré-especificado.

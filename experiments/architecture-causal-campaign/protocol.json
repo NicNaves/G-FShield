@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "campaign_id": "gfshield-architecture-causal-2026-v5",
+  "campaign_id": "gfshield-architecture-causal-2026-v6",
   "maximum_seconds": 864000,
   "run_timeout_seconds": 3000,
   "finalization_reserve_seconds": 300,

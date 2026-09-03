@@ -54,6 +54,9 @@ class CausalParityTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("synchronized (metricsLock)", source)
         self.assertIn("campaignElapsedMs={}", source)
+        self.assertIn("implements DisposableBean", source)
+        self.assertIn("public void destroy() throws Exception", source)
+        self.assertNotIn("jakarta.annotation", source)
         self.assertNotIn("private boolean firstTime", source)
 
     def test_relief_flushes_each_completed_candidate_metric(self):
