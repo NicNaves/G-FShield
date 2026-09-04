@@ -22,9 +22,9 @@ IWSSR. Isso comprova o mecanismo no piloto, mas ainda não comprova uma vantagem
 estatística de velocidade ou eficiência.
 
 Nenhuma conclusão final de superioridade deve ser escrita na dissertação antes
-da conclusão e análise da campanha v8.
+da conclusão e análise da campanha v9.
 
-## Desenho formal congelado para a v8
+## Desenho formal congelado para a v9
 
 - 30 sementes pareadas: 42 a 71.
 - Ordem AB/BA alternada: 15 pares começam pelo distribuído e 15 pelo monólito.
@@ -173,6 +173,29 @@ e limites de validade devem acompanhar os valores de p.
   `/home/idscps/nicolas/experiment-artifacts/architecture-causal/pilot-v7` e não
   integra a inferência formal.
 
+## Validação do censoramento no piloto v8
+
+- Commit/tag: `d051630`, `experiment-architecture-causal-v8`.
+- O artefato transferido conferiu com SHA-256
+  `683241bf7eb22b344f074b4daad1893651a8b774641f98eb350aa3db0cde7760`.
+- A janela distribuída tinha 45 eventos internos brutos; 43 ocorreram dentro
+  do prazo e dois durante o desligamento. O resultado registrou exatamente 43,
+  demonstrando que o censoramento estrito funcionou.
+- Resultado distribuído: F1 macro de validação 0,922302, teste 0,922115 e
+  nenhum alcance de 0,94 em 600 s.
+- Resultado monolítico: F1 macro de validação 0,944231, teste 0,944685 e
+  alcance de 0,94 em 387,461 s.
+- A análise diagnóstica mediu 88,94% de sobreposição no distribuído e 0%
+  no monólito, com CPU mediana de 3,031 e 1,004 núcleos, respectivamente.
+- A vazão foi 0,0717 candidato/s no distribuído e 0,1150 candidato/s no
+  monólito; o custo estimado foi 0,011748 e 0,002425 CPU-h/candidato.
+- Portanto, este piloto comprova o mecanismo de paralelismo, mas favorece o
+  monólito em velocidade e eficiência para a semente/janela curta. Ele não
+  autoriza uma afirmação de superioridade do G-FShield.
+- A v9 não muda o algoritmo nem o comportamento no timeout. Ela registra o
+  instante real de encerramento da seleção e usa essa duração para vazão e
+  custos, cobrindo também eventual parada antecipada por 500 melhorias aceitas.
+
 ## Identificadores e caminhos
 
 Worktree local:
@@ -194,7 +217,10 @@ Histórico relevante:
   Boot 2.7.5, por `DisposableBean` e congela a identidade/tag v6;
 - `bccfb97`: corrige a origem temporal da janela causal e congela a identidade
   v7;
-- a revisão seguinte aplica o censoramento estrito e congela a identidade v8.
+- `d051630`: aplica o censoramento estrito, trata buscas locais incompletas e
+  congela a identidade/tag v8;
+- a revisão v9 registra a duração efetiva da seleção, inclusive em eventual
+  parada antecipada, e usa essa duração nos denominadores de vazão e custo.
 
 Servidor autorizado pelo usuário:
 
@@ -205,14 +231,16 @@ Servidor autorizado pelo usuário:
 - piloto v2: `/home/idscps/nicolas/experiment-artifacts/architecture-causal/pilot-v2`.
 - piloto v6: `/home/idscps/nicolas/experiment-artifacts/architecture-causal/pilot-v6`.
 - piloto v7: `/home/idscps/nicolas/experiment-artifacts/architecture-causal/pilot-v7`.
+- piloto v8: `/home/idscps/nicolas/experiment-artifacts/architecture-causal/pilot-v8`.
 
 As credenciais do servidor não devem ser registradas no repositório.
 
 ## Estado de versionamento
 
-`bccfb97` separa tempo de implantação e tempo requisição--resultado. A v8
-acrescenta seleção, contagem e análise estritamente censuradas, inclusive para
-buscas incompletas. O analisador aceita pilotos somente com a opção explícita
+`d051630` é o estado validado pelo piloto v8. A revisão v9 preserva o algoritmo,
+o orçamento e o censoramento já validados; acrescenta somente metadados da
+duração efetiva de seleção e corrige os denominadores de vazão, CPU e memória
+para essa duração. O analisador aceita pilotos somente com a opção explícita
 `--allow-pilot`, evitando tratá-los acidentalmente como evidência inferencial.
 
 Os bundles locais `architecture-causal-*.bundle` são artefatos temporários e
@@ -221,14 +249,16 @@ não devem ser adicionados ao Git.
 ## Próximos passos obrigatórios
 
 1. Executar os 54 testes locais novamente.
-2. Criar o commit e a tag `experiment-architecture-causal-v8`.
+2. Criar o commit e a tag `experiment-architecture-causal-v9`.
 3. Gerar e enviar um novo bundle ao servidor.
 4. Fazer fast-forward do worktree isolado; não tocar no repositório principal
    sujo nem nos contêineres de produção.
 5. Validar `docker compose config`, conferindo três partições/consumidores e a
    soma de 6 CPUs/12 GiB.
-6. Recompilar as seis imagens com um sufixo derivado do commit v8.
-7. Executar novo piloto pareado em diretório `pilot-v8` separado.
+6. Recompilar as seis imagens com um sufixo derivado do commit v9.
+7. Executar uma validação pareada curta em diretório `pilot-v9`, destinada a
+   verificar os novos campos de duração e o analisador, sem reutilizar o piloto
+   como evidência formal.
 8. Confirmar no piloto:
    - três buscas IWSSR simultâneas com seeds/candidatos distintos;
    - ausência de corrupção no CSV;
@@ -237,7 +267,7 @@ não devem ser adicionados ao Git.
    - presença de `campaignElapsedMs`, intervalos de fase, resultados finais,
      amostras de recursos e checksums;
    - nenhuma exceção, OOM, reinício ou timeout de polling Kafka.
-9. Somente depois iniciar a campanha formal v8 em `tmux`, com estado/resultados
+9. Somente depois iniciar a campanha formal v9 em `tmux`, com estado/resultados
    separados e retomáveis.
 10. Ao terminar, baixar uma cópia dos artefatos, verificar checksums, executar
     `analyze_results.py` e interpretar o critério pré-especificado.

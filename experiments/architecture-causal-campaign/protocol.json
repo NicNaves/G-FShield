@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "campaign_id": "gfshield-architecture-causal-2026-v8",
+  "campaign_id": "gfshield-architecture-causal-2026-v9",
   "maximum_seconds": 864000,
   "measurement_window": {
     "cold_start_reported_separately": true,
