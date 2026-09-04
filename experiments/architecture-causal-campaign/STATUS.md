@@ -196,6 +196,28 @@ e limites de validade devem acompanhar os valores de p.
   instante real de encerramento da seleção e usa essa duração para vazão e
   custos, cobrindo também eventual parada antecipada por 500 melhorias aceitas.
 
+## Campanha formal v9 em execução
+
+- Commit congelado: `7960791`.
+- Tag Git: `experiment-architecture-causal-v9`.
+- Tag das seis imagens experimentais: `causal-7960791`.
+- Início UTC: `2026-09-04T00:32:45.436694+00:00`.
+- Limite global UTC: `2026-09-14T00:32:45.436694+00:00`.
+- Sessão persistente: `tmux` `gfshield-formal-v9`.
+- Estado: `/home/idscps/nicolas/experiment-artifacts/architecture-causal/formal-v9/state.json`.
+- Resultados: `/home/idscps/nicolas/experiment-artifacts/architecture-causal/formal-v9/results`.
+- Log do supervisor: `/home/idscps/nicolas/experiment-artifacts/architecture-causal/formal-v9/runner.log`.
+- O primeiro braço é o distribuído da semente 42. A requisição foi submetida
+  após a prontidão dos serviços em `2026-09-04T00:34:45.783856+00:00`, com
+  janela de seleção de 2.700 s.
+- As imagens ativas foram conferidas como `causal-7960791`. A configuração
+  resolvida confirmou três consumidores/partições e o teto agregado exato de
+  6 CPUs e 12 GiB no `cpuset` 8--15.
+- O piloto v9 de 300 s foi interrompido e preservado separadamente porque sua
+  janela de seleção de 180 s não produziu uma solução distribuída completa.
+  Ele não integra a análise. O piloto v8 de 600 s continua sendo a validação
+  funcional do código, que é idêntico na v9.
+
 ## Identificadores e caminhos
 
 Worktree local:
@@ -248,30 +270,19 @@ não devem ser adicionados ao Git.
 
 ## Próximos passos obrigatórios
 
-1. Executar os 54 testes locais novamente.
-2. Criar o commit e a tag `experiment-architecture-causal-v9`.
-3. Gerar e enviar um novo bundle ao servidor.
-4. Fazer fast-forward do worktree isolado; não tocar no repositório principal
-   sujo nem nos contêineres de produção.
-5. Validar `docker compose config`, conferindo três partições/consumidores e a
-   soma de 6 CPUs/12 GiB.
-6. Recompilar as seis imagens com um sufixo derivado do commit v9.
-7. Executar uma validação pareada curta em diretório `pilot-v9`, destinada a
-   verificar os novos campos de duração e o analisador, sem reutilizar o piloto
-   como evidência formal.
-8. Confirmar no piloto:
-   - três buscas IWSSR simultâneas com seeds/candidatos distintos;
-   - ausência de corrupção no CSV;
-   - igualdade do primeiro subconjunto e F1 entre os braços, ajustando índices
-     Java de base 1 para Python de base 0;
-   - presença de `campaignElapsedMs`, intervalos de fase, resultados finais,
-     amostras de recursos e checksums;
-   - nenhuma exceção, OOM, reinício ou timeout de polling Kafka.
-9. Somente depois iniciar a campanha formal v9 em `tmux`, com estado/resultados
-   separados e retomáveis.
-10. Ao terminar, baixar uma cópia dos artefatos, verificar checksums, executar
-    `analyze_results.py` e interpretar o critério pré-especificado.
-11. Atualizar dissertações PT/EN e gráficos apenas com o resultado observado.
+1. Monitorar a campanha formal sem alterar o commit, as imagens, o protocolo ou
+   o servidor de produção; investigar somente tentativas inválidas registradas
+   no estado retomável.
+2. Confirmar a conclusão válida dos 60 braços (30 pares), sem promover pilotos
+   ou tentativas inválidas à amostra inferencial.
+3. Baixar uma cópia dos artefatos, verificar os manifestos SHA-256 e executar
+   `analyze_results.py` contra a raiz formal.
+4. Interpretar primeiro o desfecho primário e a salvaguarda de qualidade. Uma
+   vantagem só pode ser alegada se ambos forem satisfeitos e a telemetria
+   confirmar o mecanismo concorrente.
+5. Atualizar dissertações PT/EN e recriar tabelas/gráficos apenas com o resultado
+   observado; se a hipótese não for sustentada, relatar o resultado nulo ou
+   desfavorável sem reformular retroativamente o critério.
 
 ## Condição para alegar melhoria arquitetural
 
