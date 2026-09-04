@@ -1,6 +1,6 @@
 # Estado da campanha causal de arquitetura
 
-Atualizado em: 2026-09-03 (America/Sao_Paulo)
+Atualizado em: 2026-09-04 (America/Sao_Paulo)
 
 ## Objetivo
 
@@ -217,6 +217,36 @@ e limites de validade devem acompanhar os valores de p.
   janela de seleção de 180 s não produziu uma solução distribuída completa.
   Ele não integra a análise. O piloto v8 de 600 s continua sendo a validação
   funcional do código, que é idêntico na v9.
+
+### Fotografia intermediária não inferencial (sementes 42--50)
+
+- Em `2026-09-04T15:00:29Z`, havia 18 braços válidos, formando nove pares
+  completos, e 20 tentativas registradas. Duas tentativas distribuídas
+  (sementes 44 e 46, tentativa 1) falharam antes da medição por indisponibilidade
+  transitória do ZooKeeper durante a inicialização do Kafka; as repetições
+  correspondentes terminaram válidas e somente elas integram a amostra.
+- Uma fotografia somente dos pares completos foi transferida e conferida com
+  SHA-256 `2f0c3d0696e247ee45855fb5c90bf5c9b95e642eaad642dc7eada06f50dc1b5b`.
+  A cópia derivada foi marcada localmente como piloto exclusivamente para o
+  analisador bloquear qualquer conclusão inferencial antes dos 30 pares.
+- Nos nove pares, o distribuído atingiu F1 macro de validação 0,94 em oito
+  execuções e o monólito em nove. A diferença mediana pareada do tempo censurado
+  (distribuído menos monólito) foi `+554,133 s`, portanto desfavorável ao
+  distribuído neste recorte.
+- A mediana de vazão foi maior no distribuído (`0,1170` contra `0,0785`
+  candidato/s), e a sobreposição mediana entre construção e busca local foi
+  `100,00%` contra `0,00%`. Isso sustenta provisoriamente o mecanismo de
+  pipeline, não uma vantagem end-to-end.
+- O custo mediano estimado foi maior no distribuído: `0,009840` contra
+  `0,003554` CPU-h/candidato. O uso mediano foi `4,111` contra `1,004` núcleos.
+- As medianas de F1 macro no teste foram `0,944729` e `0,944747`, mas o limite
+  inferior bootstrap unilateral preliminar para a diferença média pareada foi
+  `-0,019241`, abaixo da margem de `-0,005`. A semente 49 distribuída não
+  alcançou 0,94 e terminou com F1 de teste `0,885327`; checksums, janela e
+  telemetria da execução são válidos, logo ela não pode ser descartada.
+- Esses valores são diagnósticos parciais, sujeitos às 21 sementes pareadas
+  restantes. Não devem ser transportados para as tabelas finais nem usados para
+  declarar significância, não inferioridade ou superioridade arquitetural.
 
 ## Identificadores e caminhos
 
