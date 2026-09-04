@@ -1,6 +1,6 @@
 # Relatório de validação das dissertações
 
-Data da validação: 2 de setembro de 2026.
+Data da validação editorial mais recente: 3 de setembro de 2026.
 
 ## Compilação
 
@@ -8,10 +8,12 @@ As duas versões foram compiladas com MiKTeX pdfTeX 1.40.28, BibTeX 0.99e e `abn
 
 | Versão | Páginas | Tamanho | SHA-256 |
 |---|---:|---:|---|
-| Português | 91 | 17.353.798 bytes | `E2F7F93080F0F5B3A59ABC9EF6A80DE23E151D7DAD47270A1D76B74118B54279` |
-| Inglês | 90 | 17.319.012 bytes | `EDE851D4C47EDBA89C40F2EC02624C01FD1393DF5F147BF1D8D0504007E0016A` |
+| Português | 91 | 17.354.578 bytes | `500520406603CF543233E88DB750CE9AE5FDA2E781F032CD4D4915DAC8842C08` |
+| Inglês | 90 | 17.319.613 bytes | `CAD35EBE88DD684FFDDE13604B51B84F4AA05DEFA32B6270801CE1500F624A42` |
 
 Os logs finais não contêm erros LaTeX, referências/citações indefinidas, rótulos múltiplos nem caixas horizontais fora das margens. O aviso do MiKTeX sobre a verificação de atualizações não afeta o PDF produzido.
+
+A revisão de 3 de setembro corrigiu a caracterização da função objetivo da campanha: o commit de origem das imagens usa F1 macro multiclasse e mantém a rotina binária com `normalClass=0` desabilitada. As limitações em Avaliação e Conclusão agora se concentram na diferença de operadores e na ausência de uma trajetória temporal monolítica equivalente na campanha anterior. As páginas afetadas foram renderizadas novamente e não apresentaram corte, sobreposição ou perda de legibilidade.
 
 ## Consistência e bibliografia
 

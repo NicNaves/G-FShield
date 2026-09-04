@@ -7,7 +7,7 @@
 - All-features median test macro-F1: 0.937809.
 - Holm-adjusted exploratory paired comparisons below 0.05: 0.
 - The common final metric is Weka J48 macro-F1 on the untouched test split.
-- G-FShield's internal best-so-far score remains the legacy binary score; it is not interchangeable with final macro-F1.
+- Audit of image-source commit `b38eff3ed9c1e6b6f4c25ecfb574377e5fde88b5` confirmed that G-FShield's active internal best-so-far score is multiclass macro-F1. The legacy binary routine containing `normalClass=0` was disabled. The campaign still does not support a valid architectural time-to-target comparison because the monolith CSV files record per-candidate evaluation durations rather than a cumulative monotonic candidate timeline.
 
 ## Configuration summary
 
