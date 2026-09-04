@@ -4,6 +4,15 @@
 
 A auditoria do commit de origem das imagens da campanha anterior confirmou que a avaliação ativa já usa F1 macro multiclasse; `normalClass=0` pertence a uma rotina binária desabilitada. A limitação real é o confundimento entre arquitetura e algoritmo. A campanha `gfshield-architecture-causal-2026-v9`, iniciada em 4 de setembro de 2026, executa 30 sementes pareadas com RF--VND--IWSSR, J48, split, sementes, prazo de seleção e teto agregado de 6 CPUs/12 GiB idênticos. O braço distribuído usa três consumidores para permitir sobreposição entre construção e busca local; o monólito conserva o fluxo sequencial. Os resultados devem permanecer pendentes até a conclusão válida dos 60 braços e a aplicação do desfecho primário e da salvaguarda de qualidade pré-especificados.
 
+Em 4 de setembro, uma fotografia intermediária continha nove pares válidos
+(sementes 42--50). Ela confirmou maior vazão e sobreposição de estágios no
+distribuído, mas o tempo censurado mediano até F1 macro de validação 0,94 e o
+custo de CPU por candidato favoreceram o monólito. A salvaguarda preliminar de
+não inferioridade também não foi satisfeita. Esses valores são diagnósticos,
+não entram na dissertação e não autorizam conclusão antes dos 30 pares. O
+registro detalhado e o SHA-256 da fotografia estão no `STATUS.md` da branch
+`experiment/architecture-causal`.
+
 ## Prioridade 2 — convergência e comportamento *anytime*
 
 A instrumentação causal agora avalia cada candidato intermediário na validação comum e persiste `(campaign_id, run_id, request_id, seed, arm, elapsed_monotonic, subset, validation_macro_f1)`. Ela calcula tempo censurado até F1 macro 0,93, 0,94, 0,945 e 0,95, além da área normalizada sob a curva da melhor solução. O teste é consultado uma única vez para a solução selecionada. Falta concluir a campanha e analisar os 30 pares; pilotos não substituem essa evidência.
