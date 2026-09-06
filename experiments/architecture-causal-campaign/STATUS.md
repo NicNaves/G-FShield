@@ -271,6 +271,34 @@ dados, a v10 congela antes da execução:
 Esse experimento pode demonstrar vantagem arquitetural de rendimento de
 qualidade, não apagar nem substituir o resultado desfavorável de latência da v9.
 
+### Execução v10
+
+- Commit e tag congelados: `5dec3b1700187bbbc0f13a1ece081979b90f4ff5` e
+  `experiment-architecture-quality-yield-v10`.
+- Tag das seis imagens: `quality-5dec3b1`.
+- Worktree isolado no servidor:
+  `/home/idscps/nicolas/G-FShield-quality-yield-v10`.
+- O piloto da semente 72 terminou em `PILOT_COMPLETED`, com dois braços válidos,
+  dois manifestos íntegros e código de saída zero. O distribuído apresentou
+  32 candidatos no resultado e 32 eventos no rastro; o monólito, 49 e 49.
+  Todos os eventos ficaram dentro da janela de seleção. Os rastros continham,
+  respectivamente, 30 e 44 subconjuntos distintos. A janela curta não produziu
+  candidato com F1 de validação 0,945 e serve somente para validar a
+  instrumentação, não para testar a hipótese.
+- A campanha formal começou em `2026-09-06T20:26:38.367523+00:00`, com limite
+  global em `2026-09-16T20:26:38.367523+00:00`.
+- Sessão persistente: `tmux` `gfshield-quality-formal-v10`.
+- Estado:
+  `/home/idscps/nicolas/experiment-artifacts/architecture-quality-yield/formal-v10/state.json`.
+- Resultados:
+  `/home/idscps/nicolas/experiment-artifacts/architecture-quality-yield/formal-v10/results`.
+- Log e saída do supervisor ficam em `runner.log` e `runner.exit` na mesma
+  pasta. O primeiro braço, distribuído da semente 72, iniciou com Kafka e
+  ZooKeeper saudáveis.
+- Não executar outra campanha intensiva no mesmo `cpuset` enquanto a v10 estiver
+  ativa. Estudos de concorrência e scale-out devem começar somente depois de
+  seu término para não contaminar CPU, memória e tempo.
+
 ### Fotografia intermediária não inferencial (sementes 42--50)
 
 - Em `2026-09-04T15:00:29Z`, havia 18 braços válidos, formando nove pares
