@@ -125,7 +125,7 @@ public class RelieFAsyncService {
                             Math.max(0L, System.nanoTime() - campaignStartedMonotonic) / 1_000_000L);
 
                     logger.info(
-                            "rcl generation ready algorithm={} requestId={} generation={} seedId={} featureCount={} rclSize={} neighborhood={} enabledSearches={} f1={} campaignElapsedMs={}",
+                            "rcl generation ready algorithm={} requestId={} generation={} seedId={} featureCount={} rclSize={} neighborhood={} enabledSearches={} f1={} features={} campaignElapsedMs={}",
                             ALGORITHM_NAME,
                             requestId,
                             generation + 1,
@@ -135,6 +135,7 @@ public class RelieFAsyncService {
                             generatedSolution.getNeighborhood(),
                             generatedSolution.getEnabledLocalSearches(),
                             generatedSolution.getF1Score(),
+                            generatedSolution.getSolutionFeatures(),
                             generatedSolution.getMonotonicElapsedMs()
                     );
                     reliefProducer.send(generatedSolution);

@@ -291,11 +291,12 @@ public class IwssrService implements DisposableBean {
         solution.setMemoryUsagePercent(Float.isFinite(avgMemoryPercent) ? avgMemoryPercent : 0.0F);
 
         log.info(
-                "dls iteration search=IWSSR seedId={} iteration={} f1={} featureCount={} campaignElapsedMs={}",
+                "dls iteration search=IWSSR seedId={} iteration={} f1={} featureCount={} features={} campaignElapsedMs={}",
                 solution.getSeedId(),
                 solution.getIterationLocalSearch(),
                 solution.getF1Score(),
                 solution.getSolutionFeatures().size(),
+                solution.getSolutionFeatures(),
                 solution.getMonotonicElapsedMs()
         );
 

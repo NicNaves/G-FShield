@@ -196,7 +196,7 @@ e limites de validade devem acompanhar os valores de p.
   instante real de encerramento da seleção e usa essa duração para vazão e
   custos, cobrindo também eventual parada antecipada por 500 melhorias aceitas.
 
-## Campanha formal v9 em execução
+## Campanha formal v9 concluída
 
 - Commit congelado: `7960791`.
 - Tag Git: `experiment-architecture-causal-v9`.
@@ -217,6 +217,59 @@ e limites de validade devem acompanhar os valores de p.
   janela de seleção de 180 s não produziu uma solução distribuída completa.
   Ele não integra a análise. O piloto v8 de 600 s continua sendo a validação
   funcional do código, que é idêntico na v9.
+
+### Resultado formal dos 30 pares
+
+- A campanha terminou em `2026-09-05T23:43:22.086427+00:00`, com 60 braços
+  válidos, 30 pares completos e código de saída zero. O arquivo de estado tem
+  SHA-256 `7c98cef249be408fb32b9baa2bbce38d6c94473d3b3fb9c17c099a1aefc7c686`.
+- Sete primeiras tentativas distribuídas falharam durante a inicialização do
+  Kafka/ZooKeeper (sementes 44, 46, 51, 52, 53, 57 e 58). Todas foram repetidas
+  com sucesso; apenas as 60 tentativas com contrato de artefatos válido entram
+  na inferência. Nenhum manifesto das execuções válidas apresentou divergência.
+- O desfecho primário rejeitou a hipótese de maior velocidade para uma única
+  requisição. A diferença mediana pareada no tempo até F1 0,94 foi
+  `+422,740 s` (distribuído menos monólito; IC bootstrap de 95% da mediana
+  `283,275--755,227 s`), com 7 vitórias e 23 derrotas do distribuído e
+  `p=0,000795`.
+- A salvaguarda de qualidade ficou ligeiramente abaixo do limite: diferença
+  média pareada de F1 no teste `-0,001759` e limite inferior bootstrap
+  unilateral de 95% `-0,005615`, diante da margem de `-0,005`.
+- O mecanismo arquitetural e a vazão foram confirmados. A sobreposição mediana
+  foi `99,998%` contra `0%`, e a vazão mediana foi `0,1074` contra `0,0739`
+  candidato/s. O distribuído venceu os 30 pares nesses dois desfechos; os
+  valores de `p` ajustados por Holm foram `0,000055`.
+- O ganho de vazão exigiu mais recursos: `4,076` contra `1,004` núcleos,
+  `0,010875` contra `0,003821` CPU-h/candidato e `0,012366` contra `0,004904`
+  GiB-h/candidato. Não há evidência de eficiência de recursos.
+- O distribuído obteve F1 mediano de teste `0,945529`, contra `0,944699`, e
+  redução dimensional mediana `78,43%`, contra `76,47%`. A diferença mediana
+  de redução foi `+1,96` ponto percentual, com 18 vitórias e 12 empates.
+- A conclusão correta é dimensional: o pipeline distribuído demonstrou maior
+  vazão, paralelismo e redução dimensional, mas foi mais lento até a primeira
+  solução com F1 0,94 e consumiu mais CPU e memória por candidato.
+
+## Confirmação independente de rendimento de qualidade (v10)
+
+A v9 gerou, de forma exploratória, a hipótese de que o paralelismo pode aumentar
+o número de subconjuntos distintos de qualidade mais alta, mesmo sem reduzir a
+latência da primeira solução em 0,94. Para evitar dupla utilização dos mesmos
+dados, a v10 congela antes da execução:
+
+- sementes independentes 72--101 e os mesmos dados, algoritmo, janela,
+  classificador, teto de 6 CPUs/12 GiB e ordem AB/BA;
+- desfecho primário: diferença pareada na contagem de subconjuntos de atributos
+  distintos com F1 macro de validação pelo menos 0,945 em 2.700 s;
+- teste unilateral pareado de permutação, alfa 0,05;
+- a mesma salvaguarda de não inferioridade no teste e confirmação do mecanismo
+  de sobreposição;
+- telemetria de todos os candidatos, com subconjunto canônico, F1 e timestamp
+  monotônico, nos dois braços;
+- dependência do Kafka condicionada à saúde do ZooKeeper, para reduzir as
+  falhas de inicialização observadas sem alterar a busca.
+
+Esse experimento pode demonstrar vantagem arquitetural de rendimento de
+qualidade, não apagar nem substituir o resultado desfavorável de latência da v9.
 
 ### Fotografia intermediária não inferencial (sementes 42--50)
 

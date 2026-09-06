@@ -204,6 +204,28 @@ def record_global_best(features, metrics, seed_id):
         os.fsync(handle.fileno())
 
 
+def record_candidate_evaluation(features, metrics):
+    """Persist every validation candidate for prespecified quality-yield analyses."""
+    if RUN_STARTED_MONOTONIC is None:
+        raise RuntimeError("run start was not initialized")
+    record = {
+        "validation_f1_macro": float(metrics["f1"]),
+        "validation_precision_macro": float(metrics["prec"]),
+        "validation_recall_macro": float(metrics["rec"]),
+        "accuracy": float(metrics["acc"]),
+        "selected_features": list(features),
+        "subset_size": len(features),
+        "candidate_count": CANDIDATE_COUNT,
+        "monotonic_elapsed_ms": int(
+            (time.monotonic() - RUN_STARTED_MONOTONIC) * 1000.0
+        ),
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+    }
+    with open("logs/all-candidate-trace.jsonl", "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+        handle.flush()
+
+
 def record_phase(phase, seed_id, started_monotonic, finished_monotonic):
     """Persist phase intervals used to verify the monolith is sequential."""
     if RUN_STARTED_MONOTONIC is None:
@@ -368,7 +390,10 @@ def evaluate_subset(X_train, y_train, X_test, y_test, feat_idx0b: List[int], clf
         split = WEKA_SPLIT_BY_OBJECT_ID.get(id(X_test))
         if WEKA_EVALUATOR is None or split is None:
             raise RuntimeError("Weka evaluator or split mapping is not initialized")
-        return WEKA_EVALUATOR.evaluate(split, feat_idx0b)
+        metrics = WEKA_EVALUATOR.evaluate(split, feat_idx0b)
+        if split == "validation":
+            record_candidate_evaluation(feat_idx0b, metrics)
+        return metrics
     Xtr = X_train.iloc[:, feat_idx0b]
     Xte = X_test.iloc[:, feat_idx0b]
 

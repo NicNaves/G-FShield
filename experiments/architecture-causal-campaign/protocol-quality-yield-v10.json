@@ -1,0 +1,87 @@
+{
+  "schema_version": 3,
+  "campaign_id": "gfshield-architecture-quality-yield-2026-v10",
+  "maximum_seconds": 864000,
+  "measurement_window": {
+    "cold_start_reported_separately": true,
+    "final_evaluation_excluded_from_search_resource_costs": true,
+    "post_deadline_candidates_excluded": true,
+    "primary_origin": "request_submission_after_distributed_service_readiness",
+    "resource_sampling_origin": "request_submission_after_distributed_service_readiness",
+    "unfinished_phase_intervals": "right_censored_at_last_observed_activity"
+  },
+  "run_timeout_seconds": 3000,
+  "finalization_reserve_seconds": 300,
+  "startup_timeout_seconds": 300,
+  "graceful_shutdown_seconds": 300,
+  "maximum_attempts_per_cell": 3,
+  "seeds": [
+    72, 73, 74, 75, 76, 77, 78, 79, 80, 81,
+    82, 83, 84, 85, 86, 87, 88, 89, 90, 91,
+    92, 93, 94, 95, 96, 97, 98, 99, 100, 101
+  ],
+  "paired_order": "alternating_ab_ba",
+  "architectures": ["distributed", "monolith"],
+  "algorithm": {
+    "feature_selector": "relieff",
+    "relieff_sample_size": 1000,
+    "rcl_cutoff": 30,
+    "initial_subset_size": 5,
+    "controller": "vnd",
+    "enabled_local_searches": ["iwssr"],
+    "pipeline_workers": 3,
+    "training_dataset_cache": true,
+    "neighborhood_cycles": 100,
+    "local_search_iterations": 100,
+    "minimum_improvement": 0.0001,
+    "maximum_accepted_improvements": 500,
+    "classifier": "Weka J48 3.8.6",
+    "classifier_parameters": {
+      "confidence_factor": 0.25,
+      "minimum_instances_per_leaf": 2,
+      "pruned": true
+    },
+    "selection_metric": "validation_macro_f1",
+    "holdout_policy": "test_once_after_validation_selection"
+  },
+  "resources": {
+    "cpuset": "8-15",
+    "numa_node": "1",
+    "aggregate_cpu_ceiling": 6,
+    "aggregate_memory": "12g",
+    "distributed_component_ceiling_sum": {
+      "rcl": {"cpu": 1.0, "memory_gib": 3, "concurrency": 1},
+      "iwssr": {"cpu": 3.0, "memory_gib": 4, "concurrency": 3},
+      "vnd": {"cpu": 0.5, "memory_gib": 1, "concurrency": 3},
+      "verifier": {"cpu": 0.5, "memory_gib": 1, "concurrency": 3},
+      "kafka": {"cpu": 0.75, "memory_gib": 2, "partitions": 3},
+      "zookeeper": {"cpu": 0.25, "memory_gib": 1}
+    }
+  },
+  "dataset": {
+    "split_manifest": "datasets/campaign/split-manifest.json",
+    "source_sha256": "60ebfcdc9c209e5c760e2bdbf5be75dfe4d931b81442597b0ef32e2f5fe6c1f6",
+    "train_sha256": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
+    "validation_sha256": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a",
+    "test_sha256": "05d393c5881aec032664ef4a84e18337988e819edc74664fe1255757961cfab4"
+  },
+  "hypotheses": {
+    "derivation": "The v9 campaign generated the hypothesis; v10 uses disjoint seeds for confirmation.",
+    "quality_threshold_validation_macro_f1": 0.945,
+    "primary": "paired difference in the number of distinct internally evaluated feature subsets with validation macro-F1 at least 0.945 within the 2700-second selection window",
+    "primary_direction": "higher in the distributed architecture",
+    "quality_guardrail": "the one-sided 95% bootstrap lower bound for the paired mean held-out macro-F1 difference (distributed minus monolith) must be at least -0.005",
+    "mechanism_guardrail": "median construction/local-search overlap must be greater in the distributed architecture",
+    "secondary": [
+      "probability of at least one distinct qualifying subset by the deadline",
+      "time to the first distinct qualifying subset, censored at 2700 seconds",
+      "all-candidate throughput",
+      "qualifying-subset throughput",
+      "median utilized CPU cores",
+      "CPU-hours and GiB-hours per distinct qualifying subset",
+      "final held-out macro-F1 and dimensionality reduction"
+    ],
+    "alpha": 0.05,
+    "multiplicity": "the sole primary outcome uses a one-sided paired sign-flip permutation test at alpha 0.05; Holm correction is applied within the secondary family"
+  }
+}
