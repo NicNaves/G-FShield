@@ -15,6 +15,8 @@ Os logs finais não contêm erros LaTeX, referências/citações indefinidas, r�
 
 A revisão de 3 de setembro corrigiu a caracterização da função objetivo da campanha: o commit de origem das imagens usa F1 macro multiclasse e mantém a rotina binária com `normalClass=0` desabilitada. As limitações em Avaliação e Conclusão agora se concentram na diferença de operadores e na ausência de uma trajetória temporal monolítica equivalente na campanha anterior. As páginas afetadas foram renderizadas novamente e não apresentaram corte, sobreposição ou perda de legibilidade.
 
+Em 6 de setembro, a campanha causal v9 foi encerrada e integrada às versões PT e EN. Foram validados 30 pares com algoritmo, dados, prazo e teto computacional comuns. A tabela causal e os gráficos de velocidade/processamento e comportamento *anytime* foram inseridos em paisagem com proporção preservada. As duas dissertações foram compiladas em duas passagens de `pdflatex`; não restaram referências indefinidas introduzidas pela nova seção. As páginas alteradas foram renderizadas a 120 dpi e inspecionadas: tabela, eixos, legendas, captions e margens estão legíveis e sem corte. Os PDFs de entrega estão em `output/pdf/`.
+
 ## Consistência e bibliografia
 
 - As duas versões usam o mesmo conjunto de 37 chaves efetivamente citadas.

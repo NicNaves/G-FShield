@@ -107,6 +107,62 @@ Sob o mesmo teto agregado, as execuções distribuídas usaram mediana global de
 
 Como análise exploratória, cada configuração distribuída foi comparada aos três comparadores por semente com teste exato bilateral de inversão de sinais e tamanho de efeito bisserial por postos. A correção de Holm foi aplicada separadamente à família de 24 comparações de cada comparador. Para RF--VND--IWSSR, houve sete vitórias e uma derrota diante do baseline e oito vitórias diante de cada monólito; os três valores $p$ ajustados foram 0,1875. Nenhuma das 72 comparações ajustadas ficou abaixo de 0,05. Com oito sementes, os intervalos e testes têm baixo poder; os resultados sustentam diferenças descritivas, não afirmações de significância ou causalidade arquitetural.
 
+\section{Experimento Causal Pareado da Arquitetura}
+\label{sec:architecture-causal}
+
+Para separar arquitetura de algoritmo, uma segunda campanha comparou duas implementações da mesma sequência RF--VND--IWSSR: o pipeline G-FShield e um executável monolítico sequencial. Foram fixados a especificação dos operadores, Weka J48, função objetivo, divisões de dados, parâmetros, sementes, prazo de seleção de 2.700~s e teto agregado de seis CPUs e 12~GiB. O braço distribuído empregou três consumidores para permitir que uma construção prosseguisse enquanto outra solução estava em busca local; o monólito executou as mesmas fases em sequência. A ordem AB/BA foi balanceada entre as sementes 42--71. Como as implementações usam runtimes distintos, efeitos residuais de implementação não podem ser completamente excluídos.
+
+O protocolo pré-especificou como desfecho primário o tempo censurado até F1 macro de validação $\geq 0{,}94$, com diferença pareada definida como distribuído menos monólito e teste de permutação unilateral. A interpretação favorável também exigia que o limite inferior unilateral de 95\% da diferença média de F1 macro no teste não fosse inferior a $-0{,}005$. Candidatos foram pontuados somente na validação; o teste reservado foi consultado uma vez para a solução final. A campanha terminou com 60 execuções válidas, ou 30 pares. Sete tentativas distribuídas anteriores falharam durante a inicialização de Kafka/ZooKeeper e foram rejeitadas e repetidas pelo contrato; nenhum dos 60 manifestos válidos apresentou erro de checksum.
+
+\begin{landscape}
+\begin{table}[p]
+\centering
+\scriptsize
+\caption{Campanha causal: medianas por arquitetura e comparações pareadas em 30 sementes.}
+\label{tab:architecture-causal}
+\resizebox{.96\linewidth}{!}{%
+\begin{tabular}{lrrrl}
+\toprule
+\textbf{Medida} & \textbf{G-FShield} & \textbf{Monólito} & \textbf{Diferença pareada mediana} & \textbf{Resultado} \\
+\midrule
+F1 macro no teste & 0,945529 & 0,944699 & $+0{,}000017$ & 15 vitórias, 10 empates, 5 derrotas \\
+Tempo até F1 $\geq 0{,}94$ (s) & 940,077 & 701,255 & $+422{,}740$ & $p=0{,}000795$; distribuído mais lento \\
+AUC \textit{anytime} normalizada & 0,879884 & 0,897069 & $-0{,}016898$ & $p_{Holm}=0{,}000055$ \\
+Candidatos por segundo & 0,1074 & 0,0739 & $+0{,}0317$ & 30/30 pares; $p_{Holm}=0{,}000055$ \\
+CPU mediana utilizada (núcleos) & 4,076 & 1,004 & $+3{,}070$ & 30/30 pares \\
+CPU-h por candidato & 0,010875 & 0,003821 & $+0{,}007095$ & 0/30 pares favoráveis ao distribuído \\
+GiB-h por candidato & 0,012366 & 0,004904 & $+0{,}007397$ & 0/30 pares favoráveis ao distribuído \\
+Sobreposição construção--busca local & 99,998\% & 0\% & $+99{,}998$ p.p. & 30/30 pares; $p_{Holm}=0{,}000055$ \\
+Redução dimensional & 78,43\% & 76,47\% & $+1{,}96$ p.p. & 18 vitórias, 12 empates; $p_{Holm}=0{,}000080$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+\end{landscape}
+
+O desfecho primário contradiz a hipótese de menor latência para uma única requisição: o G-FShield demorou mais para atingir 0,94 em 23 dos 30 pares. A diferença média pareada de F1 no teste foi $-0{,}001759$, e o limite inferior unilateral de 95\% foi $-0{,}005615$; como ultrapassou por pouco a margem negativa pré-especificada de $-0{,}005$, a salvaguarda de não inferioridade também não foi satisfeita. O limiar 0,95 foi censurado em todos os pares e não distingue as arquiteturas.
+
+Em contrapartida, a decomposição produziu o mecanismo arquitetural pretendido: praticamente toda a busca local ocorreu em paralelo à construção, enquanto a execução monolítica permaneceu sequencial. Isso elevou a vazão mediana de avaliações de candidatos em aproximadamente 45\%, mas exigiu cerca de quatro vezes mais CPU simultânea e maior custo de CPU e memória por candidato. A Figura~\ref{fig:architecture-speed-processing} mostra conjuntamente esses efeitos. Portanto, ``melhor'' é uma conclusão dependente do objetivo: o G-FShield é superior para paralelismo observável, vazão bruta e, neste protocolo, redução dimensional; o monólito é superior para latência até 0,94 e eficiência por unidade de recurso. Não se demonstrou superioridade global da arquitetura distribuída.
+
+\begin{landscape}
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=.96\linewidth,height=.80\textheight,keepaspectratio]{fig/gfshield/architecture-speed-processing.pdf}
+  \caption{Comparações pareadas de tempo até F1 macro 0,94, vazão de candidatos, CPU utilizada e sobreposição entre construção e busca local.}
+  \label{fig:architecture-speed-processing}
+\end{figure}
+\end{landscape}
+
+A trajetória mediana da melhor validação (Figura~\ref{fig:architecture-anytime}) explica o resultado: o monólito alcança cedo soluções boas, ao passo que a maior vazão distribuída não se converte automaticamente em progresso de qualidade. A inspeção posterior sugeriu contar subconjuntos \emph{distintos} com F1 de validação $\geq 0{,}945$ por prazo como uma medida de rendimento de soluções de alta qualidade. Como esse limiar foi escolhido após observar estes dados, ele não é usado como confirmação nesta campanha; foi congelado para uma nova campanha independente com sementes 72--101.
+
+\begin{landscape}
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=.96\linewidth,height=.80\textheight,keepaspectratio]{fig/gfshield/architecture-anytime-validation-f1.pdf}
+  \caption{Trajetória mediana da melhor solução na validação durante os 45 minutos de seleção. As faixas representam o intervalo interquartil entre sementes.}
+  \label{fig:architecture-anytime}
+\end{figure}
+\end{landscape}
+
 \section{Observabilidade e Rastreabilidade}
 
 Cada execução preserva \texttt{campaign\_id}, \texttt{run\_id}, braço, semente, parâmetros, hashes dos dados, comando resolvido, estados, motivo de parada, timestamps UTC e monotônicos, solução selecionada, métricas finais, mensagens de melhor solução, CSVs internos, logs e telemetria de contêiner. Um manifesto de checksums por execução permite detectar alteração nos artefatos, e o estado da campanha permite reconstruir tentativas, rejeições e repetições.
@@ -115,10 +171,10 @@ Na aplicação, o backend persiste eventos de solução inicial, reinício de vi
 
 \section{Ameaças à Validade}
 
-\textbf{Validade interna.} CPU, memória, conjunto de CPUs, dados, sementes, limite, J48 e F1 macro foram controlados. Entretanto, os comparadores não executam a mesma sequência algorítmica: o G-FShield selecionado usa RF--VND--IWSSR, o Monólito~1 usa GR--BF e o Monólito~2 usa GR--IWSS. A campanha também não alternou a ordem de execução nem registrou uma trajetória cumulativa equivalente de candidatos nos monólitos. Essas diferenças impedem atribuir os resultados somente à arquitetura. As 12 tentativas sem solução completa foram rejeitadas e repetidas; esse mecanismo pode favorecer execuções que conseguem inicializar, embora preserve a matriz de sementes válidas.
+\textbf{Validade interna.} Na primeira campanha, CPU, memória, conjunto de CPUs, dados, sementes, limite, J48 e F1 macro foram controlados, mas os comparadores executaram sequências algorítmicas distintas. O experimento causal posterior corrigiu esse confundimento, registrou trajetórias cumulativas equivalentes e balanceou a ordem AB/BA. Persistem possíveis efeitos de interferência do host compartilhado e de inicialização: 12 tentativas da primeira campanha e sete tentativas distribuídas da campanha causal foram rejeitadas e repetidas por não produzirem artefato completo. O procedimento preserva a matriz de sementes, mas condiciona a análise às execuções que inicializaram corretamente.
 
 \textbf{Validade de construção.} A medida principal é F1 macro no teste reservado, e execução, solução final e registro interno foram separados. A escolha da mediana por braço reduz a influência de extremos, mas não resume toda a distribuição. CPU e memória medem contêineres, não energia nem custo monetário. O limiar 0,95 é convenção analítica, não requisito operacional.
 
-\textbf{Validade de conclusão.} O pareamento por semente e a correção de Holm evitam tratar candidatos internos como observações independentes e limitam falsos positivos na família testada. Ainda assim, oito sementes oferecem baixo poder, o baseline é determinístico e a seleção da melhor configuração pela mediana de validação introduz seleção entre 24 alternativas. Não se afirma significância estatística.
+\textbf{Validade de conclusão.} Na primeira campanha, oito sementes oferecem baixo poder, o baseline é determinístico e a escolha entre 24 configurações introduz seleção múltipla. No experimento causal, os 30 pares, o desfecho primário e a salvaguarda de qualidade foram definidos antes da análise; candidatos internos não foram tratados como réplicas. As medidas secundárias usam correção de Holm. A contagem de subconjuntos de alta qualidade proposta após a análise é explicitamente exploratória e requer confirmação nas sementes independentes 72--101.
 
 \textbf{Validade externa.} A evidência cobre um servidor, um corpus IEC~61850, um particionamento e J48. Não demonstra generalização para outros corpora, classificadores, cargas concorrentes, números de réplicas, hardware, falhas ou ingestão contínua. Estudos posteriores devem repetir o protocolo com múltiplos conjuntos de dados e medir escalabilidade e recuperação separadamente.

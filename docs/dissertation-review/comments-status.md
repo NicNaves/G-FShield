@@ -2,7 +2,7 @@
 
 Esta matriz usa três estados: **resolvido** quando a redação, a evidência ou a apresentação foi corrigida; **parcialmente resolvido** quando a dissertação foi delimitada corretamente, mas uma parte da solicitação ainda depende de artefato ou avaliação adicional; e **depende de novo experimento** quando os dados existentes não permitem produzir a evidência pedida sem nova execução. As mudanças foram mantidas semanticamente equivalentes nas versões em português e inglês.
 
-Resumo: **75 resolvidos**, **4 parcialmente resolvidos** e **3 dependentes de novo experimento**.
+Resumo: **77 resolvidos**, **4 parcialmente resolvidos** e **1 dependente de novo experimento**.
 
 | Nº | Local do parecer | Situação | Mudança aplicada / evidência |
 |---:|---|---|---|
@@ -45,7 +45,7 @@ Resumo: **75 resolvidos**, **4 parcialmente resolvidos** e **3 dependentes de no
 | 37 | §4, geral | Resolvido | Criada subseção de reprodutibilidade com tag/commit, imagens, serviços, versões, Kafka, portas, volumes, CPU/RAM, concorrência, comando e limitações do host. |
 | 38 | §5.1, par. 1 | Resolvido | Monólitos 1 e 2 foram definidos exatamente: GR–BF e GR–IWSS/VND, parâmetros, classificador, splits, parada e correspondência distribuída. |
 | 39 | §5.1, par. 2 | Resolvido | Hardware, SO, Docker, CPU/RAM, cpuset/NUMA, serviços/consumidores e execução no mesmo servidor foram documentados. |
-| 40 | §5.1, par. 2 | Parcialmente resolvido | A campanha anterior usou teto agregado comum de 8 CPUs/16 GiB, mas comparou operadores distintos. Uma campanha causal com algoritmo pareado e teto de 6 CPUs/12 GiB está em execução; scale-out variando réplicas/workers permanece fora do escopo. |
+| 40 | §5.1, par. 2 | Parcialmente resolvido | A campanha causal concluída usa algoritmo pareado e teto comum de 6 CPUs/12 GiB, comprovando vazão e custo sob uma configuração. Scale-out variando réplicas/workers permanece fora do escopo. |
 | 41 | §5.1, par. 2 | Resolvido | Corpus descrito com 199.998 instâncias, 51 preditores, nove classes, ataques, hashes e split estratificado 119.998/40.000/40.000. |
 | 42 | §5.1, após par. 2 | Resolvido | Avaliador comum Weka J48 3.8.6 e hiperparâmetros documentados; validação seleciona e teste é consultado uma vez ao final. |
 | 43 | §5.1, após par. 2 | Resolvido | Cada um dos 27 braços usa oito sementes independentes (42–49); a unidade experimental é a execução válida. |
@@ -62,12 +62,12 @@ Resumo: **75 resolvidos**, **4 parcialmente resolvidos** e **3 dependentes de no
 | 54 | §5.3/§5.5, geral | Resolvido | Incluído baseline `ALL-51`, avaliado nas mesmas oito sementes e pelo mesmo avaliador final. |
 | 55 | §5.4, par. 1 | Resolvido | “Prontas para uso” e qualquer equivalência entre F1 e prontidão operacional foram removidos. |
 | 56 | §5.4, Figura 13 | Resolvido | F1 foi padronizado na escala 0–1; o limiar 0,95 não é usado para sustentar conclusão formal. |
-| 57 | §5.4, par. 2 | Depende de novo experimento | A função ativa já era F1 macro, mas os CSVs monolíticos anteriores registram duração individual, não tempo cumulativo comparável. A nova campanha instrumenta time-to-target pareado; o comentário depende de sua conclusão. |
+| 57 | §5.4, par. 2 | Resolvido | A campanha causal registrou trajetórias monotônicas equivalentes e comparou tempo censurado até F1 macro 0,94 em 30 pares; o resultado favoreceu o monólito e foi reportado sem extrapolação. |
 | 58 | §5.5, par. 2 | Resolvido | “Massa de qualidade” foi removida; gráficos identificam mediana, IQR/distribuição e unidade de análise. |
 | 59 | §5.5, par. 3 | Resolvido | Inferência usa oito execuções independentes; candidatos correlacionados não são tratados como amostra estatística. |
 | 60 | §5.5, Figuras 14–15 | Resolvido | Figuras antigas que nivelavam componentes e pipelines foram substituídas por braços completos; métricas internas são descritas separadamente. |
 | 61 | §5.6, par. 1 | Resolvido | “Job” e “deixa de ser” foram removidos; o fluxo é definido como tarefa/pipeline offline persistente, não streaming. |
-| 62 | §5.6, par. 1 | Depende de novo experimento | A dissertação não reivindica *anytime behavior*. A nova campanha persiste snapshots comparáveis e AUC da melhor solução, mas a evidência permanece pendente até a conclusão dos 30 pares. |
+| 62 | §5.6, par. 1 | Resolvido | A campanha causal concluiu 30 pares e reporta a trajetória e a AUC *anytime* comparáveis; ambas favorecem o monólito neste protocolo. |
 | 63 | §5.6, par. 2 | Parcialmente resolvido | Eventos, estados, IDs, timestamps, persistência e reconstrução foram documentados; completude, latência, overhead, recuperação e reprocessamento não foram medidos. |
 | 64 | §5.7, par. 1 | Resolvido | O novo experimento aplica orçamento agregado comum; o 4,4× foi retirado e nenhuma eficiência causal é afirmada. |
 | 65 | §5.7, seção | Resolvido | Ameaças reorganizadas em validade interna, de construção, de conclusão e externa, cobrindo todos os itens solicitados. |

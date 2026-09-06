@@ -1,0 +1,9 @@
+{
+  "analysis_scope": "formal_campaign",
+  "analysis_seed": 20260903,
+  "bootstrap_repetitions": 20000,
+  "paired_seed_count": 30,
+  "permutation_repetitions": 200000,
+  "run_count": 60,
+  "state_sha256": "7c98cef249be408fb32b9baa2bbce38d6c94473d3b3fb9c17c099a1aefc7c686"
+}

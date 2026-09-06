@@ -5,21 +5,22 @@ This dissertation presented \textit{G-FShield}, a distributed, event-driven, obs
 
 The formal campaign answered RQ1 with common end-to-end units. It evaluated 24 G-FShield arms, two monoliths, and an all-features baseline, each under eight independent seeds. RF--VND--IWSSR was selected on validation and obtained median test macro-F1 0.9448 with 11 of 51 predictors, a 78.4\% reduction. The baseline obtained 0.9378, Monolith~1 0.9397, and Monolith~2 0.8411. The difference from the baseline is descriptive; none of the 72 exploratory Holm-adjusted comparisons had $p<0.05$.
 
-For RQ2, distributed-configuration medians ranged from 0.8671 to 0.9448. VND--BF combinations remained below those that explored IWSS/IWSSR in this protocol, but all 208 searches stopped at the time limit, so there is no evidence of convergence. Although the internal score was already macro-F1, the campaign did not record cumulative candidate time equivalently in the monoliths and therefore cannot compare time to macro-F1 0.95. For RQ3, the common ceiling was eight CPUs and 16~GiB: distributed runs consumed global medians of 3.56 cores and 5,317~MiB, above the monoliths, without this proving architectural efficiency or inefficiency.
+For RQ2 and RQ3, an additional causal campaign removed algorithm--architecture confounding: 30 seeds paired distributed and monolithic implementations of the same RF--VND--IWSSR sequence under a 2,700-s deadline and an aggregate ceiling of six CPUs and 12~GiB. G-FShield evaluated 0.1074 candidate/s versus 0.0739 for the monolith and overlapped virtually 100\% of local search with construction, compared with 0\% in the sequential flow. Both outcomes occurred in all 30 pairs. Greater throughput, however, did not yield lower quality latency: median time to validation macro-F1 0.94 was 940.1~s for distributed execution and 701.3~s for the monolith; the paired median difference was $+422.7$~s, with $p=0.000795$ in the direction opposite to the hypothesis. Anytime AUC also favored the monolith.
+
+Parallel execution used a median 4.076 cores versus 1.004 and incurred higher CPU-h and GiB-h per candidate in every pair. Conversely, median dimensionality reduction was 78.43\% for G-FShield and 76.47\% for the monolith. The evidence therefore demonstrates the architectural ability to execute stages concurrently and increase raw throughput, but does not support global superiority: for a single request, the monolith reached the threshold sooner and was more resource-efficient.
 
 For RQ4, the manifest, resolved commands, hashes, campaign and run identifiers, seeds, states, stop reasons, timestamps, messages, internal CSV files, logs, final metrics, and telemetry reconstruct what was captured. The application also persists events by seed and stage. Telemetry completeness and cost, loss and duplication under failure, recovery time, and reprocessing were not measured; resilience, fault tolerance, and scalability remain design objectives.
 
-The principal remaining threat is confounding between architecture and algorithm: selected G-FShield executes RF--VND--IWSSR, whereas the monoliths execute GR--BF and GR--IWSS. All use J48 and macro-F1, but their algorithmic work and candidate trajectories differ; the common evaluation therefore makes final solutions comparable without isolating the effect of distribution. Evidence is also limited to one server, one corpus, one split, J48, and eight seeds.
+Algorithm--architecture confounding remains in the broad 27-arm comparison, but the paired causal campaign removed it. Its main remaining threats are the distributed attempts retried after startup failures and the scope restricted to one server, one corpus, one split, J48, one concurrency configuration, and 30 seeds. The results do not establish horizontal scalability, fault tolerance, or generalization to other workloads.
 
 Future work should:
 
 \begin{itemize}
-  \item complete a paired campaign with the same RF--VND--IWSSR sequence, objective function, seeds, deadline, and aggregate budget in distributed and monolithic arms;
-  \item increase the number of seeds and preregister adequately powered confirmatory comparisons;
-  \item record intermediate candidates on a monotonic timeline to measure time to target without consulting test data;
+  \item complete the independent confirmatory campaign, already preregistered for seeds 72--101, on the number of distinct subsets with validation macro-F1 $\geq 0.945$;
+  \item repeat the causal comparison with more seeds and independent concurrent workloads;
   \item run scale-out studies that vary replicas and concurrency and report throughput per cost;
   \item measure telemetry completeness, overhead, recovery, and reprocessing;
   \item repeat the protocol with other corpora, classifiers, splits, and hardware.
 \end{itemize}
 
-In summary, G-FShield demonstrates a distributed and traceable GRASP-FS integration and produces an auditable experimental dataset. Its quantitative results delimit observed quality, dimensionality reduction, and resource consumption without extrapolating to statistical significance, architectural causality, or operational readiness.
+In summary, G-FShield demonstrates a distributed and traceable GRASP-FS integration and produces an auditable experimental dataset. The causal experiment confirms that decomposition enables construction--local-search overlap and greater candidate throughput, while revealing its cost: higher consumption per candidate and worse time to F1 0.94 under this workload. The architectural contribution is therefore a measured trade-off, not a claim of universal superiority or operational readiness.

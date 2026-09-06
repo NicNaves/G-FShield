@@ -107,6 +107,62 @@ Under the same aggregate ceiling, distributed runs used a global median of 3.56 
 
 As an exploratory analysis, each distributed configuration was paired by seed with each comparator using a two-sided exact sign-flip test and paired rank-biserial effect size. Holm correction was applied separately to each comparator's family of 24 tests. RF--VND--IWSSR recorded seven wins and one loss against the baseline and eight wins against each monolith; all three adjusted $p$-values were 0.1875. None of the 72 adjusted comparisons was below 0.05. With eight seeds, intervals and tests have low power; the results support descriptive differences, not claims of significance or architectural causality.
 
+\section{Paired Causal Architecture Experiment}
+\label{sec:architecture-causal}
+
+To separate architecture from algorithm, a second campaign compared two implementations of the same RF--VND--IWSSR sequence: the G-FShield pipeline and a sequential monolithic executable. Operator specification, Weka J48, objective function, data splits, parameters, seeds, the 2,700-s selection deadline, and the aggregate ceiling of six CPUs and 12~GiB were fixed. The distributed arm used three consumers so that one construction could progress while another solution underwent local search; the monolith executed the same stages sequentially. AB/BA order was balanced across seeds 42--71. Because the implementations use different runtimes, residual implementation effects cannot be completely excluded.
+
+The protocol prespecified censored time to validation macro-F1 $\geq 0.94$ as the primary outcome, defining the paired difference as distributed minus monolith and applying a one-sided permutation test. A favorable interpretation also required the one-sided 95\% lower bound of the mean held-out macro-F1 difference to be no lower than $-0.005$. Candidates were scored only on validation; held-out test was queried once for the final solution. The campaign completed 60 valid runs, or 30 pairs. Seven earlier distributed attempts failed during Kafka/ZooKeeper startup and were rejected and retried by the artifact contract; none of the 60 valid manifests had a checksum error.
+
+\begin{landscape}
+\begin{table}[p]
+\centering
+\scriptsize
+\caption{Causal campaign: architecture medians and paired comparisons across 30 seeds.}
+\label{tab:architecture-causal}
+\resizebox{.96\linewidth}{!}{%
+\begin{tabular}{lrrrl}
+\toprule
+\textbf{Measure} & \textbf{G-FShield} & \textbf{Monolith} & \textbf{Paired median difference} & \textbf{Result} \\
+\midrule
+Test macro-F1 & 0.945529 & 0.944699 & $+0.000017$ & 15 wins, 10 ties, 5 losses \\
+Time to F1 $\geq 0.94$ (s) & 940.077 & 701.255 & $+422.740$ & $p=0.000795$; distributed slower \\
+Normalized anytime AUC & 0.879884 & 0.897069 & $-0.016898$ & $p_{Holm}=0.000055$ \\
+Candidates per second & 0.1074 & 0.0739 & $+0.0317$ & 30/30 pairs; $p_{Holm}=0.000055$ \\
+Median utilized CPU (cores) & 4.076 & 1.004 & $+3.070$ & 30/30 pairs \\
+CPU-h per candidate & 0.010875 & 0.003821 & $+0.007095$ & 0/30 pairs favorable to distributed \\
+GiB-h per candidate & 0.012366 & 0.004904 & $+0.007397$ & 0/30 pairs favorable to distributed \\
+Construction--local-search overlap & 99.998\% & 0\% & $+99.998$ pp & 30/30 pairs; $p_{Holm}=0.000055$ \\
+Dimensionality reduction & 78.43\% & 76.47\% & $+1.96$ pp & 18 wins, 12 ties; $p_{Holm}=0.000080$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+\end{landscape}
+
+The primary outcome contradicts the hypothesis of lower latency for a single request: G-FShield took longer to reach 0.94 in 23 of 30 pairs. The paired mean test macro-F1 difference was $-0.001759$, and its one-sided 95\% lower bound was $-0.005615$; because it narrowly crossed the prespecified negative margin of $-0.005$, the noninferiority guardrail was not satisfied either. The 0.95 threshold was censored in every pair and does not distinguish the architectures.
+
+Conversely, decomposition produced the intended architectural mechanism: almost all local search occurred concurrently with construction, whereas monolithic execution remained sequential. This increased median candidate-evaluation throughput by approximately 45\%, but required roughly four times as much simultaneous CPU and incurred higher CPU and memory cost per candidate. Figure~\ref{fig:architecture-speed-processing} presents these effects together. Thus, ``better'' depends on the objective: G-FShield is superior in observable parallelism, raw throughput, and, under this protocol, dimensionality reduction; the monolith is superior in latency to 0.94 and resource efficiency. Global superiority of the distributed architecture was not demonstrated.
+
+\begin{landscape}
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=.96\linewidth,height=.80\textheight,keepaspectratio]{fig/gfshield/architecture-speed-processing.pdf}
+  \caption{Paired comparisons of time to macro-F1 0.94, candidate throughput, utilized CPU, and overlap between construction and local search.}
+  \label{fig:architecture-speed-processing}
+\end{figure}
+\end{landscape}
+
+The median best-validation trajectory (Figure~\ref{fig:architecture-anytime}) explains the result: the monolith reaches good solutions early, whereas greater distributed throughput does not automatically translate into quality progress. Post-hoc inspection suggested counting \emph{distinct} subsets with validation F1 $\geq 0.945$ by the deadline as a high-quality-solution yield measure. Because this threshold was selected after observing these data, it is not used as confirmation in this campaign; it was frozen for a new independent campaign with seeds 72--101.
+
+\begin{landscape}
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=.96\linewidth,height=.80\textheight,keepaspectratio]{fig/gfshield/architecture-anytime-validation-f1.pdf}
+  \caption{Median best-validation trajectory during the 45-minute selection period. Bands show the interquartile range across seeds.}
+  \label{fig:architecture-anytime}
+\end{figure}
+\end{landscape}
+
 \section{Observability and Traceability}
 
 Each run preserves \texttt{campaign\_id}, \texttt{run\_id}, arm, seed, parameters, data hashes, resolved command, states, stop reason, UTC and monotonic timestamps, selected solution, final metrics, best-solution messages, internal CSV files, logs, and container telemetry. A checksum manifest for every run detects artifact changes, and campaign state reconstructs attempts, rejections, and retries.
@@ -115,10 +171,10 @@ In the application, the backend persists events for initial solution, neighborho
 
 \section{Threats to Validity}
 
-\textbf{Internal validity.} CPU, memory, CPU set, data, seeds, time limit, J48, and macro-F1 were controlled. The comparators nevertheless execute different algorithmic sequences: selected G-FShield uses RF--VND--IWSSR, Monolith~1 uses GR--BF, and Monolith~2 uses GR--IWSS. The campaign also neither alternated execution order nor recorded an equivalent cumulative candidate trajectory for the monoliths. These differences prevent attributing outcomes solely to architecture. The 12 attempts without a complete solution were rejected and retried; this mechanism may favor runs that can initialize, although it preserves the valid seed matrix.
+\textbf{Internal validity.} In the first campaign, CPU, memory, CPU set, data, seeds, time limit, J48, and macro-F1 were controlled, but the comparators executed different algorithmic sequences. The subsequent causal experiment removed this confounding, recorded equivalent cumulative trajectories, and balanced AB/BA order. Possible shared-host interference and startup effects remain: 12 attempts in the first campaign and seven distributed attempts in the causal campaign were rejected and retried because they did not produce a complete artifact. This preserves the seed matrix but conditions analysis on runs that initialized correctly.
 
 \textbf{Construct validity.} The primary measure is macro-F1 on held-out test data, and runs, final solutions, and internal records are separated. The median per arm reduces the influence of extremes but does not summarize the full distribution. CPU and memory measure containers, not energy or monetary cost. The 0.95 threshold is an analytical convention, not an operational requirement.
 
-\textbf{Conclusion validity.} Pairing by seed and Holm correction avoid treating internal candidates as independent observations and limit false positives in the tested family. Nevertheless, eight seeds provide low power, the baseline is deterministic, and selecting the best configuration by median validation performance introduces selection among 24 alternatives. Statistical significance is not claimed.
+\textbf{Conclusion validity.} In the first campaign, eight seeds provide low power, the baseline is deterministic, and choosing among 24 configurations introduces multiple selection. In the causal experiment, the 30 pairs, primary outcome, and quality guardrail were defined before analysis; internal candidates were not treated as replicates. Secondary measures use Holm correction. The high-quality-subset count proposed after analysis is explicitly exploratory and requires confirmation on independent seeds 72--101.
 
 \textbf{External validity.} Evidence covers one server, one IEC~61850 corpus, one split, and J48. It does not demonstrate generalization to other corpora, classifiers, concurrent loads, replica counts, hardware, failures, or continuous ingestion. Future work should repeat the protocol on multiple datasets and evaluate scaling and recovery separately.
