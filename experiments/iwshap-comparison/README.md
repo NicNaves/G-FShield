@@ -74,6 +74,12 @@ For an implementation ablation, `--architectures distributed` runs only the two
 distributed cells; this mode is diagnostic and must not be described as a
 paired architectural comparison.
 
+`launch_formal_after_ablation.py` can monitor that diagnostic run and launch the
+formal campaign only if both construction and completed IWSSR evaluation counts
+increase over the pre-optimization reference in both scenarios. It writes the
+machine-readable decision to `formal-campaign-gate.json`; this gate checks the
+implementation fix, not the desired direction of the architectural result.
+
 After a successful pilot, `run_paired_campaign.py` executes 30 paired seeds on
 both scenarios (120 cells), counterbalances scenario and architecture order,
 allows at most two attempts per cell, records image IDs and host information,
