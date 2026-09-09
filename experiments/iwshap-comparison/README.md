@@ -133,3 +133,19 @@ It cannot establish general superiority over IWSHAP from the historical log
 alone. Differences in classifier, objective, partitioning, sample size, hardware,
 and test reuse prevent a direct inferential comparison. Such a claim requires
 the preregistered common-data/common-evaluator runs above.
+
+## Offline runtime image build
+
+If Maven Central is temporarily unavailable to Docker, package each modified
+Java service with the host Maven cache and place it in the pinned runtime image
+without downloading dependencies during `docker build`:
+
+```sh
+mvn -q package -DskipTests
+docker build -f Dockerfile.prebuilt -t <immutable-experiment-tag> .
+```
+
+Run the targeted unit tests first, then record `mvn -version`, the Git commit,
+the resulting JAR SHA-256, and the Docker image ID in the experiment manifest.
+`Dockerfile.prebuilt` uses the same pinned Temurin digest as the regular
+multi-stage Dockerfile.
