@@ -71,6 +71,20 @@ The pilot is a systems check and effect-size estimate, not an inferential test.
 Do not use its single seed to claim statistical superiority. A final campaign
 must retain the ten-day global ceiling and use the preregistered paired seeds.
 
+Generate the traceable comparison table after either the common baselines or
+the paired pilot has produced results:
+
+```sh
+python3 experiments/iwshap-comparison/analyze_results.py \
+  --manifest /path/to/iwshap-comparison-data/audit-and-split-manifest.json \
+  --baseline-root /path/to/iwshap-common-baselines \
+  --paired-root /path/to/iwshap-paired-pilot \
+  --output-dir /path/to/iwshap-analysis
+```
+
+The generated report keeps repository-log XGBoost measurements, controlled J48
+re-evaluations, and the matched-architecture pilot in separate evidence strata.
+
 ## Preregistered comparison
 
 Run suspension and fabrication as separate datasets. For each dataset:
