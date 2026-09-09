@@ -54,6 +54,23 @@ python3 experiments/iwshap-comparison/run_common_baselines.py \
   --evaluation-timeout-seconds 1800
 ```
 
+Before committing server time to the 30-seed campaign, run the resumable paired
+pilot. It uses ReliefF + VND + IWSSR in both implementations, counterbalances
+execution order across the two scenarios, allocates the same aggregate CPU and
+memory, and enforces both per-cell and global wall-clock deadlines:
+
+```sh
+python3 experiments/iwshap-comparison/run_paired_pilot.py \
+  --data-root /path/to/iwshap-comparison-data \
+  --output-root /path/to/iwshap-paired-pilot \
+  --run-timeout-seconds 1200 \
+  --global-timeout-seconds 7200
+```
+
+The pilot is a systems check and effect-size estimate, not an inferential test.
+Do not use its single seed to claim statistical superiority. A final campaign
+must retain the ten-day global ceiling and use the preregistered paired seeds.
+
 ## Preregistered comparison
 
 Run suspension and fabrication as separate datasets. For each dataset:
