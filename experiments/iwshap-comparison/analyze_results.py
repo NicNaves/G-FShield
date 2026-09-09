@@ -126,9 +126,27 @@ def write_report(path: Path, manifest: dict[str, Any], rows: list[dict[str, Any]
         "controlled J48 protocol support a direct quality/runtime comparison. The",
         "single-seed architecture pilot is descriptive until the paired campaign is run.",
         "",
+        "## Dataset audit",
+        "",
+        "| Scenario | Records | Features | Class 0 | Class 1 | Unique complete vectors | Duplicate records beyond first | Conflicting-label groups | Missing feature values |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for scenario in manifest["scenarios"]:
+        lines.append(
+            f"| {scenario['scenario']} | {scenario['records']} | {scenario['features']} | "
+            f"{scenario['classes']['0']} | {scenario['classes']['1']} | "
+            f"{scenario['unique_complete_feature_vectors']} | "
+            f"{scenario['duplicate_records_beyond_first']} | "
+            f"{scenario['conflicting_label_feature_groups']} | "
+            f"{scenario['missing_feature_values']} |"
+        )
+    lines.extend([
+        "",
+        "## Result strata",
+        "",
         "| Scenario | Evidence | Method | Features | Reduction | Macro-F1 | Positive F1 | Positive precision | Positive recall | Classifier ms | End-to-end ms |",
         "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
-    ]
+    ])
     for row in rows:
         lines.append(
             "| {scenario} | {evidence} | {method} | {subset_size} | {reduction_percent}% | "
