@@ -124,7 +124,22 @@ Run suspension and fabrication as separate datasets. For each dataset:
   CPU-seconds, peak RSS, and energy only if an actual energy sensor is available;
 - externally re-evaluate every frozen subset with the same XGBoost version and
   parameters used by IWSHAP, while retaining the common Weka result as the
-  architecture-controlled analysis.
+architecture-controlled analysis.
+
+To reproduce the repository protocol itself, build the unmodified pinned checkout
+and run it with bounded, recorded resources:
+
+```sh
+docker build -t sf24-iwshap:fb0d3093c124 /path/to/pinned/sf24-iwshap
+python3 experiments/iwshap-comparison/run_original_iwshap.py \
+  --source-root /path/to/pinned/sf24-iwshap \
+  --output-root /path/to/iwshap-original-reproduction
+```
+
+This intentionally preserves the original 80/20 split (`random_state=42`),
+pre-split categorical encoding, XGBoost defaults, and reuse of the 20% partition
+during iterative selection. It is an artifact reproduction, not the unbiased
+test used for the primary comparison.
 
 The article's 784,744-instance balanced suspension experiment is not recreated
 by the repository's 20,000-row demonstration CSVs. Results on the demo artifacts
