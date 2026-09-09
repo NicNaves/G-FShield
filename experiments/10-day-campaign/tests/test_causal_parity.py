@@ -138,6 +138,10 @@ class CausalParityTest(unittest.TestCase):
             self.assertEqual(
                 1, run_arm.internal_candidate_count_before_deadline(path, 600_000),
             )
+            self.assertEqual(
+                {"construction": 1, "local_search": 0, "total": 1},
+                run_arm.internal_evaluation_counts_before_deadline(path, 600_000),
+            )
 
     def test_incomplete_local_search_interval_closes_at_last_activity(self):
         analysis = load_causal_analysis()

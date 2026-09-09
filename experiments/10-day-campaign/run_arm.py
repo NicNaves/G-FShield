@@ -308,22 +308,36 @@ def metric_evaluation_count(metrics_dir: Path) -> int:
     return total
 
 
-INTERNAL_CANDIDATE_LOG = re.compile(
-    r"(?:rcl generation ready|dls iteration search=IWSSR).*?campaignElapsedMs=(\d+)"
+CONSTRUCTION_EVALUATION_LOG = re.compile(
+    r"rcl generation ready.*?campaignElapsedMs=(\d+)"
+)
+LOCAL_SEARCH_EVALUATION_LOG = re.compile(
+    r"dls iteration search=IWSSR.*?campaignElapsedMs=(\d+)"
 )
 
 
-def internal_candidate_count_before_deadline(path: Path, cutoff_elapsed_ms: int) -> int:
-    """Count completed internal evaluations whose timestamps are inside selection."""
+def internal_evaluation_counts_before_deadline(
+    path: Path, cutoff_elapsed_ms: int,
+) -> dict[str, int]:
+    """Count completed evaluations per pipeline stage inside selection time."""
+    counts = {"construction": 0, "local_search": 0}
     if not path.exists():
-        return 0
-    count = 0
+        return {**counts, "total": 0}
     with path.open(encoding="utf-8", errors="replace") as handle:
         for line in handle:
-            match = INTERNAL_CANDIDATE_LOG.search(line)
-            if match and int(match.group(1)) <= cutoff_elapsed_ms:
-                count += 1
-    return count
+            for stage, pattern in (
+                ("construction", CONSTRUCTION_EVALUATION_LOG),
+                ("local_search", LOCAL_SEARCH_EVALUATION_LOG),
+            ):
+                match = pattern.search(line)
+                if match and int(match.group(1)) <= cutoff_elapsed_ms:
+                    counts[stage] += 1
+    return {**counts, "total": counts["construction"] + counts["local_search"]}
+
+
+def internal_candidate_count_before_deadline(path: Path, cutoff_elapsed_ms: int) -> int:
+    """Backward-compatible total of stage evaluations inside selection time."""
+    return internal_evaluation_counts_before_deadline(path, cutoff_elapsed_ms)["total"]
 
 
 def enabled_local_searches(args: argparse.Namespace) -> tuple[str, ...]:
@@ -843,8 +857,15 @@ def run_distributed(args: argparse.Namespace) -> int:
             args, best, validation, test, measurement_started_monotonic,
             stop_reason, status, len(messages),
         )
-        result["candidate_count"] = internal_candidate_count_before_deadline(
+        evaluation_counts = internal_evaluation_counts_before_deadline(
             result_dir / "compose.log", cutoff_elapsed_ms,
+        )
+        result["construction_evaluation_count"] = evaluation_counts["construction"]
+        result["local_search_evaluation_count"] = evaluation_counts["local_search"]
+        result["candidate_count"] = evaluation_counts["total"]
+        result["candidate_count_definition"] = (
+            "construction evaluations plus completed IWSSR iterations; use stage counts "
+            "instead of this total for phase-specific throughput"
         )
         raw_target_times = validation_times_to_targets_ms(messages)
         result["validation_time_to_targets_ms"] = {
