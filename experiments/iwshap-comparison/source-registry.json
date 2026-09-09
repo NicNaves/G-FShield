@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "source_repository": "https://github.com/sf24-iwshap/sf24-iwshap",
+  "source_commit": "fb0d3093c12421d08ab3fb595d20c29ba2442e65",
+  "license_status": "No LICENSE file was present at the pinned commit; retain the data outside Git until redistribution permission is confirmed.",
+  "files": {
+    "IWSHAP.py": "30eee4d6ef7eee119fff0692494a6843695e1452a6c6332e3a05d1bd5eedbace",
+    "dataset/safe_dataset.csv": "9f1b6ee137676d69dc154bf19c28a094a4482f7974f485080704fbfd6826a493",
+    "dataset/attack_dataset_fabr.csv": "65f19543397437091d18ec61f54a4ec79b3fba94272d282d7e43843df06e90ce",
+    "dataset/attack_dataset_susp.csv": "08b542f6c7776c276e39e4b38a2faf8638dcf2d4c8367862c5bc39d21926721b",
+    "logs/Log_2024-06-25_13-20-41.txt": "c4044dcff87121803fdabc91a1a98ac6ac8cd68df2e4edf231d197902861652d",
+    "logs/Log_2024-07-04_13-59-15.txt": "4e38370e6cc82618e54065bf64e93619c9bb50e47eab2c882574e7c6363034bb",
+    "reduced-datas/dataset_reduced_2024-07-04_13-59-15.csv": "8a3673b2610538998fada5046cc064224351ee7ff45e7fd8e8b3dfa5c43df927"
+  },
+  "scenarios": {
+    "suspension": {
+      "attack_file": "dataset/attack_dataset_susp.csv",
+      "log_file": "logs/Log_2024-06-25_13-20-41.txt",
+      "log_scope": "The log matches the paper's suspension feature set and scores, but does not record input hashes or row count; association with the 20,000-row demo CSV is not assumed."
+    },
+    "fabrication": {
+      "attack_file": "dataset/attack_dataset_fabr.csv",
+      "log_file": "logs/Log_2024-07-04_13-59-15.txt",
+      "reduced_file": "reduced-datas/dataset_reduced_2024-07-04_13-59-15.csv",
+      "log_scope": "The timestamp-matched reduced export is row-for-row identical to the selected columns of the 20,000-row safe-plus-fabrication demo concatenation."
+    }
+  }
+}
