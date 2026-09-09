@@ -44,6 +44,16 @@ G-FShield campaign runner. `iwshap-selected/campaign/` uses the same filenames
 for the historical IWSHAP subset under identical split membership, so the same
 common final-evaluator runner can consume either directory without special cases.
 
+The four common Weka references can then be run with an absolute per-evaluation
+limit and resumable state:
+
+```sh
+python3 experiments/iwshap-comparison/run_common_baselines.py \
+  --data-root /path/to/iwshap-comparison-data \
+  --output-root /path/to/iwshap-common-baselines \
+  --evaluation-timeout-seconds 1800
+```
+
 ## Preregistered comparison
 
 Run suspension and fabrication as separate datasets. For each dataset:

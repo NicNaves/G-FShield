@@ -358,6 +358,10 @@ def write_scenario(
             "guarantee": "an identical complete feature vector occurs in one split only",
         },
         "splits": split_manifest,
+        "split_index": {
+            "path": str(index_path.relative_to(output_root)),
+            "sha256": sha256_file(index_path),
+        },
         "iwshap_log": log_summary,
         "iwshap_log_scope": config["log_scope"],
         "iwshap_selected_reduction_from_688": 1.0
