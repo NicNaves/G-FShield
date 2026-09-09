@@ -32,6 +32,7 @@ class PairedPilotTests(unittest.TestCase):
                 monolith_runner=Path("mono.py"), distributed_runner=Path("dist.py"),
                 pipeline_workers=3, startup_timeout_seconds=300,
                 evaluator_image="evaluator:tag",
+                campaign_id="test-campaign", run_prefix="test-run",
             )
             distributed, _ = MODULE.command_for(
                 args, scenario, "distributed", Path(temporary) / "d"
@@ -42,6 +43,8 @@ class PairedPilotTests(unittest.TestCase):
         distributed_text = " ".join(str(value) for value in distributed)
         monolith_text = " ".join(str(value) for value in monolith)
         self.assertIn("--construction relieff", distributed_text)
+        self.assertIn("--campaign-id test-campaign", distributed_text)
+        self.assertIn("test-run-fabrication-distributed-s7", distributed_text)
         self.assertIn("--controller vnd", distributed_text)
         self.assertIn("--enabled-local-searches iwssr", distributed_text)
         self.assertIn("--pipeline-workers 3", distributed_text)

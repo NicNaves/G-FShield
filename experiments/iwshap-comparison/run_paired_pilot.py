@@ -78,11 +78,11 @@ def command_for(
     output: Path,
 ) -> tuple[list[str], str]:
     scenario_name = scenario["scenario"]
-    run_id = f"iwshap-pilot-{scenario_name}-{architecture}-s{args.seed}"
+    run_id = f"{args.run_prefix}-{scenario_name}-{architecture}-s{args.seed}"
     dataset_dir = args.data_root.resolve() / scenario_name
     dataset_hash = scenario["split_index"]["sha256"]
     common = [
-        "--campaign-id", "gfshield-iwshap-paired-pilot-2026",
+        "--campaign-id", args.campaign_id,
         "--arm-id", f"matched-rf-vnd-iwssr-{architecture}",
         "--run-id", run_id,
         "--seed", str(args.seed),
@@ -128,13 +128,15 @@ def command_for(
     ], run_id)
 
 
-def valid_result(path: Path, scenario: str, architecture: str, run_id: str) -> bool:
+def valid_result(
+    path: Path, scenario: str, architecture: str, run_id: str, campaign_id: str
+) -> bool:
     try:
         result = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
     return (
-        result.get("campaign_id") == "gfshield-iwshap-paired-pilot-2026"
+        result.get("campaign_id") == campaign_id
         and result.get("arm_id") == f"matched-rf-vnd-iwssr-{architecture}"
         and result.get("run_id") == run_id
         and result.get("status") in {"completed", "timeout"}
@@ -154,6 +156,8 @@ def main() -> int:
     parser.add_argument("--monolith-runner", type=Path, default=root / "10-day-campaign/run_monolith.py")
     parser.add_argument("--image-tag", default="quality-5dec3b1")
     parser.add_argument("--evaluator-image", default="gfshield-campaign-evaluator:quality-5dec3b1")
+    parser.add_argument("--campaign-id", default="gfshield-iwshap-paired-pilot-2026")
+    parser.add_argument("--run-prefix", default="iwshap-pilot")
     parser.add_argument("--seed", type=int, default=20260909)
     parser.add_argument("--run-timeout-seconds", type=int, default=1200)
     parser.add_argument("--finalization-reserve-seconds", type=int, default=120)
@@ -248,7 +252,9 @@ def main() -> int:
                 terminate(process, args.shutdown_grace_seconds)
                 return_code = 124
         result_path = destination / "final-result.json"
-        artifact_valid = valid_result(result_path, scenario_name, architecture, run_id)
+        artifact_valid = valid_result(
+            result_path, scenario_name, architecture, run_id, args.campaign_id
+        )
         attempt = {
             "scenario": scenario_name,
             "architecture": architecture,

@@ -71,6 +71,12 @@ The pilot is a systems check and effect-size estimate, not an inferential test.
 Do not use its single seed to claim statistical superiority. A final campaign
 must retain the ten-day global ceiling and use the preregistered paired seeds.
 
+After a successful pilot, `run_paired_campaign.py` executes 30 paired seeds on
+both scenarios (120 cells), counterbalances scenario and architecture order,
+allows at most two attempts per cell, records image IDs and host information,
+checks every input and output hash, and refuses a global deadline beyond ten
+days. Its default per-cell budget is the same 20 minutes used by the pilot.
+
 Generate the traceable comparison table after either the common baselines or
 the paired pilot has produced results:
 
