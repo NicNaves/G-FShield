@@ -70,6 +70,9 @@ python3 experiments/iwshap-comparison/run_paired_pilot.py \
 The pilot is a systems check and effect-size estimate, not an inferential test.
 Do not use its single seed to claim statistical superiority. A final campaign
 must retain the ten-day global ceiling and use the preregistered paired seeds.
+For an implementation ablation, `--architectures distributed` runs only the two
+distributed cells; this mode is diagnostic and must not be described as a
+paired architectural comparison.
 
 After a successful pilot, `run_paired_campaign.py` executes 30 paired seeds on
 both scenarios (120 cells), counterbalances scenario and architecture order,

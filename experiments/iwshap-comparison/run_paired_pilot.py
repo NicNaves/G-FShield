@@ -166,6 +166,11 @@ def main() -> int:
     parser.add_argument("--max-accepted-improvements", type=int, default=50)
     parser.add_argument("--minimum-improvement", type=float, default=0.0001)
     parser.add_argument("--pipeline-workers", type=int, default=3)
+    parser.add_argument(
+        "--architectures", nargs="+", choices=("distributed", "monolith"),
+        default=("distributed", "monolith"),
+        help="Limit a diagnostic run to selected architectures; use both for a paired pilot.",
+    )
     parser.add_argument("--startup-timeout-seconds", type=int, default=300)
     parser.add_argument("--cpuset", default="8-15")
     parser.add_argument("--numa-node", default="1")
@@ -194,6 +199,7 @@ def main() -> int:
         "numa_node": args.numa_node,
         "aggregate_cpus": args.aggregate_cpus,
         "aggregate_memory": args.aggregate_memory,
+        "architectures": list(args.architectures),
         "image_tag": args.image_tag,
         "evaluator_image": args.evaluator_image,
     }
@@ -218,12 +224,13 @@ def main() -> int:
 
     completed = {(row["scenario"], row["architecture"]) for row in state["completed"]}
     scenarios = {row["scenario"]: row for row in manifest["scenarios"]}
-    schedule = (
+    full_schedule = (
         ("suspension", "distributed"),
         ("suspension", "monolith"),
         ("fabrication", "monolith"),
         ("fabrication", "distributed"),
     )
+    schedule = tuple(row for row in full_schedule if row[1] in args.architectures)
     deadline = datetime.fromisoformat(state["deadline_utc"])
     for scenario_name, architecture in schedule:
         if (scenario_name, architecture) in completed:
