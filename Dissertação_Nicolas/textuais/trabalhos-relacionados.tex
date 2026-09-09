@@ -13,6 +13,8 @@ Os estudos de \citeonline{Cardenas2009}, \citeonline{Mitchell2014} e \citeonline
 
 GRASP é fundamentado por \citeonline{ResendeRibeiro2010}; sua aplicação à seleção de características para IDS é investigada por \citeonline{quincozes2020grasp,quincozes2021performance,quincozes2022extended}. Revisões recentes indicam que metaheurísticas continuam relevantes para detecção de ataques em ambientes industriais e IIoT \cite{Termanini2025Survey,Francis2026MFSReview}. Essa trajetória sustenta os componentes algorítmicos reutilizados pelo G-FShield, não uma alegação de novo algoritmo.
 
+Como comparador externo, \citeonline{Scherer2024IWSHAP} propõem o IWSHAP, que ordena características por valores SHAP e aplica seleção incremental do tipo \textit{wrapper} com XGBoost em tráfego CAN. O artigo relata, para seu experimento de suspensão no X-CANIDS, F1 da classe positiva de aproximadamente 0,9186 com 16 das 688 características. Esses valores são resultados publicados sob protocolo, classificador e escala de dados próprios; por isso, nesta dissertação eles contextualizam a qualidade da seleção, mas não são subtraídos diretamente das métricas do G-FShield. A comparação experimental controlada usa o artefato público fixado em uma revisão, partições comuns de treino, validação e teste e o mesmo avaliador final para todos os subconjuntos.
+
 \section{Arquiteturas Distribuídas e Observabilidade}
 
 Trabalhos anteriores exploram paralelismo em partes do GRASP-FS. A proposta de \citeonline{Silva2023GDLSFS} distribui a busca local, enquanto a de \citeonline{Naves2023DRG} distribui a geração da lista restrita de candidatos. Em metaheurísticas de outros domínios, \citeonline{SUBRAMANIAN20101899} exemplifica busca paralela, mas sem o problema de seleção de características ou a integração operacional aqui estudada.
@@ -42,6 +44,7 @@ A Tabela~\ref{tab:related_work_gfshield} sintetiza as capacidades discutidas. ``
 Resende e Ribeiro (2016) & -- & \checkmark & -- & -- & -- & -- \\
 Yusta (2009); Esseghir et al. (2010) & -- & Parcial & -- & -- & -- & -- \\
 Quincozes et al. (2020--2022) & \checkmark & \checkmark & -- & -- & -- & -- \\
+Scherer et al. (2024), IWSHAP & \checkmark & -- & -- & -- & -- & -- \\
 Silva et al. (2023) & \checkmark & \checkmark & -- & \checkmark & Parcial & -- \\
 Faria et al. (2023) & \checkmark & \checkmark & \checkmark & -- & Parcial & -- \\
 Beyer et al. (2016); Usman et al. (2022) & -- & -- & -- & -- & -- & \checkmark \\

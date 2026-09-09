@@ -13,6 +13,8 @@ This chapter positions \textit{G-FShield} in the literature on \acp{ids} for \ac
 
 GRASP is grounded by \citeonline{ResendeRibeiro2010}; its use for IDS feature selection is investigated by \citeonline{quincozes2020grasp,quincozes2021performance,quincozes2022extended}. Recent surveys indicate that metaheuristics remain relevant to attack detection in industrial and IIoT environments \cite{Termanini2025Survey,Francis2026MFSReview}. This trajectory supports the algorithmic components reused by G-FShield, not a claim of a new algorithm.
 
+As an external comparator, \citeonline{Scherer2024IWSHAP} propose IWSHAP, which ranks features with SHAP values and applies incremental wrapper selection with XGBoost to CAN traffic. For its X-CANIDS suspension experiment, the paper reports positive-class F1 of approximately 0.9186 with 16 of the 688 features. These are published results obtained under the work's own protocol, classifier, and data scale; in this dissertation, they therefore contextualize selection quality but are not directly subtracted from G-FShield metrics. The controlled experimental comparison uses the public artifact pinned to a revision, common train, validation, and test partitions, and the same final evaluator for every subset.
+
 \section{Distributed Architectures and Observability}
 
 Earlier work explored parallelism in parts of GRASP-FS. \citeonline{Silva2023GDLSFS} distributes local search, whereas \citeonline{Naves2023DRG} distributes restricted-candidate-list generation. In metaheuristics from another domain, \citeonline{SUBRAMANIAN20101899} exemplifies parallel search but does not address feature selection or the operational integration studied here.
@@ -42,6 +44,7 @@ Table~\ref{tab:related_work_gfshield} summarizes the discussed capabilities. ``D
 Resende and Ribeiro (2016) & -- & \checkmark & -- & -- & -- & -- \\
 Yusta (2009); Esseghir et al. (2010) & -- & Partial & -- & -- & -- & -- \\
 Quincozes et al. (2020--2022) & \checkmark & \checkmark & -- & -- & -- & -- \\
+Scherer et al. (2024), IWSHAP & \checkmark & -- & -- & -- & -- & -- \\
 Silva et al. (2023) & \checkmark & \checkmark & -- & \checkmark & Partial & -- \\
 Faria et al. (2023) & \checkmark & \checkmark & \checkmark & -- & Partial & -- \\
 Beyer et al. (2016); Usman et al. (2022) & -- & -- & -- & -- & -- & \checkmark \\
