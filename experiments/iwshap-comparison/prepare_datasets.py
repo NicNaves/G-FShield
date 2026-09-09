@@ -260,7 +260,7 @@ def write_scenario(
 
     scenario_root = output_root / name
     full_dir = scenario_root / "campaign"
-    selected_dir = scenario_root / "iwshap-selected"
+    selected_dir = scenario_root / "iwshap-selected" / "campaign"
     full_dir.mkdir(parents=True, exist_ok=True)
     selected_dir.mkdir(parents=True, exist_ok=True)
     full_handles = {
@@ -268,7 +268,7 @@ def write_scenario(
         for split in SPLITS
     }
     selected_handles = {
-        split: (selected_dir / f"iwshap-selected-{split}.arff").open(
+        split: (selected_dir / f"erenoall-{split}.arff").open(
             "w", encoding="utf-8", newline="\n"
         )
         for split in SPLITS
@@ -329,9 +329,9 @@ def write_scenario(
             },
             "iwshap_selected_arff": {
                 "path": str(
-                    (selected_dir / f"iwshap-selected-{split}.arff").relative_to(output_root)
+                    (selected_dir / f"erenoall-{split}.arff").relative_to(output_root)
                 ),
-                "sha256": sha256_file(selected_dir / f"iwshap-selected-{split}.arff"),
+                "sha256": sha256_file(selected_dir / f"erenoall-{split}.arff"),
             },
         }
         for split in SPLITS

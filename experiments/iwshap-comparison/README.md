@@ -40,8 +40,9 @@ python3 experiments/iwshap-comparison/prepare_datasets.py \
 ```
 
 For each scenario, `campaign/` has the exact filenames consumed by the existing
-G-FShield campaign runner. `iwshap-selected/` has the historical IWSHAP subset
-under the same split membership for a common final evaluator.
+G-FShield campaign runner. `iwshap-selected/campaign/` uses the same filenames
+for the historical IWSHAP subset under identical split membership, so the same
+common final-evaluator runner can consume either directory without special cases.
 
 ## Preregistered comparison
 
