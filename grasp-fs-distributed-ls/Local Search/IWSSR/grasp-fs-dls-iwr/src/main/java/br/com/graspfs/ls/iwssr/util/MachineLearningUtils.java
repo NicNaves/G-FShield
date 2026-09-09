@@ -3,6 +3,8 @@ package br.com.graspfs.ls.iwssr.util;
 import weka.classifiers.AbstractClassifier;
 import weka.core.Instance;
 import weka.core.Instances;
+import weka.filters.Filter;
+import weka.filters.unsupervised.attribute.Remove;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -11,9 +13,9 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.IntStream;
 
 public class MachineLearningUtils {
 
@@ -74,31 +76,32 @@ public class MachineLearningUtils {
     public static Instances selecionaFeatures(Instances amostras, ArrayList<Integer> features) {
         int totalFeatures = amostras.numAttributes();
 
-        Collections.sort(features);
-
         if (totalFeatures <= features.size()) {
             System.err.println("O numero de features precisa ser maior que o filtro.");
             System.out.println("Reduzindo de " + totalFeatures + " para " + features.size() + " features.");
             throw new RuntimeException("O numero de features no dataset e menor ou igual ao numero selecionado.");
         }
 
-        boolean[] manter = new boolean[totalFeatures];
-        for (int f : features) {
-            if (f - 1 >= 0 && f - 1 < totalFeatures - 1) {
-                manter[f - 1] = true;
-            }
+        int classIndex = totalFeatures - 1;
+        int[] selected = IntStream.concat(
+                features.stream()
+                        .mapToInt(feature -> feature - 1)
+                        .filter(feature -> feature >= 0 && feature < classIndex)
+                        .distinct()
+                        .sorted(),
+                IntStream.of(classIndex)
+        ).toArray();
+        try {
+            Remove filter = new Remove();
+            filter.setAttributeIndicesArray(selected);
+            filter.setInvertSelection(true);
+            filter.setInputFormat(amostras);
+            Instances reduced = Filter.useFilter(amostras, filter);
+            reduced.setClassIndex(reduced.numAttributes() - 1);
+            return reduced;
+        } catch (Exception error) {
+            throw new IllegalStateException("Falha ao selecionar features em lote.", error);
         }
-
-        manter[totalFeatures - 1] = true;
-
-        for (int i = totalFeatures - 1; i >= 0; i--) {
-            if (!manter[i]) {
-                amostras.deleteAttributeAt(i);
-            }
-        }
-
-        amostras.setClassIndex(amostras.numAttributes() - 1);
-        return amostras;
     }
 
     public static double classificarInstancias(AbstractClassifier classificador, Instances teste) {
