@@ -35,6 +35,11 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def sha256_normalized_text(path: Path) -> str:
+    content = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(content).hexdigest()
+
+
 def load_registry() -> dict:
     return json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
 
@@ -46,7 +51,7 @@ def verify_sources(root: Path, registry: dict) -> None:
         if not source.is_file():
             failures.append(f"missing {relative}")
             continue
-        actual = sha256_file(source)
+        actual = sha256_normalized_text(source)
         if actual.lower() != expected.lower():
             failures.append(f"hash mismatch for {relative}: {actual}")
     if failures:
@@ -457,6 +462,7 @@ def main() -> int:
         "source_repository": registry["source_repository"],
         "source_commit": registry["source_commit"],
         "source_files": registry["files"],
+        "source_hash_policy": registry["hash_policy"],
         "license_status": registry["license_status"],
         "scenarios": scenarios,
     }

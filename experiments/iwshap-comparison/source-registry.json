@@ -2,15 +2,16 @@
   "schema_version": 1,
   "source_repository": "https://github.com/sf24-iwshap/sf24-iwshap",
   "source_commit": "fb0d3093c12421d08ab3fb595d20c29ba2442e65",
+  "hash_policy": "SHA-256 after normalizing CRLF and bare CR line endings to LF",
   "license_status": "No LICENSE file was present at the pinned commit; retain the data outside Git until redistribution permission is confirmed.",
   "files": {
-    "IWSHAP.py": "30eee4d6ef7eee119fff0692494a6843695e1452a6c6332e3a05d1bd5eedbace",
-    "dataset/safe_dataset.csv": "9f1b6ee137676d69dc154bf19c28a094a4482f7974f485080704fbfd6826a493",
-    "dataset/attack_dataset_fabr.csv": "65f19543397437091d18ec61f54a4ec79b3fba94272d282d7e43843df06e90ce",
-    "dataset/attack_dataset_susp.csv": "08b542f6c7776c276e39e4b38a2faf8638dcf2d4c8367862c5bc39d21926721b",
-    "logs/Log_2024-06-25_13-20-41.txt": "c4044dcff87121803fdabc91a1a98ac6ac8cd68df2e4edf231d197902861652d",
-    "logs/Log_2024-07-04_13-59-15.txt": "4e38370e6cc82618e54065bf64e93619c9bb50e47eab2c882574e7c6363034bb",
-    "reduced-datas/dataset_reduced_2024-07-04_13-59-15.csv": "8a3673b2610538998fada5046cc064224351ee7ff45e7fd8e8b3dfa5c43df927"
+    "IWSHAP.py": "f1c63340a9f777a3cfe2d7c0e167317ff43df8737d608fe8641cc19292547388",
+    "dataset/safe_dataset.csv": "db1e94a96cbade291f6dcfee1c2971f2880ca03ed9140be30d6cd25c7538e87c",
+    "dataset/attack_dataset_fabr.csv": "76d30e280f9ff5de55dbb9f7ac2cf050cc98237fd5794ed335dce1bca301da45",
+    "dataset/attack_dataset_susp.csv": "d642d9d406011d3aee59e83b64f393201df1f3d7a4fdbf2011cd315e0d9d210c",
+    "logs/Log_2024-06-25_13-20-41.txt": "24f1a764bdcbc2aaa3aef995d91a28002ba5cabe289d90445e2e54aa2474426e",
+    "logs/Log_2024-07-04_13-59-15.txt": "f50471a3ab13a3a8e884cdc3c07fc2439a6ae9e04e93882c46c06e4e49e19354",
+    "reduced-datas/dataset_reduced_2024-07-04_13-59-15.csv": "6d9da1df4ee4cfabadb39c3e9f6a8bb9618aaa18803c97e7478db2e82ae400a5"
   },
   "scenarios": {
     "suspension": {

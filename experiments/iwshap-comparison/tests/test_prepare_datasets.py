@@ -47,6 +47,17 @@ Melhor F1 Score: 0.7
             parsed["best"]["cumulative_reported_fit_predict_seconds_to_first_best"],
         )
 
+    def test_source_hash_is_independent_of_checkout_line_endings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            lf = Path(directory) / "lf.txt"
+            crlf = Path(directory) / "crlf.txt"
+            lf.write_bytes(b"first\nsecond\n")
+            crlf.write_bytes(b"first\r\nsecond\r\n")
+            self.assertEqual(
+                MODULE.sha256_normalized_text(lf),
+                MODULE.sha256_normalized_text(crlf),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
