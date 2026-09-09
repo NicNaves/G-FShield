@@ -85,6 +85,13 @@ python3 experiments/iwshap-comparison/analyze_results.py \
 The generated report keeps repository-log XGBoost measurements, controlled J48
 re-evaluations, and the matched-architecture pilot in separate evidence strata.
 
+For a classifier-controlled comparison closer to IWSHAP, run the frozen subsets
+through `run_xgboost_evaluation.py` inside an environment pinned to XGBoost
+2.0.3, scikit-learn 1.5.0, NumPy 1.26.4, and pandas 2.2.2. The script fixes the
+XGBoost random state, limits its worker count, verifies every ARFF hash, and
+reports macro and positive-class metrics separately. These runs evaluate frozen
+subsets; they do not reproduce IWSHAP's selection procedure.
+
 ## Preregistered comparison
 
 Run suspension and fabrication as separate datasets. For each dataset:
