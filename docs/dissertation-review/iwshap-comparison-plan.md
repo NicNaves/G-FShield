@@ -56,7 +56,14 @@ razões artificiais.
 
 ## Estado
 
-- Ablação do filtro em lote: em execução.
-- Reprodução original IWSHAP: preparada e enfileirada após a ablação.
-- Campanha formal G-FShield: enfileirada após o gate da ablação e a reprodução.
+- Ablação do filtro em lote: concluída e aprovada nos dois cenários.
+- Reprodução original IWSHAP: concluída nos cenários de suspensão e fabricação.
+- Campanha formal G-FShield: 63 de 120 células válidas foram concluídas antes de
+  uma reinicialização do servidor em 10 de setembro de 2026. Os 63 manifestos e
+  todos os arquivos enumerados por eles foram revalidados por SHA-256, sem erro.
+  A pasta da 64ª célula, interrompida antes de produzir `final-result.json`, foi
+  preservada como `attempt-1-interrupted-reboot-20260910`, e a campanha foi
+  retomada em 12 de setembro sem repetir as células válidas.
+- Pós-processamento: o analisador pareado e a reavaliação XGBoost comum estão
+  versionados e enfileirados para iniciar somente após `CAMPAIGN_COMPLETED`.
 - Integração PT/EN, compilação e inspeção visual: aguardam resultados finais.
