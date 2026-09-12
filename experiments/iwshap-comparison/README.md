@@ -86,6 +86,21 @@ allows at most two attempts per cell, records image IDs and host information,
 checks every input and output hash, and refuses a global deadline beyond ten
 days. Its default per-cell budget is the same 20 minutes used by the pilot.
 
+After all 120 cells are complete, verify every recorded checksum and produce the
+scenario-aware paired analysis with:
+
+```sh
+python3 experiments/iwshap-comparison/analyze_formal_results.py \
+  --state /path/to/formal-campaign/state.json \
+  --baseline-root /path/to/iwshap-common-baselines \
+  --output /path/to/formal-analysis
+```
+
+The analyzer keeps construction and IWSSR evaluation counts separate, treats
+the execution/seed as the paired unit, reports bootstrap intervals and paired
+permutation tests, and labels time to the pre-existing all-feature baseline as
+descriptive because that target was not embedded in the frozen manifest.
+
 Generate the traceable comparison table after either the common baselines or
 the paired pilot has produced results:
 
@@ -125,6 +140,9 @@ Run suspension and fabrication as separate datasets. For each dataset:
 - externally re-evaluate every frozen subset with the same XGBoost version and
   parameters used by IWSHAP, while retaining the common Weka result as the
 architecture-controlled analysis.
+When `--paired-root` points to a completed formal campaign, the evaluator loads
+all 60 frozen subsets per scenario and identifies each output by architecture
+and seed. It refuses to use an incomplete formal state.
 
 To reproduce the repository protocol itself, build the unmodified pinned checkout
 and run it with bounded, recorded resources:

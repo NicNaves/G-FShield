@@ -96,12 +96,38 @@ def historical_indices(scenario: dict[str, Any], feature_names: list[str]) -> li
 def paired_subsets(paired_root: Path | None, scenario: str) -> list[tuple[str, list[int], str]]:
     if paired_root is None:
         return []
-    variants = []
+    variants: list[tuple[str, list[int], str]] = []
     for architecture in ("distributed", "monolith"):
         path = paired_root / scenario / architecture / "final-result.json"
         if path.is_file():
             result = json.loads(path.read_text(encoding="utf-8"))
             variants.append((architecture, result["selected_features"], str(path)))
+    state_path = paired_root / "state.json"
+    if state_path.is_file():
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        if state.get("state") != "CAMPAIGN_COMPLETED":
+            raise RuntimeError(
+                f"formal paired campaign is not complete: {state.get('state')}"
+            )
+        completed = sorted(
+            (
+                row for row in state.get("completed", [])
+                if row.get("scenario") == scenario
+            ),
+            key=lambda row: (int(row["seed"]), row["architecture"]),
+        )
+        for row in completed:
+            result_path = Path(row["result_path"])
+            if not result_path.is_file():
+                raise RuntimeError(f"missing frozen subset result: {result_path}")
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+            architecture = row["architecture"]
+            seed = int(row["seed"])
+            variants.append((
+                f"{architecture}-seed-{seed}",
+                result["selected_features"],
+                str(result_path),
+            ))
     return variants
 
 

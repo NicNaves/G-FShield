@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -26,6 +27,31 @@ class XGBoostEvaluationTests(unittest.TestCase):
         self.assertEqual(labels, [0, 1])
         self.assertNotEqual(rows[0][1], rows[0][1])
         self.assertEqual(rows[1], [2.0, 3.0])
+
+    def test_formal_campaign_subsets_include_architecture_and_seed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            result_path = root / "run" / "final-result.json"
+            result_path.parent.mkdir()
+            result_path.write_text(
+                json.dumps({"selected_features": [2, 5]}), encoding="utf-8"
+            )
+            (root / "state.json").write_text(
+                json.dumps({
+                    "state": "CAMPAIGN_COMPLETED",
+                    "completed": [{
+                        "scenario": "suspension",
+                        "architecture": "distributed",
+                        "seed": 11,
+                        "result_path": str(result_path),
+                    }],
+                }),
+                encoding="utf-8",
+            )
+            variants = MODULE.paired_subsets(root, "suspension")
+        self.assertEqual(
+            [("distributed-seed-11", [2, 5], str(result_path))], variants
+        )
 
 
 if __name__ == "__main__":
