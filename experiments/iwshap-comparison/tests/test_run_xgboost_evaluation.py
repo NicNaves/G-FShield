@@ -40,6 +40,19 @@ class XGBoostEvaluationTests(unittest.TestCase):
         self.assertNotEqual(rows[0][1], rows[0][1])
         self.assertEqual(rows[1], [2.0, 3.0])
 
+    def test_arff_reader_accepts_label_as_target_attribute(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "sample.arff"
+            path.write_text(
+                "@relation sample\n@attribute feature numeric\n"
+                "@attribute label {0,1}\n@data\n1,0\n2,1\n",
+                encoding="utf-8",
+            )
+            names, rows, labels = MODULE.read_arff(path)
+        self.assertEqual(names, ["feature"])
+        self.assertEqual(rows, [[1.0], [2.0]])
+        self.assertEqual(labels, [0, 1])
+
     def test_formal_campaign_subsets_include_architecture_and_seed(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

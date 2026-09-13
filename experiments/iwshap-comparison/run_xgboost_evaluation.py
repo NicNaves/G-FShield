@@ -81,8 +81,8 @@ def read_arff(path: Path) -> tuple[list[str], list[list[float]], list[int]]:
                 raise ValueError(f"{path}: expected {len(attributes)} values, got {len(values)}")
             rows.append([float("nan") if value.strip() == "?" else float(value) for value in values[:-1]])
             labels.append(int(float(values[-1])))
-    if not in_data or not attributes or attributes[-1].lower() != "class":
-        raise ValueError(f"{path}: unsupported ARFF header or missing class attribute")
+    if not in_data or not attributes or attributes[-1].lower() not in {"class", "label"}:
+        raise ValueError(f"{path}: unsupported ARFF header or missing class/label attribute")
     return attributes[:-1], rows, labels
 
 
