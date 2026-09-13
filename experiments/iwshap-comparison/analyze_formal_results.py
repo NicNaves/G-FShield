@@ -61,6 +61,33 @@ def resolve_result_path(state_path: Path, completed: dict[str, Any]) -> Path:
     )
 
 
+def command_integer(command: list[str], option: str) -> int:
+    try:
+        return int(command[command.index(option) + 1])
+    except (ValueError, IndexError) as error:
+        raise ValueError(f"missing integer campaign option {option}") from error
+
+
+def selection_window_ms(
+    result: dict[str, Any], attempt: dict[str, Any],
+) -> tuple[float, float]:
+    duration = result.get("selection_duration_ms")
+    if duration is None:
+        command = attempt["command"]
+        duration = 1000 * (
+            command_integer(command, "--run-timeout-seconds")
+            - command_integer(command, "--finalization-reserve-seconds")
+        )
+    elapsed = result.get("selection_elapsed_ms")
+    if elapsed is None:
+        measured = (
+            float(result["run_elapsed_ms"])
+            - float(result.get("classifier_time_ms") or 0)
+        )
+        elapsed = min(float(duration), max(0.0, measured))
+    return float(duration), float(elapsed)
+
+
 def csv_data_rows(path: Path, preamble_rows: int) -> int:
     if not path.is_file():
         return 0
@@ -133,6 +160,9 @@ def load_runs(
         "resource_analysis",
     )
     targets = baseline_targets(baseline_root)
+    attempts = {
+        attempt["run_id"]: attempt for attempt in state.get("attempts", [])
+    }
     rows = []
     errors: list[str] = []
     for completed in state["completed"]:
@@ -146,7 +176,10 @@ def load_runs(
         result = json.loads(result_path.read_text(encoding="utf-8"))
         scenario = completed["scenario"]
         architecture = completed["architecture"]
-        horizon = float(result["selection_duration_ms"]) / 1000.0
+        duration_ms, selection_elapsed_ms = selection_window_ms(
+            result, attempts[completed["run_id"]]
+        )
+        horizon = duration_ms / 1000.0
         trace = causal.read_best_trace(run_dir, architecture)
         if not trace:
             errors.append(f"missing candidate trace: {run_dir}")
@@ -158,7 +191,7 @@ def load_runs(
         construction_count, local_search_count = stage_counts(run_dir, architecture, result)
         phase = causal.pipeline_metrics(run_dir, architecture, horizon)
         positive = result["test_per_class_metrics"]["1"]
-        selection_seconds = float(result["selection_elapsed_ms"]) / 1000.0
+        selection_seconds = selection_elapsed_ms / 1000.0
         target_metrics = anytime_at_target(trace, targets[scenario], horizon)
         cpu_cores = float(resources["cpu_cores_median"])
         row = {

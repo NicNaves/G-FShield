@@ -12,6 +12,23 @@ SPEC.loader.exec_module(MODULE)
 
 
 class FormalAnalysisTests(unittest.TestCase):
+    def test_monolith_selection_window_comes_from_frozen_command(self):
+        result = {
+            "run_elapsed_ms": 1080500,
+            "classifier_time_ms": 300,
+        }
+        attempt = {
+            "command": [
+                "runner",
+                "--run-timeout-seconds", "1200",
+                "--finalization-reserve-seconds", "120",
+            ]
+        }
+        duration, elapsed = MODULE.selection_window_ms(result, attempt)
+        self.assertEqual(1080000.0, duration)
+        self.assertEqual(1080000.0, elapsed)
+
+
     def test_result_path_is_remapped_from_recorded_campaign_root(self):
         with tempfile.TemporaryDirectory() as temporary:
             campaign = Path(temporary) / "campaign"
