@@ -1,0 +1,125 @@
+{
+  "completed": [
+    {
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "iwshap-reproduction-suspension",
+        "--cpuset-cpus",
+        "8-15",
+        "--cpus",
+        "6.0",
+        "--memory",
+        "12g",
+        "--network",
+        "none",
+        "-v",
+        "/home/idscps/nicolas/sf24-iwshap-audit:/source:ro",
+        "-v",
+        "/home/idscps/nicolas/experiment-artifacts/iwshap-comparison/original-reproduction-v1/suspension/logs:/outputs/logs",
+        "-v",
+        "/home/idscps/nicolas/experiment-artifacts/iwshap-comparison/original-reproduction-v1/suspension/graphics:/outputs/graphics",
+        "-w",
+        "/source",
+        "sf24-iwshap:fb0d3093c124",
+        "python3",
+        "IWSHAP.py",
+        "--safe-path",
+        "dataset/safe_dataset.csv",
+        "--attack-path",
+        "dataset/attack_dataset_susp.csv",
+        "--log-path",
+        "/outputs/logs",
+        "--graphic-path",
+        "/outputs/graphics"
+      ],
+      "elapsed_seconds": 52.58646827499615,
+      "log_files": [
+        "/home/idscps/nicolas/experiment-artifacts/iwshap-comparison/original-reproduction-v1/suspension/logs/Log_2026-09-09_12-20-51.txt"
+      ],
+      "return_code": 0,
+      "scenario": "suspension",
+      "status": "completed"
+    },
+    {
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "iwshap-reproduction-fabrication",
+        "--cpuset-cpus",
+        "8-15",
+        "--cpus",
+        "6.0",
+        "--memory",
+        "12g",
+        "--network",
+        "none",
+        "-v",
+        "/home/idscps/nicolas/sf24-iwshap-audit:/source:ro",
+        "-v",
+        "/home/idscps/nicolas/experiment-artifacts/iwshap-comparison/original-reproduction-v1/fabrication/logs:/outputs/logs",
+        "-v",
+        "/home/idscps/nicolas/experiment-artifacts/iwshap-comparison/original-reproduction-v1/fabrication/graphics:/outputs/graphics",
+        "-w",
+        "/source",
+        "sf24-iwshap:fb0d3093c124",
+        "python3",
+        "IWSHAP.py",
+        "--safe-path",
+        "dataset/safe_dataset.csv",
+        "--attack-path",
+        "dataset/attack_dataset_fabr.csv",
+        "--log-path",
+        "/outputs/logs",
+        "--graphic-path",
+        "/outputs/graphics"
+      ],
+      "elapsed_seconds": 82.66305821499554,
+      "log_files": [
+        "/home/idscps/nicolas/experiment-artifacts/iwshap-comparison/original-reproduction-v1/fabrication/logs/Log_2026-09-09_12-21-41.txt"
+      ],
+      "return_code": 0,
+      "scenario": "fabrication",
+      "status": "completed"
+    }
+  ],
+  "deadline_utc": "2026-09-19T15:20:44.815035+00:00",
+  "finished_utc": "2026-09-09T15:23:00.410885+00:00",
+  "image": "sf24-iwshap:fb0d3093c124",
+  "image_id": "sha256:deb8fafc72944621d3394488f1e0c990df6cd20372c67e2d441ec68edf5b8c64",
+  "inputs": {
+    "fabrication": {
+      "path": "/home/idscps/nicolas/sf24-iwshap-audit/dataset/attack_dataset_fabr.csv",
+      "sha256": "76d30e280f9ff5de55dbb9f7ac2cf050cc98237fd5794ed335dce1bca301da45"
+    },
+    "safe": {
+      "path": "/home/idscps/nicolas/sf24-iwshap-audit/dataset/safe_dataset.csv",
+      "sha256": "db1e94a96cbade291f6dcfee1c2971f2880ca03ed9140be30d6cd25c7538e87c"
+    },
+    "suspension": {
+      "path": "/home/idscps/nicolas/sf24-iwshap-audit/dataset/attack_dataset_susp.csv",
+      "sha256": "d642d9d406011d3aee59e83b64f393201df1f3d7a4fdbf2011cd315e0d9d210c"
+    }
+  },
+  "package_versions": [
+    "numpy=1.26.4",
+    "pandas=2.2.2",
+    "shap=0.45.1",
+    "scikit-learn=1.5.0",
+    "xgboost=2.0.3"
+  ],
+  "protocol": "original repository code: categorical encoding before split; 80/20 random_state=42; XGBClassifier repository defaults; same 20% reused for iterative selection and reported performance",
+  "resources": {
+    "cpus": 6.0,
+    "cpuset": "8-15",
+    "memory": "12g"
+  },
+  "schema_version": 1,
+  "source_commit": "fb0d3093c12421d08ab3fb595d20c29ba2442e65",
+  "started_utc": "2026-09-09T15:20:44.815035+00:00",
+  "state": "REPRODUCTION_COMPLETED"
+}

@@ -9,9 +9,11 @@ For RQ2 and RQ3, an additional causal campaign removed algorithm--architecture c
 
 Parallel execution used a median 4.076 cores versus 1.004 and incurred higher CPU-h and GiB-h per candidate in every pair. Conversely, median dimensionality reduction was 78.43\% for G-FShield and 76.47\% for the monolith. The evidence therefore demonstrates the architectural ability to execute stages concurrently and increase raw throughput, but does not support global superiority: for a single request, the monolith reached the threshold sooner and was more resource-efficient.
 
+\input{textuais/conclusao-iwshap}
+
 For RQ4, the manifest, resolved commands, hashes, campaign and run identifiers, seeds, states, stop reasons, timestamps, messages, internal CSV files, logs, final metrics, and telemetry reconstruct what was captured. The application also persists events by seed and stage. Telemetry completeness and cost, loss and duplication under failure, recovery time, and reprocessing were not measured; resilience, fault tolerance, and scalability remain design objectives.
 
-Algorithm--architecture confounding remains in the broad 27-arm comparison, but the paired causal campaign removed it. Its main remaining threats are the distributed attempts retried after startup failures and the scope restricted to one server, one corpus, one split, J48, one concurrency configuration, and 30 seeds. The results do not establish horizontal scalability, fault tolerance, or generalization to other workloads.
+Algorithm--architecture confounding remains in the broad 27-arm comparison, but the paired campaigns removed it. The main remaining threats are the distributed attempts retried after startup failures and the scope restricted to one server, two views of one corpus, one group-aware split, J48 in the architectural comparison, XGBoost in the external comparison, one concurrency configuration, and 30 seeds per scenario and architecture. The results do not establish horizontal scalability, fault tolerance, or generalization to other workloads.
 
 Future work should:
 

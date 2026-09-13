@@ -9,9 +9,11 @@ Para as RQ2 e RQ3, uma campanha causal adicional removeu o confundimento entre a
 
 O paralelismo utilizou mediana de 4,076 núcleos, contra 1,004, e apresentou maior custo de CPU-h e GiB-h por candidato em todos os pares. Em compensação, a redução dimensional mediana foi 78,43\% no G-FShield e 76,47\% no monólito. Assim, a evidência demonstra a capacidade arquitetural de executar estágios concorrentemente e aumentar vazão bruta, mas não sustenta superioridade global: para uma única requisição, o monólito atingiu o limiar mais cedo e foi mais eficiente por recurso.
 
+\input{textuais/conclusao-iwshap}
+
 Quanto à RQ4, manifesto, comandos resolvidos, hashes, identificadores de campanha e execução, sementes, estados, motivos de parada, timestamps, mensagens, CSVs internos, logs, métricas finais e telemetria permitem reconstruir o que foi capturado. A aplicação também persiste eventos por semente e estágio. Não foram medidos completude ou custo da telemetria, perda e duplicação sob falhas, tempo de recuperação ou reprocessamento; resiliência, tolerância a falhas e escalabilidade permanecem objetivos de projeto.
 
-O confundimento entre arquitetura e algoritmo permanece na comparação ampla de 27 braços, mas foi removido na campanha causal pareada. Suas principais ameaças remanescentes são as tentativas distribuídas repetidas após falhas de inicialização e o escopo restrito a um servidor, um corpus, um particionamento, J48, uma configuração de concorrência e 30 sementes. Os resultados não demonstram escalabilidade horizontal, tolerância a falhas ou generalização para outras cargas.
+O confundimento entre arquitetura e algoritmo permanece na comparação ampla de 27 braços, mas foi removido nas campanhas pareadas. As principais ameaças remanescentes são as tentativas distribuídas repetidas após falhas de inicialização e o escopo restrito a um servidor, dois recortes de um corpus, um particionamento agrupado, J48 na comparação arquitetural, XGBoost na comparação externa, uma configuração de concorrência e 30 sementes por cenário e arquitetura. Os resultados não demonstram escalabilidade horizontal, tolerância a falhas ou generalização para outras cargas.
 
 Como trabalhos futuros:
 

@@ -163,6 +163,8 @@ A trajetória mediana da melhor validação (Figura~\ref{fig:architecture-anytim
 \end{figure}
 \end{landscape}
 
+\input{textuais/avaliacao-iwshap}
+
 \section{Observabilidade e Rastreabilidade}
 
 Cada execução preserva \texttt{campaign\_id}, \texttt{run\_id}, braço, semente, parâmetros, hashes dos dados, comando resolvido, estados, motivo de parada, timestamps UTC e monotônicos, solução selecionada, métricas finais, mensagens de melhor solução, CSVs internos, logs e telemetria de contêiner. Um manifesto de checksums por execução permite detectar alteração nos artefatos, e o estado da campanha permite reconstruir tentativas, rejeições e repetições.

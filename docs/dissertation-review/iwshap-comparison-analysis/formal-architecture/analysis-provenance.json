@@ -1,0 +1,13 @@
+{
+  "analysis_seed": 20260912,
+  "baseline_targets": {
+    "fabrication": 0.877356397158,
+    "suspension": 0.717036349604
+  },
+  "bootstrap_repetitions": 20000,
+  "paired_seeds_per_scenario": 30,
+  "permutation_repetitions": 200000,
+  "run_count": 120,
+  "state_sha256": "2213d22cec5f4039df83d386078b2332133191a03f2692d9b8ff739c2ba32025",
+  "time_target_status": "descriptive; baseline existed before campaign but was not frozen in campaign manifest"
+}
