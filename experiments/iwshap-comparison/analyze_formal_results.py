@@ -42,6 +42,25 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def resolve_result_path(state_path: Path, completed: dict[str, Any]) -> Path:
+    """Resolve a frozen result even when the campaign root was remounted."""
+    recorded = Path(completed["result_path"])
+    if recorded.is_file():
+        return recorded
+    campaign_root = state_path.parent
+    matching_roots = [
+        index for index, part in enumerate(recorded.parts)
+        if part == campaign_root.name
+    ]
+    for index in reversed(matching_roots):
+        remapped = campaign_root.joinpath(*recorded.parts[index + 1:])
+        if remapped.is_file():
+            return remapped
+    raise FileNotFoundError(
+        f"frozen result is unavailable at recorded or remapped path: {recorded}"
+    )
+
+
 def csv_data_rows(path: Path, preamble_rows: int) -> int:
     if not path.is_file():
         return 0
@@ -117,7 +136,7 @@ def load_runs(
     rows = []
     errors: list[str] = []
     for completed in state["completed"]:
-        result_path = Path(completed["result_path"])
+        result_path = resolve_result_path(state_path, completed)
         run_dir = result_path.parent
         checksum_path = run_dir / "checksums.sha256"
         if not checksum_path.is_file() or sha256_file(checksum_path) != completed["checksums_sha256"]:

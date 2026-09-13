@@ -12,6 +12,18 @@ SPEC.loader.exec_module(MODULE)
 
 
 class FormalAnalysisTests(unittest.TestCase):
+    def test_result_path_is_remapped_from_recorded_campaign_root(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            campaign = Path(temporary) / "campaign"
+            result = campaign / "scenario" / "distributed" / "final-result.json"
+            result.parent.mkdir(parents=True)
+            result.write_text("{}", encoding="utf-8")
+            resolved = MODULE.resolve_result_path(
+                campaign / "state.json",
+                {"result_path": "/host/archive/campaign/scenario/distributed/final-result.json"},
+            )
+        self.assertEqual(result, resolved)
+
     def test_anytime_target_is_censored_and_auc_is_bounded(self):
         result = MODULE.anytime_at_target([(2.0, 0.4), (5.0, 0.8)], 0.7, 10.0)
         self.assertTrue(result["baseline_target_reached"])

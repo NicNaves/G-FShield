@@ -40,6 +40,25 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def resolve_result_path(state_path: Path, completed: dict[str, Any]) -> Path:
+    """Resolve a frozen result even when the campaign root was remounted."""
+    recorded = Path(completed["result_path"])
+    if recorded.is_file():
+        return recorded
+    campaign_root = state_path.parent
+    matching_roots = [
+        index for index, part in enumerate(recorded.parts)
+        if part == campaign_root.name
+    ]
+    for index in reversed(matching_roots):
+        remapped = campaign_root.joinpath(*recorded.parts[index + 1:])
+        if remapped.is_file():
+            return remapped
+    raise FileNotFoundError(
+        f"frozen result is unavailable at recorded or remapped path: {recorded}"
+    )
+
+
 def read_arff(path: Path) -> tuple[list[str], list[list[float]], list[int]]:
     attributes: list[str] = []
     rows: list[list[float]] = []
@@ -117,7 +136,7 @@ def paired_subsets(paired_root: Path | None, scenario: str) -> list[tuple[str, l
             key=lambda row: (int(row["seed"]), row["architecture"]),
         )
         for row in completed:
-            result_path = Path(row["result_path"])
+            result_path = resolve_result_path(state_path, row)
             if not result_path.is_file():
                 raise RuntimeError(f"missing frozen subset result: {result_path}")
             result = json.loads(result_path.read_text(encoding="utf-8"))

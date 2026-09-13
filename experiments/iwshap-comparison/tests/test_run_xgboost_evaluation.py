@@ -13,6 +13,18 @@ SPEC.loader.exec_module(MODULE)
 
 
 class XGBoostEvaluationTests(unittest.TestCase):
+    def test_result_path_is_remapped_from_recorded_campaign_root(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            campaign = Path(temporary) / "campaign"
+            result = campaign / "scenario" / "monolith" / "final-result.json"
+            result.parent.mkdir(parents=True)
+            result.write_text("{}", encoding="utf-8")
+            resolved = MODULE.resolve_result_path(
+                campaign / "state.json",
+                {"result_path": "/host/archive/campaign/scenario/monolith/final-result.json"},
+            )
+        self.assertEqual(result, resolved)
+
     def test_arff_reader_preserves_order_and_missing_values(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "sample.arff"
