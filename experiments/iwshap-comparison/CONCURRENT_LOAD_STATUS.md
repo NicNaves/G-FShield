@@ -41,16 +41,22 @@ Pilot v2 used suspension, load 2, a 420-second selection window, and batch seed
 batch does not establish superiority. It confirmed request isolation and
 per-request provenance in the shared distributed stack.
 
-Pilot v3 uses the final instrumented images, suspension, load 16, the formal
-1,080-second selection window, and batch seed `20260973`. It was launched on
-2026-09-14 and must finish successfully before the formal campaign is started.
+Pilot v3 used the final instrumented images, suspension, load 16, the formal
+1,080-second selection window, and batch seed `20260973`. Both artifacts were
+valid and all containers respected the shared 6 CPU/12 GiB budget. G-FShield
+admitted all 16 requests but produced no solution before the deadline; all 16
+monolith jobs produced a solution and crossed the 0.78 validation threshold.
+This diagnostic result identifies the single-CPU construction service as a
+burst-load bottleneck. It is not part of the formal inferential sample.
 
 ## Formal-campaign gate
 
-Start the formal campaign only if pilot v3 creates valid artifacts for both
-architectures, all 16 requests are admitted, resource limits are enforced, and
-failures can be classified as algorithmic capacity outcomes rather than broken
-instrumentation. Pilot outputs must remain outside the formal analysis.
+The gate was satisfied: pilot v3 created valid artifacts for both architectures,
+all 16 requests were admitted, resource limits were enforced, and the absence
+of distributed solutions was classified as a capacity outcome rather than an
+instrumentation failure. The formal campaign `gfshield-concurrent-load-2026-v1`
+started at 2026-09-14 19:41 UTC with a hard deadline at 2026-09-24 19:41 UTC.
+Pilot outputs remain outside the formal analysis.
 
 Do not update the dissertations with claims of architectural superiority until
 all 30 paired batches per scenario and load have finished and checksum-verified
