@@ -395,7 +395,7 @@ def monolith_command(
         "--numa-node", args.numa_node,
         "--aggregate-cpus", str(per_job_cpus),
         "--aggregate-memory", per_job_memory,
-        "--dataset-hash", scenario["split_index"]["sha256"],
+        "--dataset-hash", sha256_file(args.data_root / scenario["scenario"] / "split-indices.csv"),
     ]
 
 
