@@ -440,7 +440,7 @@ def validation_time_to_target_ms(
 
 
 def validation_times_to_targets_ms(
-    messages: list[dict[str, Any]], targets: tuple[float, ...] = (0.93, 0.94, 0.945, 0.95),
+    messages: list[dict[str, Any]], targets: tuple[float, ...] = (0.78, 0.88, 0.93, 0.94, 0.945, 0.95),
 ) -> dict[str, int | None]:
     return {
         str(target): validation_time_to_target_ms(messages, target)

@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "protocol_id": "gfshield-concurrent-load-2026-v1",
+  "status": "preregistered-before-formal-execution",
+  "datasets": ["X-CANIDS suspension demo", "X-CANIDS fabrication demo"],
+  "architectures": ["distributed", "matched sequential monolith 2"],
+  "algorithm": {
+    "construction": "ReliefF",
+    "controller": "VND",
+    "local_search": "IWSSR",
+    "classifier": "Weka J48 3.8.6",
+    "rcl_cutoff": 30,
+    "sample_size": 5,
+    "relieff_sample_size": 1000,
+    "neighborhood_iterations": 100,
+    "local_search_iterations": 100,
+    "minimum_improvement": 0.0001,
+    "maximum_accepted_improvements": 50
+  },
+  "design": {
+    "batch_seeds": {
+      "first": 20260941,
+      "last": 20260970,
+      "count": 30
+    },
+    "concurrency_levels": [1, 2, 4, 8, 16],
+    "selection_seconds": 1080,
+    "absolute_job_seconds": 1200,
+    "global_seconds": 864000,
+    "experimental_unit": "paired batch seed",
+    "independence_note": "jobs inside a batch are correlated observations and are never treated as independent inferential replicates",
+    "order": "scenario, load and architecture orders are counterbalanced by batch-seed parity",
+    "split": "fixed group-aware 60/20/20 split; identical complete vectors remain in one partition",
+    "test_access": "held-out test is evaluated once after each selected subset is frozen"
+  },
+  "resources": {
+    "cpuset": "8-15",
+    "numa_node": "1",
+    "aggregate_cpu_limit": 6.0,
+    "aggregate_memory_limit": "12 GiB",
+    "distributed_allocation": {
+      "relieff_cpu": 1.0,
+      "iwssr_cpu": 3.0,
+      "vnd_cpu": 0.5,
+      "verify_cpu": 0.5,
+      "kafka_cpu": 0.75,
+      "zookeeper_cpu": 0.25
+    },
+    "monolith_allocation": "6/concurrency CPU and 12/concurrency GiB per simultaneous container"
+  },
+  "quality_thresholds": {
+    "suspension_validation_macro_f1": 0.78,
+    "fabrication_validation_macro_f1": 0.88,
+    "origin": "rounded below the medians observed in the completed 30-seed X-CANIDS architecture campaign"
+  },
+  "primary_hypothesis": "At concurrency 4, 8 or 16 and equal aggregate resources, G-FShield increases the paired batch count of jobs reaching the scenario quality threshold within 1080 seconds.",
+  "secondary_hypotheses": [
+    "G-FShield increases qualified solutions per minute and completed jobs per minute as concurrency grows.",
+    "G-FShield increases completed IWSSR evaluations per second under concurrent load.",
+    "Held-out macro-F1 of completed jobs remains within a 0.01 non-inferiority margin."
+  ],
+  "primary_metrics": [
+    "qualified_job_count_per_batch",
+    "completed_job_count_per_batch",
+    "qualified_jobs_per_minute",
+    "time_to_quality_threshold_seconds_censored"
+  ],
+  "secondary_metrics": [
+    "IWSSR evaluations per second",
+    "held-out macro-F1",
+    "subset size",
+    "dimensionality reduction",
+    "estimated CPU-core seconds",
+    "peak aggregate RAM",
+    "cold batch elapsed time",
+    "failed or missing-result jobs"
+  ],
+  "analysis": {
+    "pairing_keys": ["scenario", "concurrency", "batch_seed"],
+    "effect": "distributed minus monolith",
+    "summary": "median paired difference with 95% bootstrap interval",
+    "test": "exact or Monte Carlo paired sign-flip permutation test",
+    "multiplicity": "Holm correction within prespecified metric families",
+    "censoring": "unreached quality thresholds are censored at 1080 seconds",
+    "alpha": 0.05,
+    "bootstrap_seed": 20260914,
+    "bootstrap_repetitions": 20000,
+    "permutation_repetitions": 200000
+  },
+  "interpretation_constraints": [
+    "A throughput advantage does not imply lower single-request latency.",
+    "Failure of jobs at high concurrency is part of capacity behavior unless caused by an infrastructure or instrumentation fault.",
+    "No claim of horizontal scalability or fault tolerance follows from this fixed-node load experiment.",
+    "Pilot seeds and pilot outputs are excluded from confirmatory analysis."
+  ]
+}

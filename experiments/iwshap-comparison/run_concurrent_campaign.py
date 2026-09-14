@@ -84,8 +84,11 @@ def capture_environment(args: argparse.Namespace, manifest_path: Path) -> dict[s
         args.evaluator_image,
         f"gfshield-campaign-monolith2:{args.image_tag}",
     ]
+    protocol_path = Path(__file__).with_name("concurrent-load-protocol-v1.json")
     return {
         "launch_commit": checked("git", "rev-parse", "HEAD", cwd=repo_root),
+        "protocol_path": str(protocol_path),
+        "protocol_sha256": sha256_file(protocol_path),
         "manifest_path": str(manifest_path),
         "manifest_sha256": sha256_file(manifest_path),
         "images": {
