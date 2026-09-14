@@ -508,6 +508,10 @@ def main() -> int:
     parser.add_argument("--output-root", required=True, type=Path)
     parser.add_argument("--batch-seeds", type=parse_ints, default=list(range(20260941, 20260971)))
     parser.add_argument("--loads", type=parse_ints, default=[1, 2, 4, 8, 16])
+    parser.add_argument("--scenarios", nargs="+", choices=("suspension", "fabrication"),
+                        default=("suspension", "fabrication"))
+    parser.add_argument("--architectures", nargs="+", choices=("distributed", "monolith"),
+                        default=("distributed", "monolith"))
     parser.add_argument("--quality-thresholds", type=parse_thresholds,
                         default={"suspension": 0.78, "fabrication": 0.88})
     parser.add_argument("--campaign-id", default="gfshield-concurrent-load-2026-v1")
@@ -543,6 +547,8 @@ def main() -> int:
         "campaign_id": args.campaign_id,
         "batch_seeds": args.batch_seeds,
         "loads": args.loads,
+        "scenarios": list(args.scenarios),
+        "architectures": list(args.architectures),
         "quality_thresholds": args.quality_thresholds,
         "algorithm": "ReliefF + VND + IWSSR",
         "run_timeout_seconds": args.run_timeout_seconds,
@@ -593,7 +599,9 @@ def main() -> int:
         for row in state["completed"]
     }
     deadline = datetime.fromisoformat(state["deadline_utc"])
-    for batch_seed, scenario_name, load, architecture in schedule(args, list(scenarios)):
+    for batch_seed, scenario_name, load, architecture in schedule(args, list(args.scenarios)):
+        if architecture not in args.architectures:
+            continue
         cell = (batch_seed, scenario_name, load, architecture)
         if cell in completed:
             continue
