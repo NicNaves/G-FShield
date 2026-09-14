@@ -43,12 +43,21 @@ public class RelieFController {
         @RequestParam(value = "neighborhoodMaxIterations", required = false) Integer neighborhoodMaxIterations,
         @RequestParam(value = "bitFlipMaxIterations", required = false) Integer bitFlipMaxIterations,
         @RequestParam(value = "iwssMaxIterations", required = false) Integer iwssMaxIterations,
-        @RequestParam(value = "iwssrMaxIterations", required = false) Integer iwssrMaxIterations
+        @RequestParam(value = "iwssrMaxIterations", required = false) Integer iwssrMaxIterations,
+        @RequestParam(value = "requestId", required = false) String requestedRequestId,
+        @RequestParam(value = "runId", required = false) String requestedRunId,
+        @RequestParam(value = "randomSeed", required = false) Integer requestedRandomSeed,
+        @RequestParam(value = "deadlineEpochMs", required = false) Long requestedDeadlineEpochMs
     ) {
         String configuredRequestId = System.getenv("CAMPAIGN_REQUEST_ID");
-        String requestId = configuredRequestId == null || configuredRequestId.isBlank()
-                ? "RF-" + UUID.randomUUID()
-                : configuredRequestId;
+        String requestId = firstNonBlank(requestedRequestId, configuredRequestId, "RF-" + UUID.randomUUID());
+        String runId = firstNonBlank(requestedRunId, System.getenv("CAMPAIGN_RUN_ID"), requestId);
+        int randomSeed = requestedRandomSeed != null
+                ? requestedRandomSeed
+                : environmentInteger("CAMPAIGN_RANDOM_SEED", 0);
+        long deadlineEpochMs = requestedDeadlineEpochMs != null
+                ? requestedDeadlineEpochMs
+                : environmentLong("CAMPAIGN_DEADLINE_EPOCH_MS", Long.MAX_VALUE);
         logger.info(
             "Received RF requestId={} train={} test={} classifier={} useTrainingCache={} maxGenerations={} rclCutoff={} sampleSize={} neighborhood={} localSearches={}",
             requestId, trainingFileName, testingFileName, classifierName, useTrainingCache, maxGenerations, rclCutoff,
@@ -59,12 +68,35 @@ public class RelieFController {
             maxGenerations, rclCutoff, sampleSize,
             trainingFileName, testingFileName, classifierName, useTrainingCache, neighborhoodStrategy, localSearches,
             neighborhoodMaxIterations, bitFlipMaxIterations, iwssMaxIterations, iwssrMaxIterations,
-            reliefProducer, relieFService, isFirstTime, requestId
+            reliefProducer, relieFService, isFirstTime, requestId, runId, randomSeed, deadlineEpochMs
         );
 
         isFirstTime = false;
 
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(Map.of("message", "Processamento assincrono iniciado.", "requestId", requestId));
+    }
+
+    private String firstNonBlank(String first, String second, String fallback) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        return second != null && !second.isBlank() ? second : fallback;
+    }
+
+    private int environmentInteger(String name, int fallback) {
+        try {
+            return Integer.parseInt(System.getenv().getOrDefault(name, Integer.toString(fallback)));
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
+    }
+
+    private long environmentLong(String name, long fallback) {
+        try {
+            return Long.parseLong(System.getenv().getOrDefault(name, Long.toString(fallback)));
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
     }
 }

@@ -31,7 +31,7 @@ public class RelieFAsyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(RelieFAsyncService.class);
     private static final String ALGORITHM_NAME = "RELIEF";
-    private static final String METRICS_FILE_NAME = "/metrics/RelieF_METRICS.csv";
+    private static final String METRICS_FILE_PREFIX = "/metrics/RelieF_METRICS_";
     private static final String DATASET_BASE_PATH = "/datasets/";
     private static final String METRICS_HEADER = "solutionFeatures;f1Score;accuracy;precision;recall;runnigTime(ms);cpuUsage(%);memoryUsage(MB);memoryUsagePercent(%);classifier;trainingFileName;testingFileName";
     private static final AtomicBoolean metricsHeaderReady = new AtomicBoolean(false);
@@ -55,15 +55,16 @@ public class RelieFAsyncService {
             KafkaSolutionsProducer reliefProducer,
             RelieFService relieFService,
             boolean isFirstTime,
-            String requestId
+            String requestId,
+            String runId,
+            int randomSeed,
+            long deadlineEpochMs
     ) {
         long requestStartedAt = System.nanoTime();
         long requestStartedMonotonic = System.nanoTime();
         long campaignStartedMonotonic = environmentLong("CAMPAIGN_START_MONOTONIC_NS", requestStartedMonotonic);
-        long deadlineEpochMs = environmentLong("CAMPAIGN_DEADLINE_EPOCH_MS", Long.MAX_VALUE);
-        int campaignSeed = (int) environmentLong("CAMPAIGN_RANDOM_SEED", 0L);
         int reliefSampleSize = positiveEnvironmentInt("CAMPAIGN_RELIEFF_SAMPLE_SIZE", 1000);
-        Random campaignRandom = new Random(campaignSeed);
+        Random campaignRandom = new Random(randomSeed);
         try {
             logger.info("rcl async start algorithm={} requestId={}", ALGORITHM_NAME, requestId);
 
@@ -81,15 +82,15 @@ public class RelieFAsyncService {
             // This seed template is reused to create each stochastic generation sent to Kafka.
             DataSolution dataSolution = relieFService.doRelief(
                     trainingDataset, rclCutoff, classifier, trainingFileName, testingFileName,
-                    reliefSampleSize, campaignSeed
+                    reliefSampleSize, randomSeed
             );
             configureNeighborhood(dataSolution, neighborhoodStrategy, localSearches,
                     neighborhoodMaxIterations, bitFlipMaxIterations, iwssMaxIterations, iwssrMaxIterations, useTrainingCache);
             dataSolution.setCampaignId(environment("CAMPAIGN_ID", "unassigned"));
             dataSolution.setArmId(environment("CAMPAIGN_ARM_ID", "unassigned"));
-            dataSolution.setRunId(environment("CAMPAIGN_RUN_ID", requestId));
+            dataSolution.setRunId(runId);
             dataSolution.setRequestId(requestId);
-            dataSolution.setSeed(campaignSeed);
+            dataSolution.setSeed(randomSeed);
             dataSolution.setDeadlineEpochMs(deadlineEpochMs);
             dataSolution.setParentId(requestId);
             logger.info(
@@ -101,10 +102,11 @@ public class RelieFAsyncService {
                     dataSolution.getEnabledLocalSearches()
             );
 
-            ensureMetricsHeader(isFirstTime);
-            logger.info("rcl metrics ready algorithm={} requestId={} file={}", ALGORITHM_NAME, requestId, METRICS_FILE_NAME);
+            File metricsFile = metricsFile(requestId);
+            ensureMetricsHeader(metricsFile);
+            logger.info("rcl metrics ready algorithm={} requestId={} file={}", ALGORITHM_NAME, requestId, metricsFile);
 
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter(METRICS_FILE_NAME, true))) {
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(metricsFile, true))) {
                 for (int generation = 0;
                      generation < maxGenerations && System.currentTimeMillis() < deadlineEpochMs;
                      generation++) {
@@ -252,22 +254,19 @@ public class RelieFAsyncService {
         dataSolution.setUseTrainingCache(useTrainingCache);
     }
 
-    private void ensureMetricsHeader(boolean isFirstRun) throws IOException {
-        if (metricsHeaderReady.get() && !isFirstRun) {
-            return;
-        }
+    private File metricsFile(String requestId) {
+        String safeRequestId = requestId.replaceAll("[^A-Za-z0-9_.-]", "_");
+        return new File(METRICS_FILE_PREFIX + safeRequestId + ".csv");
+    }
 
+    private void ensureMetricsHeader(File metricsFile) throws IOException {
         synchronized (metricsFileLock) {
-            File metricsFile = new File(METRICS_FILE_NAME);
-            boolean needsHeader = !metricsFile.exists() || metricsFile.length() == 0;
-
-            if (needsHeader) {
+            if (!metricsFile.exists() || metricsFile.length() == 0) {
                 try (BufferedWriter writer = new BufferedWriter(new FileWriter(metricsFile, true))) {
                     writer.write(METRICS_HEADER);
                     writer.newLine();
                 }
             }
-
             metricsHeaderReady.set(true);
         }
     }
