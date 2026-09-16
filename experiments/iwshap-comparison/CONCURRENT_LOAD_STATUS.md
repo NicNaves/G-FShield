@@ -82,6 +82,9 @@ optimized campaign started at 2026-09-16 04:47:16 UTC from commit `a6f216e259ca`
 using image tag `concurrent-opt-a6f216e` and supervisor PID 18640. It runs 50
 `rebalanced` cells followed by 50 `scaled-rcl` cells. Per-request replica index,
 ephemeral host port, and launch offset are persisted in `request_launches`.
+An independent watcher (PID 11318) waits for supervisor PID 18640, verifies
+`CAMPAIGN_TARGET_COMPLETED`, and then runs the containerized optimized analysis
+from commit `45735d343add`. It skips analysis if the study ends incompletely.
 
 ## Frozen baseline exploratory analysis
 
