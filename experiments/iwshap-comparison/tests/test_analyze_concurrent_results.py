@@ -17,6 +17,31 @@ class StopAfterComparison(Exception):
 
 
 class AnalyzeConcurrentResultsCliTest(unittest.TestCase):
+    def test_secondary_resource_metric_preserves_incomplete_pair_count(self):
+        rows = []
+        for seed in range(1, 6):
+            for architecture in ("distributed", "monolith"):
+                value = float(seed)
+                rows.append({
+                    "scenario": "fabrication",
+                    "concurrency": 16,
+                    "batch_seed": seed,
+                    "architecture": architecture,
+                    "qualified_job_count": value,
+                    "completed_job_count": value,
+                    "median_time_to_quality_seconds_censored": value,
+                    "local_search_evaluations_per_second": value,
+                    "median_test_f1_macro": value,
+                    "estimated_cpu_core_seconds": (
+                        float("nan") if seed == 5 and architecture == "monolith" else value
+                    ),
+                    "memory_mib_peak": value,
+                })
+        comparisons = MODULE.paired_comparisons(MODULE.pd.DataFrame(rows), expected_pairs=5)
+        resource = comparisons[comparisons.metric == "estimated_cpu_core_seconds"].iloc[0]
+        primary = comparisons[comparisons.metric == "qualified_job_count"].iloc[0]
+        self.assertEqual(resource.paired_count, 4)
+        self.assertEqual(primary.paired_count, 5)
     def test_expected_pairs_is_forwarded_to_all_validations(self):
         with tempfile.TemporaryDirectory() as directory:
             arguments = [

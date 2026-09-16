@@ -277,7 +277,7 @@ def paired_comparisons(frame: pd.DataFrame, expected_pairs: int = 30) -> pd.Data
                     - pivot["monolith"].to_numpy(float)
                 )
                 finite = raw[np.isfinite(raw)]
-                if metric != "median_test_f1_macro" and len(finite) != expected_pairs:
+                if family in {"primary", "throughput"} and len(finite) != expected_pairs:
                     raise RuntimeError(f"{scenario} load={load} metric={metric} has {len(finite)} finite pairs")
                 if len(finite):
                     low, high = bootstrap_median_ci(finite, rng)
