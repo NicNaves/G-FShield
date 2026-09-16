@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import platform
 import re
@@ -40,6 +41,20 @@ from run_arm import (  # noqa: E402
 )
 
 TEN_DAYS_SECONDS = 10 * 24 * 60 * 60
+RESOURCE_PROFILES = {
+    "baseline": {
+        "rcl_cpus": 1.0, "rcl_memory_mib": 3072, "rcl_replicas": 1,
+        "local_search_cpus": 3.0, "local_search_memory_mib": 4096,
+    },
+    "rebalanced": {
+        "rcl_cpus": 3.0, "rcl_memory_mib": 4096, "rcl_replicas": 1,
+        "local_search_cpus": 1.0, "local_search_memory_mib": 3072,
+    },
+    "scaled-rcl": {
+        "rcl_cpus": 3.0, "rcl_memory_mib": 4096, "rcl_replicas": 4,
+        "local_search_cpus": 1.0, "local_search_memory_mib": 3072,
+    },
+}
 RCL_GENERATION = re.compile(
     r"rcl generation ready algorithm=RELIEF requestId=(\S+).*?seedId=(\S+).*?campaignElapsedMs=(\d+)"
 )
@@ -63,6 +78,27 @@ def memory_mib(value: str) -> int:
     return amount * 1024 if match.group(2).lower() == "g" else amount
 
 
+def resource_profile(args: argparse.Namespace, concurrency: int) -> dict[str, Any]:
+    profile = dict(RESOURCE_PROFILES[args.distributed_profile])
+    requested_replicas = args.rcl_replicas or profile["rcl_replicas"]
+    replicas = min(concurrency, requested_replicas)
+    profile["rcl_replicas"] = replicas
+    profile["rcl_cpus_per_replica"] = profile["rcl_cpus"] / replicas
+    profile["rcl_memory_per_replica_mib"] = profile["rcl_memory_mib"] // replicas
+    profile["requests_per_replica"] = math.ceil(concurrency / replicas)
+    profile["name"] = args.distributed_profile
+    return profile
+
+
+def java_opts(memory_limit_mib: int) -> str:
+    heap_mib = max(384, int(memory_limit_mib * 0.72))
+    initial_mib = min(512, max(256, heap_mib // 4))
+    return (
+        f"-Xms{initial_mib}m -Xmx{heap_mib}m "
+        "-XX:+UseContainerSupport -XX:+UseG1GC"
+    )
+
+
 def scenario_manifest(data_root: Path) -> tuple[Path, dict[str, dict[str, Any]]]:
     manifest_path = data_root / "audit-and-split-manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -84,7 +120,12 @@ def capture_environment(args: argparse.Namespace, manifest_path: Path) -> dict[s
         args.evaluator_image,
         f"gfshield-campaign-monolith2:{args.image_tag}",
     ]
-    protocol_path = Path(__file__).with_name("concurrent-load-protocol-v1.json")
+    protocol_name = (
+        "concurrent-load-protocol-v1.json"
+        if args.distributed_profile == "baseline"
+        else "concurrent-load-optimization-protocol-v1.json"
+    )
+    protocol_path = Path(__file__).with_name(protocol_name)
     return {
         "launch_commit": checked("git", "rev-parse", "HEAD", cwd=repo_root),
         "protocol_path": str(protocol_path),
@@ -168,9 +209,11 @@ def distributed_batch(
 ) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=True)
     jobs = job_ids(batch_id, seeds)
+    profile = resource_profile(args, len(jobs))
+    rcl_replicas = profile["rcl_replicas"]
     project = re.sub(r"[^a-z0-9_-]", "-", f"gfsload-{batch_id}".lower())[:48]
     compose = ROOT / "10-day-campaign/docker-compose.campaign.yml"
-    port = free_loopback_port()
+    port = free_loopback_port() if rcl_replicas == 1 else 0
     metrics = output / "metrics"
     selection_seconds = args.run_timeout_seconds - args.finalization_reserve_seconds
     runner_start = time.monotonic()
@@ -195,15 +238,15 @@ def distributed_batch(
         "CAMPAIGN_MINIMUM_IMPROVEMENT": str(args.minimum_improvement),
         "CAMPAIGN_MAX_ACCEPTED_IMPROVEMENTS": str(args.max_accepted_improvements),
         "CAMPAIGN_RELIEFF_SAMPLE_SIZE": "1000",
-        "CAMPAIGN_RCL_CPUS": "1.0",
-        "CAMPAIGN_RCL_MEMORY": "3g",
-        "CAMPAIGN_RCL_JAVA_OPTS": "-Xms512m -Xmx2200m -XX:+UseContainerSupport -XX:+UseG1GC",
-        "CAMPAIGN_RCL_ASYNC_CORE_SIZE": str(len(jobs)),
-        "CAMPAIGN_RCL_ASYNC_MAX_SIZE": str(len(jobs)),
-        "CAMPAIGN_RCL_ASYNC_QUEUE_CAPACITY": str(max(16, len(jobs))),
-        "CAMPAIGN_LOCAL_SEARCH_CPUS": "3.0",
-        "CAMPAIGN_LOCAL_SEARCH_MEMORY": "4g",
-        "CAMPAIGN_LOCAL_SEARCH_JAVA_OPTS": "-Xms512m -Xmx3200m -XX:+UseContainerSupport -XX:+UseG1GC",
+        "CAMPAIGN_RCL_CPUS": str(profile["rcl_cpus_per_replica"]),
+        "CAMPAIGN_RCL_MEMORY": f"{profile['rcl_memory_per_replica_mib']}m",
+        "CAMPAIGN_RCL_JAVA_OPTS": java_opts(profile["rcl_memory_per_replica_mib"]),
+        "CAMPAIGN_RCL_ASYNC_CORE_SIZE": str(profile["requests_per_replica"]),
+        "CAMPAIGN_RCL_ASYNC_MAX_SIZE": str(profile["requests_per_replica"]),
+        "CAMPAIGN_RCL_ASYNC_QUEUE_CAPACITY": str(max(16, profile["requests_per_replica"])),
+        "CAMPAIGN_LOCAL_SEARCH_CPUS": str(profile["local_search_cpus"]),
+        "CAMPAIGN_LOCAL_SEARCH_MEMORY": f"{profile['local_search_memory_mib']}m",
+        "CAMPAIGN_LOCAL_SEARCH_JAVA_OPTS": java_opts(profile["local_search_memory_mib"]),
         "CAMPAIGN_LOCAL_SEARCH_CONCURRENCY": str(args.pipeline_workers),
         "CAMPAIGN_CONTROLLER_CPUS": "0.5",
         "CAMPAIGN_CONTROLLER_MEMORY": "1g",
@@ -241,15 +284,32 @@ def distributed_batch(
         with (output / "resolved-compose.yaml").open("w", encoding="utf-8") as handle:
             stack.call("config", stdout=handle)
         with (output / "compose-up.log").open("w", encoding="utf-8") as handle:
-            stack.call("up", "-d", "--no-build", *services, stdout=handle, stderr=subprocess.STDOUT)
+            up_args = ["up", "-d", "--no-build"]
+            if rcl_replicas > 1:
+                up_args.extend(["--scale", f"{RCL_SERVICES['relieff'][0]}={rcl_replicas}"])
+            stack.call(*up_args, *services, stdout=handle, stderr=subprocess.STDOUT)
         ids = stack.call("ps", "-q", capture_output=True).stdout.split()
-        if not ids:
-            raise RuntimeError("shared stack started without container identifiers")
+        rcl_ids = stack.call(
+            "ps", "-q", RCL_SERVICES["relieff"][0], capture_output=True
+        ).stdout.split()
+        if not ids or len(rcl_ids) != rcl_replicas:
+            raise RuntimeError(
+                f"shared stack expected {rcl_replicas} RCL replicas but found {len(rcl_ids)}"
+            )
         run(["docker", "update", "--cpuset-mems", args.numa_node, *ids], capture_output=True)
         startup_deadline = time.monotonic() + args.startup_timeout_seconds
         route = RCL_SERVICES["relieff"][2]
-        wait_for_port(port, startup_deadline)
-        wait_for_http_service(port, route, startup_deadline)
+        if rcl_replicas == 1:
+            rcl_ports = [port]
+        else:
+            port_template = '{{(index (index .NetworkSettings.Ports "8086/tcp") 0).HostPort}}'
+            rcl_ports = [
+                int(checked("docker", "inspect", "--format", port_template, container_id))
+                for container_id in rcl_ids
+            ]
+        for rcl_port in rcl_ports:
+            wait_for_port(rcl_port, startup_deadline)
+            wait_for_http_service(rcl_port, route, startup_deadline)
         stdout_handle = raw_messages.open("w", encoding="utf-8", newline="\n")
         stderr_handle = raw_errors.open("w", encoding="utf-8", newline="\n")
         consumer = subprocess.Popen(
@@ -263,10 +323,12 @@ def distributed_batch(
         measurement_start = time.monotonic()
         measurement_offset_ms = int(round((measurement_start - runner_start) * 1000))
         deadline_epoch_ms = int((time.time() + selection_seconds) * 1000)
-        for job in jobs:
+        for job_index, job in enumerate(jobs):
             sent = time.monotonic()
+            replica_index = job_index % len(rcl_ports)
+            request_port = rcl_ports[replica_index]
             request = urllib.request.Request(
-                f"http://127.0.0.1:{port}{route}?{query_for(job, deadline_epoch_ms)}",
+                f"http://127.0.0.1:{request_port}{route}?{query_for(job, deadline_epoch_ms)}",
                 method="POST",
             )
             with urllib.request.urlopen(request, timeout=30) as response:
@@ -274,6 +336,8 @@ def distributed_batch(
             launches.append({
                 **job,
                 "accepted_request_id": body.get("requestId"),
+                "rcl_replica_index": replica_index,
+                "rcl_host_port": request_port,
                 "launch_offset_ms": int(round((sent - measurement_start) * 1000)),
                 "response_offset_ms": int(round((time.monotonic() - measurement_start) * 1000)),
             })
@@ -356,6 +420,8 @@ def distributed_batch(
         "concurrency": len(jobs),
         "aggregate_cpus": args.aggregate_cpus,
         "aggregate_memory": args.aggregate_memory,
+        "distributed_profile": args.distributed_profile,
+        "resource_profile": profile,
         "selection_duration_ms": selection_seconds * 1000,
         "measurement_start_offset_ms": measurement_offset_ms,
         "selection_finished_ms": selection_finished_ms,
@@ -529,6 +595,9 @@ def main() -> int:
     parser.add_argument("--max-accepted-improvements", type=int, default=50)
     parser.add_argument("--minimum-improvement", type=float, default=0.0001)
     parser.add_argument("--pipeline-workers", type=int, default=3)
+    parser.add_argument("--distributed-profile", choices=tuple(RESOURCE_PROFILES), default="baseline")
+    parser.add_argument("--rcl-replicas", type=int)
+    parser.add_argument("--max-completed-cells", type=int)
     parser.add_argument("--startup-timeout-seconds", type=int, default=300)
     parser.add_argument("--cpuset", default="8-15")
     parser.add_argument("--numa-node", default="1")
@@ -543,6 +612,14 @@ def main() -> int:
         parser.error("loads must be selected from 1,2,4,8,16")
     if memory_mib(args.aggregate_memory) // max(args.loads) < 512:
         parser.error("per-job monolith memory would fall below 512 MiB")
+    if args.rcl_replicas is not None and args.rcl_replicas <= 0:
+        parser.error("RCL replicas must be positive")
+    if args.max_completed_cells is not None and args.max_completed_cells <= 0:
+        parser.error("max completed cells must be positive")
+    selected_profile = RESOURCE_PROFILES[args.distributed_profile]
+    fixed_cpu = 0.5 + 0.5 + 0.75 + 0.25
+    if abs(selected_profile["rcl_cpus"] + selected_profile["local_search_cpus"] + fixed_cpu - args.aggregate_cpus) > 1e-9:
+        parser.error("distributed profile CPU allocations must equal the aggregate CPU budget")
 
     args.data_root = args.data_root.resolve()
     manifest_path, scenarios = scenario_manifest(args.data_root)
@@ -562,6 +639,10 @@ def main() -> int:
         "max_accepted_improvements": args.max_accepted_improvements,
         "minimum_improvement": args.minimum_improvement,
         "pipeline_workers": args.pipeline_workers,
+        "distributed_profile": args.distributed_profile,
+        "rcl_replicas": args.rcl_replicas,
+        "max_completed_cells": args.max_completed_cells,
+        "resource_profile_template": RESOURCE_PROFILES[args.distributed_profile],
         "cpuset": args.cpuset,
         "numa_node": args.numa_node,
         "aggregate_cpus": args.aggregate_cpus,
@@ -603,6 +684,12 @@ def main() -> int:
     }
     deadline = datetime.fromisoformat(state["deadline_utc"])
     for batch_seed, scenario_name, load, architecture in schedule(args, list(args.scenarios)):
+        if args.max_completed_cells is not None and len(state["completed"]) >= args.max_completed_cells:
+            state["state"] = "CAMPAIGN_TARGET_COMPLETED"
+            state["finished_utc"] = iso(utc_now())
+            state["stop_reason"] = "max_completed_cells"
+            atomic_json(state_path, state)
+            return 0
         if architecture not in args.architectures:
             continue
         cell = (batch_seed, scenario_name, load, architecture)

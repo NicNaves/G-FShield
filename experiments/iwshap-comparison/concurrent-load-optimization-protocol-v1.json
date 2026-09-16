@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "study_name": "G-FShield concurrent-load engineering optimization",
+  "classification": "post-hoc exploratory engineering study",
+  "baseline": {
+    "campaign_id": "gfshield-concurrent-load-2026-v1",
+    "completed_cells": 100,
+    "paired_batches_per_scenario_load": 5,
+    "seeds": [20260941, 20260942, 20260943, 20260944, 20260945],
+    "note": "Stopped at the first balanced 100-cell factorial block by user request."
+  },
+  "optimized_profiles": {
+    "rebalanced": {
+      "rcl_replicas": 1,
+      "rcl_total_cpus": 3.0,
+      "rcl_total_memory_mib": 4096,
+      "iwssr_cpus": 1.0,
+      "iwssr_memory_mib": 3072
+    },
+    "scaled-rcl": {
+      "maximum_rcl_replicas": 4,
+      "active_replicas": "min(concurrency, 4)",
+      "rcl_total_cpus": 3.0,
+      "rcl_total_memory_mib": 4096,
+      "iwssr_cpus": 1.0,
+      "iwssr_memory_mib": 3072,
+      "request_routing": "round-robin"
+    }
+  },
+  "fixed_budget_per_condition": {
+    "cpus": 6.0,
+    "memory": "12g",
+    "cpuset": "8-15",
+    "numa_node": "1"
+  },
+  "fixed_factors": {
+    "scenarios": ["suspension", "fabrication"],
+    "loads": [1, 2, 4, 8, 16],
+    "selection_window_seconds": 1080,
+    "job_limit_seconds": 1200,
+    "quality_thresholds": {"suspension": 0.78, "fabrication": 0.88}
+  },
+  "new_measurements": {
+    "cells_per_profile": 50,
+    "total_cells": 100,
+    "architectures": ["distributed"],
+    "monolith_reference": "Reuse checksum-frozen matching baseline cells; do not rerun."
+  },
+  "implementation_changes": [
+    "single-flight ARFF cache population to prevent concurrent duplicate parsing",
+    "validation dataset cache when training cache is enabled",
+    "removal of redundant full Instances copies before column filtering",
+    "configurable stage resource profiles",
+    "optional RCL scale-out with ephemeral host ports and round-robin admission"
+  ],
+  "responses": [
+    "jobs reaching the scenario validation threshold",
+    "completed jobs",
+    "time to threshold",
+    "held-out macro-F1",
+    "construction and IWSSR evaluations per second",
+    "CPU time, throttling and peak memory",
+    "cold-start and selection-window elapsed time"
+  ],
+  "analysis": {
+    "unit": "batch seed",
+    "pairing": "Each optimized distributed cell is paired to the same seed/scenario/load monolith baseline cell.",
+    "interpretation": "Exploratory effect sizes and uncertainty intervals; no confirmatory superiority claim from n=5.",
+    "success_gate": "Proceed to a larger confirmatory campaign only if an optimized profile restores nonzero completion at loads 8 and 16 without worsening load-1/2 held-out macro-F1 by more than 0.01."
+  }
+}

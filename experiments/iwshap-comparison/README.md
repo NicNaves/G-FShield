@@ -191,3 +191,32 @@ Run the targeted unit tests first, then record `mvn -version`, the Git commit,
 the resulting JAR SHA-256, and the Docker image ID in the experiment manifest.
 `Dockerfile.prebuilt` uses the same pinned Temurin digest as the regular
 multi-stage Dockerfile.
+## Exploratory concurrent-load optimization
+
+The first concurrent-load campaign is intentionally capped at the first balanced
+100-cell block: five batch seeds, two scenarios, five loads, and two
+architectures. This is an exploratory engineering sample, not the originally
+planned 30-seed confirmatory campaign.
+
+After freezing that baseline, prepare the optimized images from the current
+commit and run two distributed-only profiles. The matching monolith cells are
+reused by checksum instead of being rerun:
+
+```sh
+python3 experiments/iwshap-comparison/run_optimized_concurrent_campaigns.py \
+  --data-root /path/to/iwshap-comparison/data \
+  --baseline-root /path/to/concurrent-load/formal-v1 \
+  --output-root /path/to/concurrent-load/optimization-v1 \
+  --image-tag <immutable-optimized-tag>
+```
+
+`rebalanced` assigns 3 CPU to the RCL and 1 CPU to IWSSR. `scaled-rcl` keeps the
+same aggregate allocation but divides the RCL budget among as many as four
+replicas and routes requests round-robin through ephemeral loopback ports. Both
+profiles retain the total 6 CPU/12 GiB budget. Together they add 100 cells (50
+per profile) across the same five seeds and factor combinations.
+
+The exact exploratory protocol and success gate are frozen in
+`concurrent-load-optimization-protocol-v1.json`. Do not merge these post-hoc
+engineering results into the original confirmatory family. Use them to decide
+whether a later, independently seeded confirmatory campaign is justified.

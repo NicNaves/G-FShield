@@ -26,6 +26,25 @@ class ConcurrentCampaignTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             MODULE.memory_mib("12gb")
 
+    def test_resource_profiles_preserve_total_rcl_budget(self):
+        args = argparse.Namespace(distributed_profile="scaled-rcl", rcl_replicas=None)
+        profile = MODULE.resource_profile(args, 16)
+        self.assertEqual(profile["rcl_replicas"], 4)
+        self.assertEqual(profile["requests_per_replica"], 4)
+        self.assertAlmostEqual(
+            profile["rcl_cpus_per_replica"] * profile["rcl_replicas"],
+            3.0,
+        )
+        self.assertLessEqual(
+            profile["rcl_memory_per_replica_mib"] * profile["rcl_replicas"],
+            4096,
+        )
+
+    def test_scaled_profile_does_not_create_idle_replicas(self):
+        args = argparse.Namespace(distributed_profile="scaled-rcl", rcl_replicas=None)
+        profile = MODULE.resource_profile(args, 2)
+        self.assertEqual(profile["rcl_replicas"], 2)
+        self.assertEqual(profile["requests_per_replica"], 1)
     def test_request_counts_are_isolated_by_request_and_deadline(self):
         jobs = [
             {"request_id": "request-a"},
