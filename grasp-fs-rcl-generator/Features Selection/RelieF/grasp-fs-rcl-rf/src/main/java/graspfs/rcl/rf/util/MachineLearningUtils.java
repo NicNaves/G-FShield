@@ -19,7 +19,8 @@ import java.util.stream.IntStream;
 
 public class MachineLearningUtils {
 
-    private static final Map<String, Instances> TRAINING_DATASET_CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, Instances> DATASET_CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, Object> DATASET_CACHE_LOCKS = new ConcurrentHashMap<>();
 
     public static double normalClass = 0;
 
@@ -52,21 +53,31 @@ public class MachineLearningUtils {
         String cacheKey = buildCacheKey(normalizedPath);
         pruneStaleEntries(normalizedPath, cacheKey);
 
-        Instances cachedDataset = TRAINING_DATASET_CACHE.get(cacheKey);
+        Instances cachedDataset = DATASET_CACHE.get(cacheKey);
         if (cachedDataset != null) {
             return new Instances(cachedDataset);
         }
 
-        try (InputStream inputStream = Files.newInputStream(normalizedPath)) {
-            Instances loadedDataset = lerDataset(inputStream);
-            TRAINING_DATASET_CACHE.put(cacheKey, new Instances(loadedDataset));
-            return loadedDataset;
+        Object cacheLock = DATASET_CACHE_LOCKS.computeIfAbsent(cacheKey, ignored -> new Object());
+        try {
+            synchronized (cacheLock) {
+                cachedDataset = DATASET_CACHE.get(cacheKey);
+                if (cachedDataset == null) {
+                    try (InputStream inputStream = Files.newInputStream(normalizedPath)) {
+                        cachedDataset = lerDataset(inputStream);
+                        DATASET_CACHE.put(cacheKey, new Instances(cachedDataset));
+                    }
+                }
+            }
+            return new Instances(cachedDataset);
+        } finally {
+            DATASET_CACHE_LOCKS.remove(cacheKey, cacheLock);
         }
     }
 
     private static void pruneStaleEntries(Path datasetPath, String currentCacheKey) {
         String prefix = datasetPath.toString() + "|";
-        TRAINING_DATASET_CACHE.keySet().removeIf((key) -> key.startsWith(prefix) && !key.equals(currentCacheKey));
+        DATASET_CACHE.keySet().removeIf((key) -> key.startsWith(prefix) && !key.equals(currentCacheKey));
     }
 
     private static String buildCacheKey(Path datasetPath) throws IOException {

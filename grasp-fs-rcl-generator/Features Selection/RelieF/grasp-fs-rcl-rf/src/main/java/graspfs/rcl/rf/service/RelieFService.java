@@ -166,8 +166,8 @@ public class RelieFService {
         ensureWithinDeadline();
         EvaluationResult result = MachineLearning.evaluateSolution(
                 new ArrayList<>(solutionFeatures),
-                new Instances(trainingDataset),
-                new Instances(testingDataset),
+                trainingDataset,
+                testingDataset,
                 classifier
         );
 

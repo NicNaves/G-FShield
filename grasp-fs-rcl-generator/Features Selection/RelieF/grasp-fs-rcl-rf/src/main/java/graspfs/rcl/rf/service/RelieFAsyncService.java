@@ -69,7 +69,7 @@ public class RelieFAsyncService {
             logger.info("rcl async start algorithm={} requestId={}", ALGORITHM_NAME, requestId);
 
             Instances trainingDataset = loadDataset(trainingFileName, "training", requestId, useTrainingCache);
-            Instances testingDataset = loadDataset(testingFileName, "testing", requestId, false);
+            Instances testingDataset = loadDataset(testingFileName, "testing", requestId, useTrainingCache);
 
             AbstractClassifier classifier = resolveClassifier(classifierName);
             logger.info(

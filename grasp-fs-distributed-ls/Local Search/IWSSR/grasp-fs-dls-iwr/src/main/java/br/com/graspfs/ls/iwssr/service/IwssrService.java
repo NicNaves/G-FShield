@@ -19,7 +19,6 @@ import weka.classifiers.trees.RandomForest;
 import weka.core.Instances;
 
 import java.io.BufferedWriter;
-import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -73,7 +72,8 @@ public class IwssrService implements DisposableBean {
                 Path.of(datasetsBasePath, data.getTrainingFileName()),
                 Boolean.TRUE.equals(data.getUseTrainingCache()));
         Instances testingDataset = MachineLearningUtils.lerDataset(
-                new FileInputStream(datasetsBasePath + data.getTestingFileName()));
+                Path.of(datasetsBasePath, data.getTestingFileName()),
+                Boolean.TRUE.equals(data.getUseTrainingCache()));
         AbstractClassifier classifier = getClassifier(data.getClassfier());
 
         ensureMetricsWriter();
@@ -221,8 +221,8 @@ public class IwssrService implements DisposableBean {
     ) throws Exception {
         return MachineLearning.evaluateSolution(
                 new ArrayList<>(solution.getSolutionFeatures()),
-                new Instances(training),
-                new Instances(testing),
+                training,
+                testing,
                 classifier
         );
     }
