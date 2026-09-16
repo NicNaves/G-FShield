@@ -220,3 +220,12 @@ The exact exploratory protocol and success gate are frozen in
 `concurrent-load-optimization-protocol-v1.json`. Do not merge these post-hoc
 engineering results into the original confirmatory family. Use them to decide
 whether a later, independently seeded confirmatory campaign is justified.
+After both profiles reach 50 cells, generate the checksum-verified exploratory
+comparison with:
+
+```sh
+python3 experiments/iwshap-comparison/analyze_optimized_concurrent_results.py \
+  --baseline-state /path/to/concurrent-load/formal-v1/state.json \
+  --optimization-root /path/to/concurrent-load/optimization-v1 \
+  --output /path/to/concurrent-load/optimization-analysis-v1
+```

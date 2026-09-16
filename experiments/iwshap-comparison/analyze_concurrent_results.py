@@ -144,10 +144,11 @@ def batch_resources(
     }
 
 
-def load_batches(state_path: Path, repo_root: Path) -> pd.DataFrame:
+def load_batches(state_path: Path, repo_root: Path, expected_pairs: int = 30) -> pd.DataFrame:
     state = json.loads(state_path.read_text(encoding="utf-8"))
-    if state.get("state") != "CAMPAIGN_COMPLETED":
-        raise RuntimeError(f"campaign is not complete: {state.get('state')}")
+    accepted_states = {"CAMPAIGN_COMPLETED", "CAMPAIGN_TARGET_COMPLETED", "STOPPED_AT_TARGET"}
+    if state.get("state") not in accepted_states:
+        raise RuntimeError(f"campaign is not frozen at a valid endpoint: {state.get('state')}")
     frozen = json.loads((state_path.parent / "frozen-manifest.json").read_text(encoding="utf-8"))
     configuration = frozen["configuration"]
     thresholds = configuration["quality_thresholds"]
@@ -210,7 +211,7 @@ def load_batches(state_path: Path, repo_root: Path) -> pd.DataFrame:
         (scenario, load, seed, architecture)
         for scenario in configuration["scenarios"]
         for load in configuration["loads"]
-        for seed in configuration["batch_seeds"]
+        for seed in configuration["batch_seeds"][:expected_pairs]
         for architecture in configuration["architectures"]
     }
     actual = set(zip(frame.scenario, frame.concurrency, frame.batch_seed, frame.architecture))
@@ -259,7 +260,7 @@ METRICS = [
 ]
 
 
-def paired_comparisons(frame: pd.DataFrame) -> pd.DataFrame:
+def paired_comparisons(frame: pd.DataFrame, expected_pairs: int = 30) -> pd.DataFrame:
     rng = np.random.default_rng(BOOTSTRAP_SEED)
     rows = []
     for scenario in sorted(frame.scenario.unique()):
@@ -276,7 +277,7 @@ def paired_comparisons(frame: pd.DataFrame) -> pd.DataFrame:
                     - pivot["monolith"].to_numpy(float)
                 )
                 finite = raw[np.isfinite(raw)]
-                if metric != "median_test_f1_macro" and len(finite) != 30:
+                if metric != "median_test_f1_macro" and len(finite) != expected_pairs:
                     raise RuntimeError(f"{scenario} load={load} metric={metric} has {len(finite)} finite pairs")
                 if len(finite):
                     low, high = bootstrap_median_ci(finite, rng)
@@ -350,13 +351,15 @@ def plot_capacity(frame: pd.DataFrame, output: Path) -> None:
     plt.close(fig)
 
 
-def write_report(frame: pd.DataFrame, comparisons: pd.DataFrame, output: Path) -> None:
+def write_report(frame: pd.DataFrame, comparisons: pd.DataFrame, output: Path, exploratory: bool) -> None:
     lines = [
         "# Concurrent-load campaign analysis",
         "",
         f"- Valid batch cells: {len(frame)}.",
         "- Experimental unit: paired batch seed; jobs inside a batch are not independent replicates.",
         "- Positive paired differences are distributed minus monolith.",
+        "- Interpretation: exploratory effect sizes; not a confirmatory superiority test."
+        if exploratory else "- Interpretation: preregistered confirmatory analysis.",
         "",
     ]
     for scenario in sorted(frame.scenario.unique()):
@@ -381,7 +384,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--state", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--expected-pairs", type=int, default=30)
+    parser.add_argument("--exploratory", action="store_true")
     args = parser.parse_args()
+    if args.expected_pairs <= 0:
+        parser.error("expected pairs must be positive")
     repo_root = Path(__file__).resolve().parents[2]
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -391,7 +398,7 @@ def main() -> int:
     summaries(frame).to_csv(output / "scenario-load-architecture-summary.csv", index=False)
     comparisons.to_csv(output / "paired-comparisons.csv", index=False)
     plot_capacity(frame, output)
-    write_report(frame, comparisons, output)
+    write_report(frame, comparisons, output, args.exploratory)
     provenance = {
         "analysis_commit": subprocess_commit(repo_root),
         "state_sha256": sha256_file(args.state.resolve()),
@@ -400,6 +407,8 @@ def main() -> int:
         "bootstrap_repetitions": BOOTSTRAP_REPETITIONS,
         "permutation_repetitions": PERMUTATION_REPETITIONS,
         "batch_count": len(frame),
+        "expected_pairs": args.expected_pairs,
+        "exploratory": args.exploratory,
     }
     (output / "analysis-provenance.json").write_text(
         json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8"
