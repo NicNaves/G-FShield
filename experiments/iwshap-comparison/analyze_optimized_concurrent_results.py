@@ -116,6 +116,7 @@ def main() -> int:
     parser.add_argument("--baseline-state", required=True, type=Path)
     parser.add_argument("--optimization-root", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--analysis-commit", type=ANALYSIS.parse_commit_sha)
     args = parser.parse_args()
     repo_root = Path(__file__).resolve().parents[2]
     output = args.output.resolve()
@@ -129,7 +130,7 @@ def main() -> int:
     plot_capacity(frame, output)
     write_report(comparison, output)
     provenance = {
-        "analysis_commit": ANALYSIS.subprocess_commit(repo_root),
+        "analysis_commit": args.analysis_commit or ANALYSIS.subprocess_commit(repo_root),
         "baseline_state_sha256": ANALYSIS.sha256_file(args.baseline_state.resolve()),
         "study_manifest_sha256": ANALYSIS.sha256_file(
             args.optimization_root.resolve() / "optimization-study-manifest.json"
