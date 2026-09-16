@@ -12,12 +12,12 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
-class StopAfterLoad(Exception):
+class StopAfterComparison(Exception):
     pass
 
 
 class AnalyzeConcurrentResultsCliTest(unittest.TestCase):
-    def test_expected_pairs_is_forwarded_to_cell_validation(self):
+    def test_expected_pairs_is_forwarded_to_all_validations(self):
         with tempfile.TemporaryDirectory() as directory:
             arguments = [
                 str(SCRIPT),
@@ -26,12 +26,17 @@ class AnalyzeConcurrentResultsCliTest(unittest.TestCase):
                 "--expected-pairs", "5",
                 "--exploratory",
             ]
+            frame = object()
             with patch.object(sys, "argv", arguments), patch.object(
-                MODULE, "load_batches", side_effect=StopAfterLoad
-            ) as load_batches:
-                with self.assertRaises(StopAfterLoad):
+                MODULE, "load_batches", return_value=frame
+            ) as load_batches, patch.object(
+                MODULE, "paired_comparisons", side_effect=StopAfterComparison
+            ) as paired_comparisons:
+                with self.assertRaises(StopAfterComparison):
                     MODULE.main()
             self.assertEqual(load_batches.call_args.args[2], 5)
+            self.assertIs(paired_comparisons.call_args.args[0], frame)
+            self.assertEqual(paired_comparisons.call_args.args[1], 5)
 
 
 if __name__ == "__main__":
