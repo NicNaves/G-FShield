@@ -30,6 +30,13 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def parse_commit_sha(value: str) -> str:
+    normalized = value.strip().lower()
+    if len(normalized) != 40 or any(character not in "0123456789abcdef" for character in normalized):
+        raise argparse.ArgumentTypeError("analysis commit must be a full 40-character SHA-1")
+    return normalized
+
+
 def verify_checksums(root: Path, manifest_path: Path) -> list[str]:
     errors = []
     for line in manifest_path.read_text(encoding="utf-8").splitlines():
@@ -293,8 +300,8 @@ def paired_comparisons(frame: pd.DataFrame, expected_pairs: int = 30) -> pd.Data
                     "direction_favoring_distributed": direction,
                     "family": family,
                     "paired_count": len(finite),
-                    "distributed_median": float(np.median(pivot["distributed"])),
-                    "monolith_median": float(np.median(pivot["monolith"])),
+                    "distributed_median": finite_median(pivot["distributed"].tolist()),
+                    "monolith_median": finite_median(pivot["monolith"].tolist()),
                     "paired_median_difference_distributed_minus_monolith": difference,
                     "paired_median_ci_low": low,
                     "paired_median_ci_high": high,
@@ -386,6 +393,7 @@ def main() -> int:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--expected-pairs", type=int, default=30)
     parser.add_argument("--exploratory", action="store_true")
+    parser.add_argument("--analysis-commit", type=parse_commit_sha)
     args = parser.parse_args()
     if args.expected_pairs <= 0:
         parser.error("expected pairs must be positive")
@@ -400,7 +408,7 @@ def main() -> int:
     plot_capacity(frame, output)
     write_report(frame, comparisons, output, args.exploratory)
     provenance = {
-        "analysis_commit": subprocess_commit(repo_root),
+        "analysis_commit": args.analysis_commit or subprocess_commit(repo_root),
         "state_sha256": sha256_file(args.state.resolve()),
         "frozen_manifest_sha256": sha256_file(args.state.resolve().parent / "frozen-manifest.json"),
         "bootstrap_seed": BOOTSTRAP_SEED,

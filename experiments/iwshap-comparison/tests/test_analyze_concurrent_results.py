@@ -17,6 +17,12 @@ class StopAfterComparison(Exception):
 
 
 class AnalyzeConcurrentResultsCliTest(unittest.TestCase):
+    def test_analysis_commit_requires_full_sha(self):
+        valid = "a" * 40
+        self.assertEqual(MODULE.parse_commit_sha(valid.upper()), valid)
+        with self.assertRaises(MODULE.argparse.ArgumentTypeError):
+            MODULE.parse_commit_sha("a6f216e")
+
     def test_secondary_resource_metric_preserves_incomplete_pair_count(self):
         rows = []
         for seed in range(1, 6):
