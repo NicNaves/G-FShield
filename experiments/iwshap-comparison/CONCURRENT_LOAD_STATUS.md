@@ -58,6 +58,19 @@ instrumentation failure. The formal campaign `gfshield-concurrent-load-2026-v1`
 started at 2026-09-14 19:41 UTC with a hard deadline at 2026-09-24 19:41 UTC.
 Pilot outputs remain outside the formal analysis.
 
-Do not update the dissertations with claims of architectural superiority until
-all 30 paired batches per scenario and load have finished and checksum-verified
-analysis artifacts have been generated. Report null or adverse results as such.
+## Exploratory stop and optimization follow-up
+
+On 2026-09-16 the user capped this first campaign at the first balanced 100-cell
+block (five seeds, two scenarios, five loads, and two architectures). An external
+watcher stops the supervisor only after the 100th valid artifact and records the
+state as `STOPPED_AT_TARGET`. The resulting n=5 comparisons are exploratory and
+must not be reported as the originally planned confirmatory 30-seed analysis.
+
+The follow-up adds 50 distributed-only cells for `rebalanced` and 50 for
+`scaled-rcl`, reusing the checksum-frozen matching monolith cells. Both retain
+the 6 CPU/12 GiB aggregate budget. The protocol, success gate, runner and
+analysis are stored alongside this status file.
+
+Do not update the dissertations with a claim of architectural superiority until
+the optimized study has finished and its checksum-verified analysis is available.
+Report null or adverse results as such.
