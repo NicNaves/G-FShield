@@ -98,6 +98,7 @@ Primary and throughput outcomes retain all five pairs. One fabrication/load-16
 monolith cell lost usable CPU/RAM sampling for 13 of its 16 job containers, so
 that resource comparison has four finite pairs. No value was imputed; the
 reduced `paired_count` is explicit in `paired-comparisons.csv`.
+
 Do not update the dissertations with a claim of architectural superiority until
 the optimized study has finished and its checksum-verified analysis is available.
 Report null or adverse results as such.
