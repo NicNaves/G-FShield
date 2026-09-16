@@ -1,6 +1,6 @@
 # Concurrent-load campaign status
 
-Last updated: 2026-09-14.
+Last updated: 2026-09-16.
 
 This file preserves the operational context of the paired concurrent-load
 experiment. It is a status record, not an inferential result.
@@ -66,10 +66,22 @@ watcher stops the supervisor only after the 100th valid artifact and records the
 state as `STOPPED_AT_TARGET`. The resulting n=5 comparisons are exploratory and
 must not be reported as the originally planned confirmatory 30-seed analysis.
 
+The baseline stopped at 2026-09-16 04:33:08 UTC with exactly 100 valid cells in
+100 attempts. The supervisor briefly started the next monolith batch before the
+watcher signal arrived; its 16 containers were removed, and that incomplete batch
+is excluded from the frozen 100-cell state.
+
 The follow-up adds 50 distributed-only cells for `rebalanced` and 50 for
 `scaled-rcl`, reusing the checksum-frozen matching monolith cells. Both retain
 the 6 CPU/12 GiB aggregate budget. The protocol, success gate, runner and
 analysis are stored alongside this status file.
+
+The scaled-RCL systems pilot completed one valid load-4 cell with four RCL
+replicas and no infrastructure error. It is excluded from the study results. The
+optimized campaign started at 2026-09-16 04:47:16 UTC from commit `a6f216e259ca`
+using image tag `concurrent-opt-a6f216e` and supervisor PID 18640. It runs 50
+`rebalanced` cells followed by 50 `scaled-rcl` cells. Per-request replica index,
+ephemeral host port, and launch offset are persisted in `request_launches`.
 
 Do not update the dissertations with a claim of architectural superiority until
 the optimized study has finished and its checksum-verified analysis is available.
