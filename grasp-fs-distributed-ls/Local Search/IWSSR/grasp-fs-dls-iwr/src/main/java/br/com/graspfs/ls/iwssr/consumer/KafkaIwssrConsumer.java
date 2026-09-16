@@ -18,7 +18,7 @@ public class KafkaIwssrConsumer {
 
     private final IwssrService iwssrService;
 
-    @KafkaListener(topics = TOPIC, groupId = "${spring.kafka.consumer.group-id}", containerFactory = "jsonKafkaListenerContainer")
+    @KafkaListener(topics = TOPIC, groupId = "${spring.kafka.consumer.group-id}", containerFactory = "jsonKafkaListenerContainer", autoStartup = "${kafka.listener.auto-startup:true}")
     public void consume(ConsumerRecord<String, DataSolution> record) {
         DataSolution data = record.value();
         log.info(
