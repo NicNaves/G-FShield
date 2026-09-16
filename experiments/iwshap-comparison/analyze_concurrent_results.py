@@ -392,7 +392,7 @@ def main() -> int:
     repo_root = Path(__file__).resolve().parents[2]
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
-    frame = load_batches(args.state.resolve(), repo_root)
+    frame = load_batches(args.state.resolve(), repo_root, args.expected_pairs)
     comparisons = paired_comparisons(frame)
     frame.to_csv(output / "batch-level-results.csv", index=False)
     summaries(frame).to_csv(output / "scenario-load-architecture-summary.csv", index=False)
