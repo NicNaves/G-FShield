@@ -83,6 +83,21 @@ using image tag `concurrent-opt-a6f216e` and supervisor PID 18640. It runs 50
 `rebalanced` cells followed by 50 `scaled-rcl` cells. Per-request replica index,
 ephemeral host port, and launch offset are persisted in `request_launches`.
 
+## Frozen baseline exploratory analysis
+
+The checksum-verified analysis was generated at
+`formal-v1-analysis-exploratory` with analysis commit `344aa0b1e83f`. Across the
+five paired seeds, median qualified-job counts were tied at loads 1 and 2, close
+or tied at load 4, and adverse to the original distributed profile at loads 8
+and 16. At the two highest loads, the distributed median was zero while the
+monolith medians were 8 and 16 qualified jobs. This is the baseline engineering
+finding that motivated the resource rebalance and RCL replication; it is not a
+claim about the optimized profiles.
+
+Primary and throughput outcomes retain all five pairs. One fabrication/load-16
+monolith cell lost usable CPU/RAM sampling for 13 of its 16 job containers, so
+that resource comparison has four finite pairs. No value was imputed; the
+reduced `paired_count` is explicit in `paired-comparisons.csv`.
 Do not update the dissertations with a claim of architectural superiority until
 the optimized study has finished and its checksum-verified analysis is available.
 Report null or adverse results as such.
