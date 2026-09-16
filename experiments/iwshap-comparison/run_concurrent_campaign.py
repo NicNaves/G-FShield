@@ -426,6 +426,7 @@ def distributed_batch(
         "measurement_start_offset_ms": measurement_offset_ms,
         "selection_finished_ms": selection_finished_ms,
         "infrastructure_error": infrastructure_error,
+        "request_launches": launches,
         "jobs": job_results,
         "completed_job_count": sum(row["status"] == "completed" for row in job_results),
         "qualified_job_count": sum(
