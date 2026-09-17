@@ -1,6 +1,6 @@
 # Concurrent-load campaign status
 
-Last updated: 2026-09-16.
+Last updated: 2026-09-17.
 
 This file preserves the operational context of the paired concurrent-load
 experiment. It is a status record, not an inferential result.
@@ -86,6 +86,22 @@ An independent watcher (PID 11318) waits for supervisor PID 18640, verifies
 `CAMPAIGN_TARGET_COMPLETED`, and then runs the containerized optimized analysis
 from commit `45735d343add`. It skips analysis if the study ends incompletely.
 
+## Completed rebalanced profile
+
+The `rebalanced` profile finished at 2026-09-16 22:30:19 UTC with 50 valid
+cells in 50 attempts and no infrastructure error. Its descriptive medians versus
+the checksum-frozen monolith were tied at loads 1 and 2, 3 versus 4 qualified
+jobs at load 4, 2 versus 8 at load 8, and 3 versus 16 at load 16 in both
+scenarios. Thus, rebalance alone improved the original distributed high-load
+outcome from zero to some completed/qualified jobs but did not achieve throughput
+parity with the monolith.
+
+At loads 8 and 16, the rebalanced profile used fewer estimated CPU core-seconds
+and less peak memory than the parallel monolith containers, while taking longer
+to reach the quality thresholds and producing fewer qualified jobs. These are
+resource/performance trade-offs, not evidence of architectural superiority. The
+`scaled-rcl` profile is still running and remains necessary for the final
+comparison.
 ## Frozen baseline exploratory analysis
 
 The checksum-verified analysis was generated at
