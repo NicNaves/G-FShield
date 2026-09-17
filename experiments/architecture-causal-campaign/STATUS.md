@@ -299,6 +299,40 @@ qualidade, não apagar nem substituir o resultado desfavorável de latência da 
   ativa. Estudos de concorrência e scale-out devem começar somente depois de
   seu término para não contaminar CPU, memória e tempo.
 
+### Resultado confirmatório v10
+
+A campanha terminou em `CAMPAIGN_COMPLETED`, com os 60 braços válidos
+(30 sementes pareadas) em 60 tentativas. A análise confirmatória foi executada
+com o commit `ba35c26ac`. Uma validação inicialmente detectou que o rastro
+monolítico preservava também candidatos concluídos após o prazo; o analisador
+foi corrigido para conferir todas as linhas persistidas contra `candidate_count`,
+mas excluir esses candidatos das métricas da janela, conforme o protocolo.
+
+O resultado sustentou a hipótese pré-especificada de rendimento de qualidade:
+
+- mediana de subconjuntos distintos com F1 macro de validação >= 0,945:
+  distribuído 1,0; monólito 0,0;
+- diferença média pareada: +0,933 subconjunto por execução (IC bootstrap de
+  95%: 0,233 a 1,667);
+- 13 vitórias, 12 empates e 5 derrotas do distribuído;
+- teste unilateral pareado de permutação: p=0,010135;
+- limite inferior unilateral de 95% da diferença de F1 macro no teste:
+  -0,003791, acima da margem de não inferioridade de -0,005;
+- sobreposição mediana entre construção e busca local: 99,37% no distribuído
+  e 0% no monólito.
+
+Portanto, os dados confirmam uma vantagem arquitetural delimitada: no mesmo
+tempo e sob o mesmo teto agregado de 6 CPUs e 12 GiB, o pipeline distribuído
+produziu maior rendimento de subconjuntos distintos de alta qualidade, sem
+perda de qualidade superior à margem pré-especificada. O resultado não
+contradiz a v9: o monólito continuou melhor em latência até a primeira solução
+e em eficiência de recursos, enquanto o G-FShield foi melhor em paralelismo,
+vazão de candidatos e rendimento de soluções qualificadas.
+
+Os artefatos da análise estão em
+`/home/idscps/nicolas/experiment-artifacts/architecture-quality-yield/formal-v10-analysis`.
+
+
 ### Fotografia intermediária não inferencial (sementes 42--50)
 
 - Em `2026-09-04T15:00:29Z`, havia 18 braços válidos, formando nove pares
