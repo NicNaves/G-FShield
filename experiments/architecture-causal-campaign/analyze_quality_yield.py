@@ -81,7 +81,7 @@ def distributed_candidates(run_dir: Path, result: dict) -> list[dict]:
 
 
 def monolith_candidates(run_dir: Path, result: dict) -> list[dict]:
-    horizon = float(result.get("selection_duration_ms", 2_700_000.0))
+    horizon = float(result.get("selection_duration_ms") or 2_700_000.0)
     path = run_dir / "all-candidate-trace.jsonl"
     if not path.exists():
         raise RuntimeError(f"missing all-candidate trace in {run_dir}")
@@ -100,6 +100,18 @@ def monolith_candidates(run_dir: Path, result: dict) -> list[dict]:
                 }
             )
     return candidates
+
+
+def monolith_trace_count(run_dir: Path) -> int:
+    """Count every persisted trace row, including post-deadline completions."""
+    path = run_dir / "all-candidate-trace.jsonl"
+    if not path.exists():
+        raise RuntimeError(f"missing all-candidate trace in {run_dir}")
+    return sum(
+        1
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines()
+        if line.strip()
+    )
 
 
 def yield_metrics(candidates: list[dict], horizon_seconds: float) -> dict:
@@ -173,17 +185,21 @@ def main() -> int:
     for completed in state["completed"]:
         run_dir = relocated_run_dir(completed, args.results_root)
         result = json.loads((run_dir / "final-result.json").read_text(encoding="utf-8"))
-        candidates = (
-            distributed_candidates(run_dir, result)
-            if completed["architecture"] == "distributed"
-            else monolith_candidates(run_dir, result)
-        )
-        if len(candidates) != int(result["candidate_count"]):
+        if completed["architecture"] == "distributed":
+            candidates = distributed_candidates(run_dir, result)
+            persisted_count = len(candidates)
+        else:
+            candidates = monolith_candidates(run_dir, result)
+            persisted_count = monolith_trace_count(run_dir)
+        if persisted_count != int(result["candidate_count"]):
             raise RuntimeError(
                 f"candidate trace mismatch in {run_dir}: "
-                f"{len(candidates)} != {result['candidate_count']}"
+                f"{persisted_count} != {result['candidate_count']}"
             )
-        metrics = yield_metrics(candidates, float(result.get("selection_duration_ms", 2_700_000)) / 1000.0)
+        metrics = yield_metrics(
+            candidates,
+            float(result.get("selection_duration_ms") or 2_700_000) / 1000.0,
+        )
         rows.append({"architecture": completed["architecture"], "seed": int(completed["seed"]), **metrics})
     yields = pd.DataFrame(rows).sort_values(["seed", "architecture"])
     enriched = runs.merge(yields, on=["architecture", "seed"], validate="one_to_one")

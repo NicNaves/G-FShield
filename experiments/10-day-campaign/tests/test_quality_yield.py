@@ -59,5 +59,31 @@ class QualityYieldTest(unittest.TestCase):
         self.assertEqual(1.0, metrics["time_to_first_qualified_seconds_censored"])
 
 
+    def test_monolith_trace_validation_keeps_post_deadline_rows_out_of_metrics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rows = [
+                {
+                    "monotonic_elapsed_ms": 2_699_999,
+                    "validation_f1_macro": 0.946,
+                    "selected_features": [0, 1],
+                },
+                {
+                    "monotonic_elapsed_ms": 2_700_001,
+                    "validation_f1_macro": 0.950,
+                    "selected_features": [0, 2],
+                },
+            ]
+            (root / "all-candidate-trace.jsonl").write_text(
+                "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+            )
+            candidates = ANALYSIS.monolith_candidates(
+                root, {"selection_duration_ms": None}
+            )
+            self.assertEqual(2, ANALYSIS.monolith_trace_count(root))
+            self.assertEqual(1, len(candidates))
+            self.assertEqual((0, 1), candidates[0]["features"])
+
+
 if __name__ == "__main__":
     unittest.main()
