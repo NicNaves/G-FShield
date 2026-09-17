@@ -99,9 +99,49 @@ parity with the monolith.
 At loads 8 and 16, the rebalanced profile used fewer estimated CPU core-seconds
 and less peak memory than the parallel monolith containers, while taking longer
 to reach the quality thresholds and producing fewer qualified jobs. These are
-resource/performance trade-offs, not evidence of architectural superiority. The
-`scaled-rcl` profile is still running and remains necessary for the final
-comparison.
+resource/performance trade-offs, not evidence of architectural superiority.
+The `scaled-rcl` profile subsequently completed and is summarized below.
+
+## Completed optimized study
+
+The optimized campaign finished at 2026-09-17 16:32:07 UTC. Both profiles
+reached `CAMPAIGN_TARGET_COMPLETED`: `rebalanced` completed 50 valid cells in
+50 attempts and `scaled-rcl` completed 50 valid cells in 50 attempts, with no
+retry or infrastructure error. The campaign therefore contains all 100 planned
+optimized cells. The supervisor and watcher exited normally and no experiment
+container remained running.
+
+The checksum-verified automatic analysis is stored on the experimental server
+under `optimization-v1-analysis`. Its provenance records analysis commit
+`45735d343add704163acda56bf62faceb3e03f0a`, baseline-state SHA-256
+`2e2c8e8dc8497b88e808302460c54930bc5df51219b36558be467bbc09547422`,
+and optimized-study-manifest SHA-256
+`b0c5ca58d364a7d839f4512eb5d34b207b1112d5bf2a4b5b58aff7d848eb03f60`.
+
+For the primary response, `scaled-rcl` versus the matched monolith yielded the
+following descriptive medians of qualified jobs. In fabrication the counts were
+1 versus 1, 2 versus 2, 2 versus 4, 3 versus 8, and 3 versus 16 at loads 1, 2,
+4, 8, and 16. In suspension they were 1 versus 1, 1 versus 2, 2 versus 4,
+2 versus 8, and 3 versus 16. The profile therefore did not reach parity with
+the monolith and did not dominate `rebalanced`; it only raised the original
+distributed high-load median from zero to between two and three qualified jobs.
+
+Time to the quality threshold was also longer for the distributed profiles.
+At loads 8 and 16, several distributed observations reached the 1,080-second
+selection-window censoring limit, whereas the matched monolith medians remained
+below that limit. Lower aggregate CPU core-seconds and peak memory at some high
+loads coincided with substantially fewer qualified outputs. Consequently these
+resource values cannot be interpreted as greater efficiency at equivalent
+useful work.
+
+This five-seed study is exploratory. It supports the engineering conclusion
+that resource rebalancing and RCL replication partially alleviate the original
+construction bottleneck, but it does not support claims that G-FShield is
+globally faster, more resource-efficient, or experimentally superior to the
+monolith. Architectural advantages such as separation of responsibilities,
+independent deployment, observability, and component-level scaling must be
+presented as design properties or capabilities, not as performance superiority.
+
 ## Frozen baseline exploratory analysis
 
 The checksum-verified analysis was generated at
