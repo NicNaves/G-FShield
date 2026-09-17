@@ -101,7 +101,7 @@ class RunArmResultTest(unittest.TestCase):
         ]
         self.assertEqual(300, RUN_ARM.validation_time_to_target_ms(messages))
         self.assertEqual(
-            {"0.93": 100, "0.94": 100, "0.945": 300, "0.95": 300},
+            {"0.78": 100, "0.88": 100, "0.93": 100, "0.94": 100, "0.945": 300, "0.95": 300},
             RUN_ARM.validation_times_to_targets_ms(messages),
         )
 

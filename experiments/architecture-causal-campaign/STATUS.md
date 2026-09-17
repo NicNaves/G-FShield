@@ -440,3 +440,25 @@ A dissertação poderá afirmar suporte à vantagem arquitetural somente se:
 
 Caso uma dessas condições falhe, o texto deve relatar que a campanha não
 estabeleceu a vantagem, apresentando os resultados descritivos e a limitação.
+
+## Pipeline-ablation campaign v11
+
+The next formal experiment is preregistered in
+protocol-pipeline-ablation-v11.json. It contains 100 cells: 25 new paired
+seeds (102--126) across monolith, distributed-w1, distributed-w2, and
+distributed-w4. All arms retain the RF--VND--IWSSR sequence, Weka J48, data
+split, 2,700-second selection horizon, six-CPU/12-GiB ceiling, and CPU set
+8--15. A Williams design balances execution position.
+
+The code now applies the explicit distributed component ceiling even when
+pipeline_workers=1; without that correction, the one-worker ablation would
+not have had the same resource contract. The frozen primary outcome is the
+paired slope of normalized high-quality-solution-yield AUC per worker doubling.
+A positive primary test alone is insufficient: mean AUC must be nondecreasing
+from one to two to four workers, held-out quality must satisfy the -0.005
+noninferiority margin, and telemetry must confirm the overlap mechanism.
+
+Operational sequence: full automated tests, clean commit and immutable tag,
+four-arm pilot in an isolated artifact directory, pilot artifact audit, then
+formal launch in a separate resumable directory with a ten-day hard deadline.
+Pilot observations are excluded from the 100 formal cells.

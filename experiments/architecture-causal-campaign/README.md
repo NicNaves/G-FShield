@@ -63,3 +63,36 @@ The supervisor is resumable. A cell is complete only when its result identity,
 common metric contract, candidate count, hashes, and checksum manifest pass.
 The pilot defaults to 900 seconds per arm with a 300-second final-evaluation
 reserve and must use state/results directories separate from the formal run.
+
+## Pipeline ablation v11 (100 cells)
+
+The v11 campaign isolates two architectural effects under the same aggregate
+six-CPU/12-GiB ceiling: stage overlap (distributed-w1 versus monolith) and
+additional consumer concurrency (distributed-w4 versus distributed-w1).
+It uses 25 previously unused seeds (102--126), four arms, a four-treatment
+Williams execution order, a 2,700-second selection window per cell, and an
+immutable ten-day campaign deadline.
+
+The primary outcome is the per-seed linear slope of normalized quality-yield
+AUC against log2 of the worker count for distributed-w1, distributed-w2, and
+distributed-w4. Quality-yield AUC integrates the cumulative number of distinct
+subsets reaching validation macro-F1 >= 0.945 over the selection window. The
+claim additionally requires a nondecreasing mean dose response, held-out
+macro-F1 noninferiority for distributed-w4 versus the monolith, and measured
+construction/local-search overlap.
+
+Pilot command:
+
+    python3 experiments/architecture-causal-campaign/run_pipeline_ablation.py \
+      --protocol experiments/architecture-causal-campaign/protocol-pipeline-ablation-v11.json \
+      --campaign-tag experiment-pipeline-ablation-v11 \
+      --image-tag pipeline-ablation-COMMIT \
+      --pilot-seed 41 \
+      --pilot-run-timeout-seconds 900 \
+      --pilot-finalization-reserve-seconds 300 \
+      --state /home/idscps/nicolas/experiment-artifacts/pipeline-ablation/pilot-v11/state.json \
+      --results /home/idscps/nicolas/experiment-artifacts/pipeline-ablation/pilot-v11/results
+
+The formal state and results must use a separate directory. The formal runner
+is resumable and accepts a cell only after identity, metric, trace, and checksum
+validation.

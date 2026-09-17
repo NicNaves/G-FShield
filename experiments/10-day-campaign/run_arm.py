@@ -667,7 +667,7 @@ def run_distributed(args: argparse.Namespace) -> int:
             "CAMPAIGN_RELIEFF_SAMPLE_SIZE": str(args.relieff_sample_size),
         }
     )
-    if args.pipeline_workers > 1:
+    if args.pipeline_workers >= 1:
         # Same six-core/12-GiB aggregate ceiling as the monolith, allocated to
         # independent pipeline consumers instead of one sequential process.
         environment.update(

@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "campaign_id": "gfshield-pipeline-ablation-2026-v11",
+  "maximum_seconds": 864000,
+  "run_timeout_seconds": 3000,
+  "finalization_reserve_seconds": 300,
+  "startup_timeout_seconds": 300,
+  "graceful_shutdown_seconds": 300,
+  "maximum_attempts_per_cell": 3,
+  "seeds": [
+    102, 103, 104, 105, 106, 107, 108, 109, 110, 111,
+    112, 113, 114, 115, 116, 117, 118, 119, 120, 121,
+    122, 123, 124, 125, 126
+  ],
+  "arms": [
+    {"id": "monolith", "architecture": "monolith", "pipeline_workers": 0},
+    {"id": "distributed-w1", "architecture": "distributed", "pipeline_workers": 1},
+    {"id": "distributed-w2", "architecture": "distributed", "pipeline_workers": 2},
+    {"id": "distributed-w4", "architecture": "distributed", "pipeline_workers": 4}
+  ],
+  "order_design": {
+    "type": "four-treatment Williams design",
+    "orders": [
+      ["monolith", "distributed-w1", "distributed-w4", "distributed-w2"],
+      ["distributed-w1", "distributed-w2", "monolith", "distributed-w4"],
+      ["distributed-w2", "distributed-w4", "distributed-w1", "monolith"],
+      ["distributed-w4", "monolith", "distributed-w2", "distributed-w1"]
+    ]
+  },
+  "measurement_window": {
+    "selection_seconds": 2700,
+    "cold_start_reported_separately": true,
+    "final_evaluation_excluded_from_search_resource_costs": true,
+    "post_deadline_candidates_excluded": true,
+    "origin": "request_submission_after_distributed_service_readiness"
+  },
+  "algorithm": {
+    "feature_selector": "relieff",
+    "relieff_sample_size": 1000,
+    "rcl_cutoff": 30,
+    "initial_subset_size": 5,
+    "controller": "vnd",
+    "enabled_local_searches": ["iwssr"],
+    "training_dataset_cache": true,
+    "neighborhood_cycles": 100,
+    "local_search_iterations": 100,
+    "minimum_improvement": 0.0001,
+    "maximum_accepted_improvements": 500,
+    "classifier": "Weka J48 3.8.6",
+    "classifier_parameters": {
+      "confidence_factor": 0.25,
+      "minimum_instances_per_leaf": 2,
+      "pruned": true
+    },
+    "selection_metric": "validation_macro_f1",
+    "holdout_policy": "test_once_after_validation_selection"
+  },
+  "resources": {
+    "cpuset": "8-15",
+    "numa_node": "1",
+    "aggregate_cpu_ceiling": 6,
+    "aggregate_memory": "12g",
+    "distributed_component_ceiling_sum": {
+      "rcl": {"cpu": 1.0, "memory_gib": 3},
+      "iwssr": {"cpu": 3.0, "memory_gib": 4},
+      "vnd": {"cpu": 0.5, "memory_gib": 1},
+      "verifier": {"cpu": 0.5, "memory_gib": 1},
+      "kafka": {"cpu": 0.75, "memory_gib": 2},
+      "zookeeper": {"cpu": 0.25, "memory_gib": 1}
+    },
+    "worker_parameter_changes_only": [
+      "local-search consumer concurrency",
+      "controller consumer concurrency",
+      "verifier consumer concurrency",
+      "Kafka partition count"
+    ]
+  },
+  "dataset": {
+    "split_manifest": "datasets/campaign/split-manifest.json",
+    "source_sha256": "60ebfcdc9c209e5c760e2bdbf5be75dfe4d931b81442597b0ef32e2f5fe6c1f6",
+    "train_sha256": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
+    "validation_sha256": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a",
+    "test_sha256": "05d393c5881aec032664ef4a84e18337988e819edc74664fe1255757961cfab4"
+  },
+  "hypotheses": {
+    "preregistration": "Frozen before observing seeds 102--126.",
+    "quality_threshold_validation_macro_f1": 0.945,
+    "primary": "positive paired mean slope of normalized quality-yield AUC against log2(workers) over distributed-w1, distributed-w2, and distributed-w4",
+    "primary_test": "one-sided paired sign-flip permutation test over the 25 per-seed slopes at alpha 0.05",
+    "quality_yield_auc": "time integral of the cumulative count of distinct subsets with validation macro-F1 at least 0.945, divided by the 2700-second horizon",
+    "architecture_contrast": "distributed-w1 minus monolith estimates the effect of stage overlap without multiple consumers",
+    "scaling_contrast": "distributed-w4 minus distributed-w1 estimates the effect of added consumer concurrency under the same aggregate resource ceiling",
+    "quality_guardrail": "the one-sided 95% bootstrap lower bound for held-out macro-F1, distributed-w4 minus monolith, must be at least -0.005",
+    "dose_response_guardrail": "mean quality-yield AUC must be nondecreasing from distributed-w1 to distributed-w2 to distributed-w4",
+    "mechanism_guardrail": "median construction/local-search overlap must be positive in every distributed arm and zero in the monolith",
+    "secondary_family": [
+      "quality-yield AUC pairwise contrasts",
+      "distinct qualified subsets at deadline",
+      "time to first qualified subset",
+      "candidate throughput",
+      "CPU-hours and GiB-hours per qualified subset",
+      "Kafka backlog and lag where available",
+      "held-out macro-F1 and dimensionality reduction"
+    ],
+    "multiplicity": "Holm correction within the secondary pairwise family"
+  }
+}
