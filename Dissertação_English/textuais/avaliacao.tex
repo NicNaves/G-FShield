@@ -1,7 +1,7 @@
 \chapter{Evaluation}
 \label{chapter:avaliacao}
 
-This chapter presents the formal experimental campaign, bounded to ten days, run on the same server for G-FShield, both monoliths, and an all-features baseline. The single source for this analysis is the result set identified by the manifest whose SHA-256 is:
+This chapter presents the formal experimental campaign, bounded to ten days, run on the same server for G-FShield, both monoliths, and an all-features baseline. The 27-arm campaign is identified by the manifest whose SHA-256 is:
 \begin{center}
 \small\texttt{29fdc973ad6b243b297e34fcd539f5826aac4ce8a0870e8a5cea5caacfc9adc4}.
 \end{center}
@@ -163,6 +163,24 @@ The median best-validation trajectory (Figure~\ref{fig:architecture-anytime}) ex
 \end{figure}
 \end{landscape}
 
+\section{Independent Confirmation of High-Quality-Solution Yield}
+\label{sec:quality-yield}
+
+The exploratory observation from the causal campaign generated a new hypothesis that was frozen before examining additional data: within the same deadline, the distributed pipeline would produce more \emph{distinct} subsets with validation macro-F1 $\geq 0.945$ than the monolithic flow. The confirmatory campaign used independent seeds 72--101, the same RF--VND--IWSSR sequence, data, classifier, parameters, 2,700-s selection deadline, aggregate ceiling of six CPUs and 12~GiB, and balanced AB/BA order. All 60 planned runs completed validly without retry. The SHA-256 of the analyzed state is \texttt{301229f7e46f67d093d5c43d36a134346c1b1e136b1dace53700b0e6438f34c8}.
+
+The primary outcome was the paired difference in the number of distinct qualifying subsets. G-FShield obtained a median of 1.0 and the monolith 0.0. The paired mean difference was $+0.933$ subsets per run, with a 95\% bootstrap CI from $0.233$ to $1.667$ and a one-sided paired permutation test of $p=0.010135$. Distributed execution recorded 13 wins, 12 ties, and five losses. The median difference was zero because of the number of ties; interpretation therefore follows the prespecified mean estimand and test while explicitly reporting the paired distribution.
+
+The one-sided 95\% lower bound for the mean held-out macro-F1 difference was $-0.003791$, above the noninferiority margin of $-0.005$. Median construction--local-search overlap was 99.37\% for G-FShield and 0\% for the monolith. The primary outcome, quality guardrail, and mechanism confirmation were therefore jointly satisfied. Figure~\ref{fig:architecture-quality-yield} shows the pairs; points above the diagonal favor G-FShield.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=.94\linewidth,height=.76\textheight,keepaspectratio]{fig/gfshield/architecture-quality-yield.pdf}
+  \caption{Paired count of distinct subsets with validation macro-F1 $\geq 0.945$ within 2,700~s for the 30 confirmatory seeds.}
+  \label{fig:architecture-quality-yield}
+\end{figure}
+
+This result demonstrates a bounded architectural advantage: under the same ceiling and deadline, distributed execution increased the mean yield of distinct high-quality solutions without violating the prespecified final-quality margin. It does not erase the preceding latency result. The monolith remained better for reaching the first solution at 0.94 and for cost per candidate; G-FShield was better for stage overlap, candidate throughput, and qualified-solution yield. The conclusion is therefore multidimensional rather than a claim of universal superiority.
+\clearpage
 \input{textuais/avaliacao-iwshap}
 
 \section{Observability and Traceability}
@@ -173,10 +191,10 @@ In the application, the backend persists events for initial solution, neighborho
 
 \section{Threats to Validity}
 
-\textbf{Internal validity.} In the first campaign, CPU, memory, CPU set, data, seeds, time limit, J48, and macro-F1 were controlled, but the comparators executed different algorithmic sequences. The subsequent causal experiment removed this confounding, recorded equivalent cumulative trajectories, and balanced AB/BA order. Possible shared-host interference and startup effects remain: 12 attempts in the first campaign and seven distributed attempts in the causal campaign were rejected and retried because they did not produce a complete artifact. This preserves the seed matrix but conditions analysis on runs that initialized correctly.
+\textbf{Internal validity.} In the first campaign, CPU, memory, CPU set, data, seeds, time limit, J48, and macro-F1 were controlled, but the comparators executed different algorithmic sequences. The subsequent causal experiment removed this confounding, recorded equivalent cumulative trajectories, and balanced AB/BA order; the independent confirmation preserved this design with new seeds. Possible shared-host interference and startup effects remain: 12 attempts in the first campaign and seven distributed attempts in the causal campaign were rejected and retried because they did not produce a complete artifact. All 60 confirmatory runs were valid on their first attempt. The procedure preserves the seed matrix, but the two earlier campaigns condition part of the analysis on runs that initialized correctly.
 
-\textbf{Construct validity.} The primary measure is macro-F1 on held-out test data, and runs, final solutions, and internal records are separated. The median per arm reduces the influence of extremes but does not summarize the full distribution. CPU and memory measure containers, not energy or monetary cost. The 0.95 threshold is an analytical convention, not an operational requirement.
+\textbf{Construct validity.} Held-out macro-F1 measures final quality; runs, final solutions, and internal records are distinct units. The confirmatory campaign measures yield as the number of distinct canonical subsets with validation macro-F1 $\geq 0.945$ within the deadline. Candidate records remain correlated within a run and are not treated as replicates. CPU and memory measure containers, not energy or monetary cost. The 0.94 and 0.945 thresholds are prespecified experimental criteria rather than operational requirements.
 
-\textbf{Conclusion validity.} In the first campaign, eight seeds provide low power, the baseline is deterministic, and choosing among 24 configurations introduces multiple selection. In the causal experiment, the 30 pairs, primary outcome, and quality guardrail were defined before analysis; internal candidates were not treated as replicates. Secondary measures use Holm correction. The high-quality-subset count proposed after analysis is explicitly exploratory and requires confirmation on independent seeds 72--101.
+\textbf{Conclusion validity.} In the first campaign, eight seeds provide low power, the baseline is deterministic, and choosing among 24 configurations introduces multiple selection. In the causal campaign, the 30 pairs, primary outcome, and quality guardrail were defined before analysis; internal candidates were not treated as replicates, and secondary measures used Holm correction. The yield hypothesis generated by that campaign was tested once on 30 independent seeds: the prespecified one-sided test and quality guardrail were satisfied. The median difference was zero, and the advantage claim explicitly follows the prespecified mean difference, its interval, and the 13 wins, 12 ties, and five losses.
 
-\textbf{External validity.} Evidence covers one server, one IEC~61850 corpus, one split, and J48. It does not demonstrate generalization to other corpora, classifiers, concurrent loads, replica counts, hardware, failures, or continuous ingestion. Future work should repeat the protocol on multiple datasets and evaluate scaling and recovery separately.
+\textbf{External validity.} Evidence covers one server, one IEC~61850 corpus, one split, J48, and one pipeline configuration. It does not establish that the advantage generalizes to other corpora, classifiers, replica counts, hardware, failures, or continuous ingestion; nor does it establish resource efficiency or horizontal scaling. Future work should repeat the protocol on multiple datasets and evaluate scaling curves and recovery separately.

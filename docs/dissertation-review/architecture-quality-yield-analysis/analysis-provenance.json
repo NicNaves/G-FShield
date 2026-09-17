@@ -1,0 +1,7 @@
+{
+  "analysis_scope": "independent_confirmatory_quality_yield",
+  "analysis_seed": 20260906,
+  "bootstrap_repetitions": 20000,
+  "permutation_repetitions": 200000,
+  "state_sha256": "301229f7e46f67d093d5c43d36a134346c1b1e136b1dace53700b0e6438f34c8"
+}

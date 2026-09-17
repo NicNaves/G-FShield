@@ -9,6 +9,8 @@ Para as RQ2 e RQ3, uma campanha causal adicional removeu o confundimento entre a
 
 O paralelismo utilizou mediana de 4,076 núcleos, contra 1,004, e apresentou maior custo de CPU-h e GiB-h por candidato em todos os pares. Em compensação, a redução dimensional mediana foi 78,43\% no G-FShield e 76,47\% no monólito. Assim, a evidência demonstra a capacidade arquitetural de executar estágios concorrentemente e aumentar vazão bruta, mas não sustenta superioridade global: para uma única requisição, o monólito atingiu o limiar mais cedo e foi mais eficiente por recurso.
 
+Uma campanha confirmatória independente, com sementes 72--101, testou a hipótese gerada pela primeira campanha sem reutilizar suas observações. Sob o mesmo prazo de 2.700~s e teto de seis CPUs e 12~GiB, o G-FShield produziu em média $0{,}933$ subconjunto distinto adicional com F1 macro de validação $\geq 0{,}945$ por execução (IC95\%: 0,233--1,667; $p=0{,}010135$). Foram 13 vitórias, 12 empates e cinco derrotas; as medianas foram 1,0 contra 0,0. A salvaguarda de qualidade no teste foi satisfeita, pois seu limite inferior unilateral foi $-0{,}003791$, acima da margem $-0{,}005$. A vantagem arquitetural sustentada pelos dados é, portanto, maior rendimento médio de soluções distintas de alta qualidade, além de sobreposição e vazão, e não superioridade em todas as dimensões.
+
 \input{textuais/conclusao-iwshap}
 
 Quanto à RQ4, manifesto, comandos resolvidos, hashes, identificadores de campanha e execução, sementes, estados, motivos de parada, timestamps, mensagens, CSVs internos, logs, métricas finais e telemetria permitem reconstruir o que foi capturado. A aplicação também persiste eventos por semente e estágio. Não foram medidos completude ou custo da telemetria, perda e duplicação sob falhas, tempo de recuperação ou reprocessamento; resiliência, tolerância a falhas e escalabilidade permanecem objetivos de projeto.
@@ -18,11 +20,11 @@ O confundimento entre arquitetura e algoritmo permanece na comparação ampla de
 Como trabalhos futuros:
 
 \begin{itemize}
-  \item concluir a campanha confirmatória independente, já pré-registrada para as sementes 72--101, sobre o número de subconjuntos distintos com F1 macro de validação $\geq 0{,}945$;
+  \item executar uma ablação do pipeline com um, dois, três e quatro consumidores, preservando o teto agregado, para estimar a contribuição causal do paralelismo;
   \item repetir a comparação causal com mais sementes e cargas simultâneas independentes;
   \item executar estudos de \textit{scale-out} que variem réplicas e concorrência e relatem vazão por custo;
   \item medir completude, \textit{overhead}, recuperação e reprocessamento da telemetria;
   \item repetir o protocolo com outros corpora, classificadores, particionamentos e hardware.
 \end{itemize}
 
-Em síntese, o G-FShield demonstra uma integração distribuída e rastreável de GRASP-FS e produz um conjunto experimental auditável. O experimento causal confirma que a decomposição permite sobreposição entre construção e busca local e maior vazão de candidatos, mas revela o preço dessa capacidade: maior consumo por candidato e pior tempo até F1 0,94 nesta carga. A contribuição arquitetural é, portanto, um compromisso mensurado, não uma alegação de superioridade universal ou prontidão operacional.
+Em síntese, o G-FShield demonstra uma integração distribuída e rastreável de GRASP-FS e produz um conjunto experimental auditável. A campanha causal confirma sobreposição entre construção e busca local e maior vazão de candidatos; a campanha independente confirma maior rendimento médio de subconjuntos distintos de alta qualidade. O preço observado foi maior consumo por candidato e pior tempo até a primeira solução em F1 0,94. A contribuição arquitetural é, portanto, uma vantagem demonstrada para paralelismo, vazão e rendimento de qualidade, acompanhada de compromissos mensurados, não uma alegação de superioridade universal ou prontidão operacional.

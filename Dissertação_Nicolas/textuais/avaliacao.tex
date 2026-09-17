@@ -1,7 +1,7 @@
 \chapter{Avaliação}
 \label{chapter:avaliacao}
 
-Este capítulo apresenta a campanha experimental formal, limitada a dez dias, executada no mesmo servidor para o G-FShield, os dois monólitos e um baseline com todas as características. A fonte única desta análise é o conjunto de resultados identificado pelo manifesto cujo SHA-256 é:
+Este capítulo apresenta a campanha experimental formal, limitada a dez dias, executada no mesmo servidor para o G-FShield, os dois monólitos e um baseline com todas as características. A campanha de 27 braços é identificada pelo manifesto cujo SHA-256 é:
 \begin{center}
 \small\texttt{29fdc973ad6b243b297e34fcd539f5826aac4ce8a0870e8a5cea5caacfc9adc4}.
 \end{center}
@@ -163,6 +163,24 @@ A trajetória mediana da melhor validação (Figura~\ref{fig:architecture-anytim
 \end{figure}
 \end{landscape}
 
+\section{Confirmação Independente do Rendimento de Qualidade}
+\label{sec:quality-yield}
+
+A observação exploratória da campanha causal originou uma hipótese nova, congelada antes de examinar dados adicionais: no mesmo prazo, o pipeline distribuído produziria mais subconjuntos \emph{distintos} com F1 macro de validação $\geq 0{,}945$ que o fluxo monolítico. A campanha confirmatória empregou sementes independentes 72--101, a mesma sequência RF--VND--IWSSR, dados, classificador, parâmetros, prazo de seleção de 2.700~s, teto agregado de seis CPUs e 12~GiB e ordem AB/BA balanceada. As 60 execuções planejadas terminaram válidas, sem repetição. O SHA-256 do estado analisado é \texttt{301229f7e46f67d093d5c43d36a134346c1b1e136b1dace53700b0e6438f34c8}.
+
+O desfecho primário foi a diferença pareada na contagem de subconjuntos qualificados distintos. O G-FShield obteve mediana 1,0 e o monólito 0,0. A diferença média pareada foi $+0{,}933$ subconjunto por execução, com IC bootstrap de 95\% de $0{,}233$ a $1{,}667$ e teste unilateral pareado de permutação $p=0{,}010135$. Houve 13 vitórias, 12 empates e cinco derrotas do distribuído. A diferença mediana foi zero por causa da quantidade de empates; por isso, a interpretação acompanha o estimando médio e o teste pré-especificados, sem ocultar a distribuição dos pares.
+
+O limite inferior unilateral de 95\% da diferença média de F1 macro no teste foi $-0{,}003791$, acima da margem de não inferioridade $-0{,}005$. A sobreposição mediana entre construção e busca local foi 99,37\% no G-FShield e 0\% no monólito. Assim, foram satisfeitos conjuntamente o desfecho primário, a salvaguarda de qualidade e a confirmação do mecanismo. A Figura~\ref{fig:architecture-quality-yield} apresenta os pares; pontos acima da diagonal favorecem o G-FShield.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=.94\linewidth,height=.76\textheight,keepaspectratio]{fig/gfshield/architecture-quality-yield.pdf}
+  \caption{Contagem pareada de subconjuntos distintos com F1 macro de validação $\geq 0{,}945$ em 2.700~s, nas 30 sementes confirmatórias.}
+  \label{fig:architecture-quality-yield}
+\end{figure}
+
+Esse resultado demonstra uma vantagem arquitetural delimitada: sob o mesmo teto e prazo, a execução distribuída aumentou o rendimento médio de soluções distintas de alta qualidade sem violar a margem pré-especificada de qualidade final. Ele não apaga o resultado de latência da campanha anterior. O monólito continuou melhor para obter a primeira solução em 0,94 e para custo por candidato; o G-FShield foi melhor para sobreposição de estágios, vazão de candidatos e rendimento de soluções qualificadas. Portanto, a conclusão é multidimensional, não uma alegação de superioridade universal.
+\clearpage
 \input{textuais/avaliacao-iwshap}
 
 \section{Observabilidade e Rastreabilidade}
@@ -173,10 +191,10 @@ Na aplicação, o backend persiste eventos de solução inicial, reinício de vi
 
 \section{Ameaças à Validade}
 
-\textbf{Validade interna.} Na primeira campanha, CPU, memória, conjunto de CPUs, dados, sementes, limite, J48 e F1 macro foram controlados, mas os comparadores executaram sequências algorítmicas distintas. O experimento causal posterior corrigiu esse confundimento, registrou trajetórias cumulativas equivalentes e balanceou a ordem AB/BA. Persistem possíveis efeitos de interferência do host compartilhado e de inicialização: 12 tentativas da primeira campanha e sete tentativas distribuídas da campanha causal foram rejeitadas e repetidas por não produzirem artefato completo. O procedimento preserva a matriz de sementes, mas condiciona a análise às execuções que inicializaram corretamente.
+\textbf{Validade interna.} Na primeira campanha, CPU, memória, conjunto de CPUs, dados, sementes, limite, J48 e F1 macro foram controlados, mas os comparadores executaram sequências algorítmicas distintas. O experimento causal posterior corrigiu esse confundimento, registrou trajetórias cumulativas equivalentes e balanceou a ordem AB/BA; a confirmação independente preservou esse desenho com sementes novas. Persistem possíveis efeitos de interferência do host compartilhado e de inicialização: 12 tentativas da primeira campanha e sete tentativas distribuídas da campanha causal foram rejeitadas e repetidas por não produzirem artefato completo. As 60 execuções confirmatórias foram válidas na primeira tentativa. O procedimento preserva a matriz de sementes, mas as duas campanhas anteriores condicionam parte da análise às execuções que inicializaram corretamente.
 
-\textbf{Validade de construção.} A medida principal é F1 macro no teste reservado, e execução, solução final e registro interno foram separados. A escolha da mediana por braço reduz a influência de extremos, mas não resume toda a distribuição. CPU e memória medem contêineres, não energia nem custo monetário. O limiar 0,95 é convenção analítica, não requisito operacional.
+\textbf{Validade de construção.} F1 macro no teste reservado mede qualidade final; execução, solução final e registro interno são unidades distintas. A campanha confirmatória mede rendimento como o número de subconjuntos canônicos distintos com F1 macro de validação $\geq 0{,}945$ no prazo. Registros de candidatos permanecem correlacionados dentro da execução e não são tratados como réplicas. CPU e memória medem contêineres, não energia nem custo monetário. Os limiares 0,94 e 0,945 são critérios experimentais pré-especificados, não requisitos operacionais.
 
-\textbf{Validade de conclusão.} Na primeira campanha, oito sementes oferecem baixo poder, o baseline é determinístico e a escolha entre 24 configurações introduz seleção múltipla. No experimento causal, os 30 pares, o desfecho primário e a salvaguarda de qualidade foram definidos antes da análise; candidatos internos não foram tratados como réplicas. As medidas secundárias usam correção de Holm. A contagem de subconjuntos de alta qualidade proposta após a análise é explicitamente exploratória e requer confirmação nas sementes independentes 72--101.
+\textbf{Validade de conclusão.} Na primeira campanha, oito sementes oferecem baixo poder, o baseline é determinístico e a escolha entre 24 configurações introduz seleção múltipla. Na campanha causal, os 30 pares, o desfecho primário e a salvaguarda de qualidade foram definidos antes da análise; candidatos internos não foram tratados como réplicas e medidas secundárias usaram correção de Holm. A hipótese de rendimento, gerada por essa campanha, foi testada uma única vez em 30 sementes independentes: o teste unilateral pré-especificado e a salvaguarda de qualidade foram satisfeitos. A mediana da diferença foi zero, e a conclusão de vantagem acompanha explicitamente a diferença média pré-especificada, seu intervalo e as 13 vitórias, 12 empates e cinco derrotas.
 
-\textbf{Validade externa.} A evidência cobre um servidor, um corpus IEC~61850, um particionamento e J48. Não demonstra generalização para outros corpora, classificadores, cargas concorrentes, números de réplicas, hardware, falhas ou ingestão contínua. Estudos posteriores devem repetir o protocolo com múltiplos conjuntos de dados e medir escalabilidade e recuperação separadamente.
+\textbf{Validade externa.} A evidência cobre um servidor, um corpus IEC~61850, um particionamento, J48 e uma configuração de pipeline. Não demonstra que a vantagem se generalize para outros corpora, classificadores, números de réplicas, hardware, falhas ou ingestão contínua; tampouco estabelece eficiência de recursos ou escala horizontal. Estudos posteriores devem repetir o protocolo com múltiplos conjuntos de dados e medir curvas de escala e recuperação separadamente.

@@ -35,7 +35,7 @@ A decomposição foi orientada por seis drivers: vazão, desacoplamento, rastrea
     \toprule
     \textbf{Driver} & \textbf{Decisão de projeto} & \textbf{Escopo da evidência} \\
     \midrule
-    Vazão & Executar os quatro rankings em serviços independentes e encaminhar sementes a operadores de busca desacoplados. & A avaliação mede a configuração implantada; não demonstra eficiência sob recursos iguais. \\
+    Vazão & Sobrepor construção e busca local e permitir consumidores independentes para candidatos distintos. & As campanhas pareadas demonstram maior vazão de candidatos e maior rendimento médio de soluções qualificadas sob teto comum; não demonstram menor custo por candidato. \\
     Desacoplamento & Usar tópicos Kafka entre construção, controladores, operadores, verificador e monitor. & O acoplamento temporal é reduzido, mas a robustez diante de falhas não foi experimentalmente medida. \\
     Rastreabilidade & Propagar \texttt{seedId}, algoritmo, busca, iterações, conjuntos de atributos e métricas. & Reconstrói-se a sequência observada pelo monitor, não uma prova de completude do fluxo. \\
     Persistência & Armazenar lançamentos, execuções, eventos e agregados no PostgreSQL e CSVs no volume de métricas. & Redis é \textit{cache}; não substitui o armazenamento persistente. \\
@@ -45,6 +45,8 @@ A decomposição foi orientada por seis drivers: vazão, desacoplamento, rastrea
   \end{tabularx}
 \end{table}
 
+
+As campanhas apresentadas no Capítulo~\ref{chapter:avaliacao} verificam esse driver: a sobreposição mediana aproximou-se de 100\%, a vazão de candidatos foi cerca de 45\% maior e uma amostra confirmatória independente apresentou maior rendimento médio de subconjuntos distintos com F1 de validação $\geq 0{,}945$. Essas vantagens coexistiram com pior latência até a primeira solução em 0,94 e maior custo por candidato.
 
 As fases de construção e refinamento possuem custos e padrões de consumo diferentes. Por isso, foram separadas em serviços com limites próprios de CPU, memória e concorrência. Essa separação permite observar e alterar uma responsabilidade sem incorporar toda a busca em um único processo. Ela também torna possível aumentar o número de instâncias de um serviço; contudo, a relação entre réplicas, vazão e custo precisa de um experimento de escala específico.
 

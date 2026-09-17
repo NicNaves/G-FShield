@@ -35,7 +35,7 @@ The decomposition was guided by six drivers: throughput, decoupling, traceabilit
     \toprule
     \textbf{Driver} & \textbf{Design decision} & \textbf{Scope of evidence} \\
     \midrule
-    Throughput & Execute the four rankings in independent services and forward seeds to decoupled search operators. & The evaluation measures the deployed configuration; it does not demonstrate efficiency under equal resources. \\
+    Throughput & Overlap construction and local search and allow independent consumers for distinct candidates. & The paired campaigns demonstrate greater candidate throughput and greater mean qualified-solution yield under a common ceiling; they do not demonstrate lower cost per candidate. \\
     Decoupling & Use Kafka topics between construction, controllers, operators, verifier, and monitor. & Temporal coupling is reduced, but robustness under failure was not experimentally measured. \\
     Traceability & Propagate \texttt{seedId}, algorithm, search, iterations, feature sets, and metrics. & The sequence observed by the monitor can be reconstructed; flow completeness is not proven. \\
     Persistence & Store launches, runs, events, and aggregates in PostgreSQL and CSVs in the metrics volume. & Redis is a \textit{cache}; it does not replace persistent storage. \\
@@ -44,6 +44,8 @@ The decomposition was guided by six drivers: throughput, decoupling, traceabilit
     \bottomrule
   \end{tabularx}
 \end{table}
+
+The campaigns presented in Chapter~\ref{chapter:avaliacao} verify this driver: median overlap approached 100\%, candidate throughput was approximately 45\% higher, and an independent confirmatory sample showed greater mean yield of distinct subsets with validation F1 $\geq 0.945$. These advantages coexisted with worse latency to the first solution at 0.94 and higher cost per candidate.
 
 The construction and refinement phases differ in cost and resource-use patterns. They were therefore separated into services with their own CPU, memory, and concurrency limits. This separation permits one responsibility to be observed and changed without incorporating the entire search into a single process. It also makes it possible to increase the number of instances of a service; however, the relationship between replicas, throughput, and cost requires a dedicated scaling experiment.
 

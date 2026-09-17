@@ -1,0 +1,21 @@
+{
+  "architectural_quality_yield_supported": true,
+  "distributed_distinct_qualified_median": 1.0,
+  "distributed_losses": 5,
+  "distributed_overlap_median_percent": 99.37235060759616,
+  "distributed_wins": 13,
+  "monolith_distinct_qualified_median": 0.0,
+  "monolith_overlap_median_percent": 0.0,
+  "paired_mean_bootstrap_95_ci": [
+    0.23333333333333334,
+    1.6666666666666667
+  ],
+  "paired_mean_difference": 0.9333333333333333,
+  "paired_median_difference": 0.0,
+  "paired_seed_count": 30,
+  "primary_one_sided_permutation_p": 0.010134949325253374,
+  "quality_guardrail_lower_95": -0.0037913705556533563,
+  "quality_guardrail_margin": -0.005,
+  "quality_threshold": 0.945,
+  "ties": 12
+}
