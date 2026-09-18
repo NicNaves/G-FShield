@@ -462,3 +462,37 @@ Operational sequence: full automated tests, clean commit and immutable tag,
 four-arm pilot in an isolated artifact directory, pilot artifact audit, then
 formal launch in a separate resumable directory with a ten-day hard deadline.
 Pilot observations are excluded from the 100 formal cells.
+
+## Formal pipeline ablation v11 launch
+
+The four-arm pilot completed successfully on 2026-09-18 with seed 41. All
+four cells (monolith, distributed-w1, distributed-w2, and distributed-w4)
+were valid on their first attempt and passed their checksum manifests. Pilot
+scores are diagnostic only and are excluded from the formal 100-cell sample.
+
+Gate v1 rejected the pilot without launching the formal campaign because it
+looked for the source environment name instead of the keys materialized by
+Docker Compose. Gate v2 audits KAFKA_LISTENER_CONCURRENCY and
+KAFKA_NUM_PARTITIONS, preserved the v1 failure log, and passed. Its SHA-256 is
+efac4ccd689106ee700430d94bb7412dc448a25143e306dff072e2fd5bf25cf3.
+The pilot audit SHA-256 recorded by launch.json is
+910f254fd13d549a2008ddb56657ffa8657ff9d36c48538d569ee9ff409d6b6b2.
+
+The formal campaign started at 2026-09-18T14:03:53.612419Z with deadline
+2026-09-28T14:03:53.612419Z. Its source commit is
+75b2db2e3726905830cc3685b512708ec4f3660e, tag
+experiment-pipeline-ablation-v11, image tag pipeline-ablation-75b2db2, source
+protocol SHA-256 3ba098d04197845cb48e101f135994e20926f95c018e0a6df0a034d46bf8484f,
+and effective protocol SHA-256
+b83f2010fea2e4917ae5d09bf8fc992e4a612a2b60ff8d70708b6afc5d79a1bb.
+
+Server paths:
+
+- repository: /home/idscps/nicolas/G-FShield-pipeline-ablation-v11;
+- pilot: /home/idscps/nicolas/experiment-artifacts/pipeline-ablation/pilot-v11;
+- formal state: /home/idscps/nicolas/experiment-artifacts/pipeline-ablation/formal-v11/state.json;
+- formal results: /home/idscps/nicolas/experiment-artifacts/pipeline-ablation/formal-v11/results.
+
+At the first post-launch check, the state was RUNNING with the monolith arm for
+seed 102 active. No inferential analysis is permitted until state.json reports
+CAMPAIGN_COMPLETED and all 100 cells pass artifact validation.
