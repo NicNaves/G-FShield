@@ -8,6 +8,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -107,6 +108,13 @@ class OrchestratorPreflightTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 with ORCHESTRATOR.CampaignLock(lock_path):
                     pass
+
+    @unittest.skipUnless(os.name == "nt", "Windows console regression")
+    def test_windows_pid_probe_never_sends_console_signals(self):
+        with mock.patch.object(ORCHESTRATOR.os, "kill", side_effect=AssertionError("unsafe signal")):
+            self.assertTrue(ORCHESTRATOR.process_running(os.getpid()))
+            self.assertFalse(ORCHESTRATOR.process_running(999999999))
+            self.assertFalse(ORCHESTRATOR.process_running(0))
 
     def test_result_artifact_identity_and_status_are_verified(self):
         with tempfile.TemporaryDirectory() as temporary:

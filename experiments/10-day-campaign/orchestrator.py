@@ -164,6 +164,45 @@ def validate_manifest(manifest: dict[str, Any], require_ready: bool = True) -> l
     return errors
 
 
+def process_running(pid: int) -> bool:
+    """Probe existence without sending console control events on Windows."""
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel.OpenProcess.restype = wintypes.HANDLE
+        kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        kernel.WaitForSingleObject.restype = wintypes.DWORD
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel.CloseHandle.restype = wintypes.BOOL
+        handle = kernel.OpenProcess(0x00100000, False, pid)  # SYNCHRONIZE only
+        if not handle:
+            error = ctypes.get_last_error()
+            if error == 87:
+                return False
+            if error == 5:
+                return True  # Access denied: preserve the lock conservatively
+            raise ctypes.WinError(error)
+        try:
+            status = kernel.WaitForSingleObject(handle, 0)
+            if status == 0xFFFFFFFF:
+                raise ctypes.WinError(ctypes.get_last_error())
+            return status == 0x00000102  # WAIT_TIMEOUT: still running
+        finally:
+            kernel.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
 class CampaignLock:
     def __init__(self, path: Path):
         self.path = path
@@ -183,17 +222,7 @@ class CampaignLock:
                 except (OSError, ValueError):
                     age_seconds = 0.0
                     owner_pid = -1
-                owner_running = False
-                if owner_pid > 0:
-                    try:
-                        os.kill(owner_pid, 0)
-                        owner_running = True
-                    except ProcessLookupError:
-                        owner_running = False
-                    except PermissionError:
-                        owner_running = True
-                    except OSError:
-                        owner_running = False
+                owner_running = process_running(owner_pid)
                 if owner_running or age_seconds < 60:
                     raise RuntimeError(f"campaign lock already exists: {self.path}") from error
                 try:
