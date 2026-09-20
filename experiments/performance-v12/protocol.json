@@ -1,0 +1,293 @@
+{
+  "schema_version": 1,
+  "campaign_id": "gfshield-performance-2026-v12",
+  "maximum_seconds": 864000,
+  "run_timeout_seconds": 3000,
+  "finalization_reserve_seconds": 300,
+  "startup_timeout_seconds": 300,
+  "graceful_shutdown_seconds": 300,
+  "maximum_attempts_per_cell": 3,
+  "seeds": [
+    128,
+    129,
+    130,
+    131,
+    132,
+    133,
+    134,
+    135,
+    136,
+    137,
+    138
+  ],
+  "arms": [
+    {
+      "id": "monolith",
+      "architecture": "monolith",
+      "pipeline_workers": 0,
+      "neighborhood_parallelism": 1,
+      "memoization": false
+    },
+    {
+      "id": "distributed-w1-n1-m0",
+      "architecture": "distributed",
+      "pipeline_workers": 1,
+      "neighborhood_parallelism": 1,
+      "memoization": false
+    },
+    {
+      "id": "distributed-w1-n1-m1",
+      "architecture": "distributed",
+      "pipeline_workers": 1,
+      "neighborhood_parallelism": 1,
+      "memoization": true
+    },
+    {
+      "id": "distributed-w1-n3-m0",
+      "architecture": "distributed",
+      "pipeline_workers": 1,
+      "neighborhood_parallelism": 3,
+      "memoization": false
+    },
+    {
+      "id": "distributed-w1-n3-m1",
+      "architecture": "distributed",
+      "pipeline_workers": 1,
+      "neighborhood_parallelism": 3,
+      "memoization": true
+    },
+    {
+      "id": "distributed-w3-n1-m0",
+      "architecture": "distributed",
+      "pipeline_workers": 3,
+      "neighborhood_parallelism": 1,
+      "memoization": false
+    },
+    {
+      "id": "distributed-w3-n1-m1",
+      "architecture": "distributed",
+      "pipeline_workers": 3,
+      "neighborhood_parallelism": 1,
+      "memoization": true
+    },
+    {
+      "id": "distributed-w3-n3-m0",
+      "architecture": "distributed",
+      "pipeline_workers": 3,
+      "neighborhood_parallelism": 3,
+      "memoization": false
+    },
+    {
+      "id": "distributed-w3-n3-m1",
+      "architecture": "distributed",
+      "pipeline_workers": 3,
+      "neighborhood_parallelism": 3,
+      "memoization": true
+    }
+  ],
+  "order_design": {
+    "type": "cyclic Latin square; positions balanced for first nine seeds, not carryover-balanced",
+    "orders": [
+      [
+        "monolith",
+        "distributed-w1-n1-m0",
+        "distributed-w1-n1-m1",
+        "distributed-w1-n3-m0",
+        "distributed-w1-n3-m1",
+        "distributed-w3-n1-m0",
+        "distributed-w3-n1-m1",
+        "distributed-w3-n3-m0",
+        "distributed-w3-n3-m1"
+      ],
+      [
+        "distributed-w1-n1-m0",
+        "distributed-w1-n1-m1",
+        "distributed-w1-n3-m0",
+        "distributed-w1-n3-m1",
+        "distributed-w3-n1-m0",
+        "distributed-w3-n1-m1",
+        "distributed-w3-n3-m0",
+        "distributed-w3-n3-m1",
+        "monolith"
+      ],
+      [
+        "distributed-w1-n1-m1",
+        "distributed-w1-n3-m0",
+        "distributed-w1-n3-m1",
+        "distributed-w3-n1-m0",
+        "distributed-w3-n1-m1",
+        "distributed-w3-n3-m0",
+        "distributed-w3-n3-m1",
+        "monolith",
+        "distributed-w1-n1-m0"
+      ],
+      [
+        "distributed-w1-n3-m0",
+        "distributed-w1-n3-m1",
+        "distributed-w3-n1-m0",
+        "distributed-w3-n1-m1",
+        "distributed-w3-n3-m0",
+        "distributed-w3-n3-m1",
+        "monolith",
+        "distributed-w1-n1-m0",
+        "distributed-w1-n1-m1"
+      ],
+      [
+        "distributed-w1-n3-m1",
+        "distributed-w3-n1-m0",
+        "distributed-w3-n1-m1",
+        "distributed-w3-n3-m0",
+        "distributed-w3-n3-m1",
+        "monolith",
+        "distributed-w1-n1-m0",
+        "distributed-w1-n1-m1",
+        "distributed-w1-n3-m0"
+      ],
+      [
+        "distributed-w3-n1-m0",
+        "distributed-w3-n1-m1",
+        "distributed-w3-n3-m0",
+        "distributed-w3-n3-m1",
+        "monolith",
+        "distributed-w1-n1-m0",
+        "distributed-w1-n1-m1",
+        "distributed-w1-n3-m0",
+        "distributed-w1-n3-m1"
+      ],
+      [
+        "distributed-w3-n1-m1",
+        "distributed-w3-n3-m0",
+        "distributed-w3-n3-m1",
+        "monolith",
+        "distributed-w1-n1-m0",
+        "distributed-w1-n1-m1",
+        "distributed-w1-n3-m0",
+        "distributed-w1-n3-m1",
+        "distributed-w3-n1-m0"
+      ],
+      [
+        "distributed-w3-n3-m0",
+        "distributed-w3-n3-m1",
+        "monolith",
+        "distributed-w1-n1-m0",
+        "distributed-w1-n1-m1",
+        "distributed-w1-n3-m0",
+        "distributed-w1-n3-m1",
+        "distributed-w3-n1-m0",
+        "distributed-w3-n1-m1"
+      ],
+      [
+        "distributed-w3-n3-m1",
+        "monolith",
+        "distributed-w1-n1-m0",
+        "distributed-w1-n1-m1",
+        "distributed-w1-n3-m0",
+        "distributed-w1-n3-m1",
+        "distributed-w3-n1-m0",
+        "distributed-w3-n1-m1",
+        "distributed-w3-n3-m0"
+      ]
+    ]
+  },
+  "measurement_window": {
+    "selection_seconds": 2700,
+    "cold_start_reported_separately": true,
+    "final_evaluation_excluded_from_search_resource_costs": true,
+    "post_deadline_candidates_excluded": true,
+    "origin": "request_submission_after_distributed_service_readiness"
+  },
+  "algorithm": {
+    "feature_selector": "relieff",
+    "relieff_sample_size": 1000,
+    "rcl_cutoff": 30,
+    "initial_subset_size": 5,
+    "controller": "vnd",
+    "enabled_local_searches": [
+      "iwssr"
+    ],
+    "training_dataset_cache": true,
+    "neighborhood_cycles": 100,
+    "local_search_iterations": 100,
+    "minimum_improvement": 0.0001,
+    "maximum_accepted_improvements": 500,
+    "classifier": "Weka J48 3.8.6",
+    "classifier_parameters": {
+      "confidence_factor": 0.25,
+      "minimum_instances_per_leaf": 2,
+      "pruned": true
+    },
+    "selection_metric": "validation_macro_f1",
+    "holdout_policy": "test_once_after_validation_selection"
+  },
+  "resources": {
+    "cpuset": "8-15",
+    "numa_node": "1",
+    "aggregate_cpu_ceiling": 6,
+    "aggregate_memory": "12g",
+    "distributed_component_ceiling_sum": {
+      "rcl": {
+        "cpu": 1,
+        "memory_gib": 3
+      },
+      "iwssr": {
+        "cpu": 3,
+        "memory_gib": 4
+      },
+      "vnd": {
+        "cpu": 0.5,
+        "memory_gib": 1
+      },
+      "verifier": {
+        "cpu": 0.5,
+        "memory_gib": 1
+      },
+      "kafka": {
+        "cpu": 0.75,
+        "memory_gib": 2
+      },
+      "zookeeper": {
+        "cpu": 0.25,
+        "memory_gib": 1
+      }
+    },
+    "factor_changes": [
+      "consumer concurrency and Kafka partitions",
+      "bounded neighborhood executor",
+      "exact run-scoped evaluation memoization"
+    ]
+  },
+  "dataset": {
+    "split_manifest": "datasets/campaign/split-manifest.json",
+    "source_sha256": "60ebfcdc9c209e5c760e2bdbf5be75dfe4d931b81442597b0ef32e2f5fe6c1f6",
+    "train_sha256": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
+    "validation_sha256": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a",
+    "test_sha256": "05d393c5881aec032664ef4a84e18337988e819edc74664fe1255757961cfab4"
+  },
+  "hypotheses": {
+    "status": "Prepared before v12 pilot; formal execution requires pilot validation and frozen source/images.",
+    "quality_threshold_validation_macro_f1": 0.945,
+    "primary": "Three paired per-seed main effects (pipeline, neighborhood, memoization) on normalized quality-yield AUC; factorial contrasts average over other factors.",
+    "primary_test": "Two-sided paired sign-flip permutation tests, Holm-adjusted across three primary effects; 11 independent seeds.",
+    "quality_yield_auc": "Integral of cumulative distinct published subsets with validation macro-F1 >= 0.945, divided by selection horizon.",
+    "architecture_contrast": "distributed-w1-n1-m0 minus monolith (descriptive secondary contrast).",
+    "interactions": "Report two-factor and three-factor interactions as exploratory with uncertainty; no selective omission.",
+    "quality_guardrail": "Report paired held-out F1 differences and one-sided 95% lower confidence bounds versus distributed-w1-n1-m0; noninferiority margin -0.005. An inconclusive interval is not evidence of equivalence.",
+    "holdout_policy": "Do not tune code or choose configurations on held-out results. Report all arms regardless of outcome.",
+    "time_to_threshold": "Include failures as right-censored at deadline; never average only successful runs.",
+    "secondary_family": [
+      "CPU-hours",
+      "GiB-hours",
+      "time to first qualified subset",
+      "trained and memoized counts",
+      "unique subsets",
+      "held-out F1 precision recall",
+      "dimensionality reduction"
+    ],
+    "limitations": [
+      "11 seeds limits power",
+      "cyclic order not fully carryover-balanced",
+      "per-evaluation CPU is a shared-process sample, not exclusive worker consumption",
+      "queue waiting/idle/restarts require separate telemetry audit"
+    ]
+  }
+}
