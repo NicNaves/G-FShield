@@ -314,15 +314,26 @@ CONSTRUCTION_EVALUATION_LOG = re.compile(
 LOCAL_SEARCH_EVALUATION_LOG = re.compile(
     r"dls iteration search=IWSSR.*?campaignElapsedMs=(\d+)"
 )
+LOCAL_SEARCH_TRAINED_LOG = re.compile(
+    r"dls iteration search=IWSSR.*?campaignElapsedMs=(\d+).*?evaluationSource=trained"
+)
+LOCAL_SEARCH_MEMOIZED_LOG = re.compile(
+    r"dls iteration search=IWSSR.*?campaignElapsedMs=(\d+).*?evaluationSource=memoized"
+)
 
 
 def internal_evaluation_counts_before_deadline(
     path: Path, cutoff_elapsed_ms: int,
 ) -> dict[str, int]:
     """Count completed evaluations per pipeline stage inside selection time."""
-    counts = {"construction": 0, "local_search": 0}
+    counts = {
+        "construction": 0,
+        "local_search": 0,
+        "local_search_trained": 0,
+        "local_search_memoized": 0,
+    }
     if not path.exists():
-        return {**counts, "total": 0}
+        return {**counts, "local_search_unclassified": 0, "total": 0}
     with path.open(encoding="utf-8", errors="replace") as handle:
         for line in handle:
             for stage, pattern in (
@@ -332,7 +343,24 @@ def internal_evaluation_counts_before_deadline(
                 match = pattern.search(line)
                 if match and int(match.group(1)) <= cutoff_elapsed_ms:
                     counts[stage] += 1
-    return {**counts, "total": counts["construction"] + counts["local_search"]}
+            for stage, pattern in (
+                ("local_search_trained", LOCAL_SEARCH_TRAINED_LOG),
+                ("local_search_memoized", LOCAL_SEARCH_MEMOIZED_LOG),
+            ):
+                match = pattern.search(line)
+                if match and int(match.group(1)) <= cutoff_elapsed_ms:
+                    counts[stage] += 1
+    unclassified = max(
+        0,
+        counts["local_search"]
+        - counts["local_search_trained"]
+        - counts["local_search_memoized"],
+    )
+    return {
+        **counts,
+        "local_search_unclassified": unclassified,
+        "total": counts["construction"] + counts["local_search"],
+    }
 
 
 def internal_candidate_count_before_deadline(path: Path, cutoff_elapsed_ms: int) -> int:
@@ -665,6 +693,15 @@ def run_distributed(args: argparse.Namespace) -> int:
             "CAMPAIGN_MINIMUM_IMPROVEMENT": str(args.minimum_improvement),
             "CAMPAIGN_MAX_ACCEPTED_IMPROVEMENTS": str(args.max_accepted_improvements),
             "CAMPAIGN_RELIEFF_SAMPLE_SIZE": str(args.relieff_sample_size),
+            "CAMPAIGN_IWSSR_EVALUATION_MEMOIZATION_ENABLED": str(
+                args.iwssr_evaluation_memoization
+            ).lower(),
+            "CAMPAIGN_IWSSR_EVALUATION_MEMOIZATION_MAX_ENTRIES": str(
+                args.iwssr_evaluation_memoization_max_entries
+            ),
+            "CAMPAIGN_IWSSR_NEIGHBORHOOD_PARALLELISM": str(
+                args.iwssr_neighborhood_parallelism
+            ),
         }
     )
     if args.pipeline_workers >= 1:
@@ -862,10 +899,16 @@ def run_distributed(args: argparse.Namespace) -> int:
         )
         result["construction_evaluation_count"] = evaluation_counts["construction"]
         result["local_search_evaluation_count"] = evaluation_counts["local_search"]
+        result["local_search_trained_evaluation_count"] = evaluation_counts["local_search_trained"]
+        result["local_search_memoized_evaluation_count"] = evaluation_counts["local_search_memoized"]
+        result["local_search_unclassified_evaluation_count"] = evaluation_counts["local_search_unclassified"]
+        result["iwssr_evaluation_memoization"] = args.iwssr_evaluation_memoization
+        result["iwssr_neighborhood_parallelism"] = args.iwssr_neighborhood_parallelism
+        result["iwssr_evaluation_memoization_max_entries"] = args.iwssr_evaluation_memoization_max_entries
         result["candidate_count"] = evaluation_counts["total"]
         result["candidate_count_definition"] = (
-            "construction evaluations plus completed IWSSR iterations; use stage counts "
-            "instead of this total for phase-specific throughput"
+            "construction evaluations plus completed IWSSR evaluation requests (including memoized requests); "
+            "use trained stage counts for actual training throughput and deduplicate subsets separately"
         )
         raw_target_times = validation_times_to_targets_ms(messages)
         result["validation_time_to_targets_ms"] = {
@@ -918,6 +961,9 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--neighborhood-iterations", type=int, default=50)
     result.add_argument("--local-search-iterations", type=int, default=100)
     result.add_argument("--pipeline-workers", type=int, default=1)
+    result.add_argument("--iwssr-evaluation-memoization", action="store_true")
+    result.add_argument("--iwssr-evaluation-memoization-max-entries", type=int, default=50000)
+    result.add_argument("--iwssr-neighborhood-parallelism", type=int, default=1)
     result.add_argument("--use-training-cache", action="store_true")
     result.add_argument("--minimum-improvement", type=float, default=0.0001)
     result.add_argument("--max-accepted-improvements", type=int, default=500)
@@ -945,6 +991,10 @@ def main() -> int:
     args = parser().parse_args()
     if args.pipeline_workers <= 0:
         raise SystemExit("--pipeline-workers must be positive")
+    if args.iwssr_evaluation_memoization_max_entries <= 0:
+        raise SystemExit("--iwssr-evaluation-memoization-max-entries must be positive")
+    if args.iwssr_neighborhood_parallelism <= 0:
+        raise SystemExit("--iwssr-neighborhood-parallelism must be positive")
     return run_distributed(args)
 
 

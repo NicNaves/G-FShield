@@ -139,7 +139,36 @@ class CausalParityTest(unittest.TestCase):
                 1, run_arm.internal_candidate_count_before_deadline(path, 600_000),
             )
             self.assertEqual(
-                {"construction": 1, "local_search": 0, "total": 1},
+                {
+                    "construction": 1,
+                    "local_search": 0,
+                    "local_search_trained": 0,
+                    "local_search_memoized": 0,
+                    "local_search_unclassified": 0,
+                    "total": 1,
+                },
+                run_arm.internal_evaluation_counts_before_deadline(path, 600_000),
+            )
+
+    def test_runner_distinguishes_trained_and_memoized_iwssr_decisions(self):
+        run_arm = load_run_arm()
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "compose.log"
+            path.write_text(
+                "dls iteration search=IWSSR campaignElapsedMs=100 evaluationSource=trained evaluationKey=a\n"
+                "dls iteration search=IWSSR campaignElapsedMs=200 evaluationSource=memoized evaluationKey=a\n"
+                "dls iteration search=IWSSR campaignElapsedMs=300\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                {
+                    "construction": 0,
+                    "local_search": 3,
+                    "local_search_trained": 1,
+                    "local_search_memoized": 1,
+                    "local_search_unclassified": 1,
+                    "total": 3,
+                },
                 run_arm.internal_evaluation_counts_before_deadline(path, 600_000),
             )
 

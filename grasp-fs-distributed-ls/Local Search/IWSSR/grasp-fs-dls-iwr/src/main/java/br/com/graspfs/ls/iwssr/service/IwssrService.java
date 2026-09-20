@@ -21,13 +21,25 @@ import weka.core.Instances;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @Slf4j
@@ -48,8 +60,20 @@ public class IwssrService implements DisposableBean {
     @Value("${local.search.progress.every-n:10}")
     private int progressEveryN;
 
+    @Value("${iwssr.evaluation.memoization.enabled:false}")
+    private boolean evaluationMemoizationEnabled;
+
+    @Value("${iwssr.evaluation.memoization.max-entries:50000}")
+    private int evaluationMemoizationMaximumEntries;
+
+    @Value("${iwssr.neighborhood.parallelism:1}")
+    private int neighborhoodParallelism;
+
     private final Object metricsLock = new Object();
+    private final Object optimizationLock = new Object();
     private BufferedWriter metricsWriter;
+    private volatile EvaluationMemoizer evaluationMemoizer;
+    private volatile ExecutorService neighborhoodExecutor;
 
     public void doIwssr(DataSolution seed) throws Exception {
         long startedAt = System.nanoTime();
@@ -106,15 +130,18 @@ public class IwssrService implements DisposableBean {
         double lastPublishedBestF1 = Double.NEGATIVE_INFINITY;
 
         int n = resolveMaxIterations(localSolutionAdd);
+        String dataIdentity = evaluationMemoizationEnabled
+                ? datasetIdentity(trainingDataset) + ":" + datasetIdentity(testingDataset)
+                : "disabled";
 
         for (int i = 0;
              i < n && !deadlineReached(localSolutionAdd) && !localSolutionAdd.getRclfeatures().isEmpty();
              i++) {
             localSolutionAdd.setIterationLocalSearch(i);
             localSolutionAdd = updateSolution(addMovement(
-                    localSolutionAdd, trainingDataset, testingDataset, classifier));
+                    localSolutionAdd, trainingDataset, testingDataset, classifier, dataIdentity));
             localSolutionReplace = updateSolution(replaceMovement(
-                    localSolutionAdd, trainingDataset, testingDataset, classifier));
+                    localSolutionAdd, trainingDataset, testingDataset, classifier, dataIdentity));
             lastPublishedBestF1 = publishProgressIfNeeded(
                     updateSolution(localSolutionReplace),
                     i,
@@ -140,11 +167,9 @@ public class IwssrService implements DisposableBean {
             DataSolution solution,
             Instances trainingDataset,
             Instances testingDataset,
-            AbstractClassifier classifier
+            AbstractClassifier classifier,
+            String dataIdentity
     ) throws Exception {
-        MetricsCollector collector = new MetricsCollector();
-        collector.startCollecting();
-
         long startTime = System.nanoTime();
 
         if (solution.getRclfeatures().isEmpty()) {
@@ -155,20 +180,23 @@ public class IwssrService implements DisposableBean {
             solution.getSolutionFeatures().add(feature);
         }
 
-        EvaluationResult scores = evaluateWithDataset(solution, trainingDataset, testingDataset, classifier);
+        MetricsCollector collector = new MetricsCollector();
+        collector.startCollecting();
+        EvaluationMemoizer.EvaluationOutcome outcome;
+        try {
+            outcome = evaluateWithDataset(solution, trainingDataset, testingDataset, classifier, dataIdentity);
+        } finally {
+            collector.stopCollectingAndAwait();
+        }
+        EvaluationResult scores = outcome.result();
 
         long endTime = System.nanoTime();
 
-        solution.setF1Score(scores.getF1Score());
-        solution.setAccuracy(scores.getAccuracy());
-        solution.setPrecision(scores.getPrecision());
-        solution.setRecall(scores.getRecall());
+        applyScores(solution, scores);
         solution.setRunnigTime((endTime - startTime) / 1_000_000L);
         stampCandidate(solution, "iwssr-add");
 
-        collector.stopCollectingAndAwait();
-
-        logMetrics(solution, collector);
+        logMetrics(solution, collector, outcome);
         return solution;
     }
 
@@ -176,55 +204,175 @@ public class IwssrService implements DisposableBean {
             DataSolution solution,
             Instances trainingDataset,
             Instances testingDataset,
-            AbstractClassifier classifier
+            AbstractClassifier classifier,
+            String dataIdentity
     ) throws Exception {
         DataSolution bestReplace = updateSolution(solution);
+        int replacementCount = solution.getSolutionFeatures().size();
+        if (replacementCount == 0) {
+            return bestReplace;
+        }
 
-        for (int i = 0; i < solution.getSolutionFeatures().size() && !deadlineReached(solution); i++) {
-            MetricsCollector collector = new MetricsCollector();
-            collector.startCollecting();
+        if (effectiveNeighborhoodParallelism(replacementCount) == 1) {
+            for (int i = 0; i < replacementCount && !deadlineReached(solution); i++) {
+                ReplacementEvaluation replacement = evaluateReplacement(
+                        solution, i, trainingDataset, testingDataset, classifier, dataIdentity);
+                bestReplace = chooseBetterReplacement(bestReplace, replacement);
+            }
+            return bestReplace;
+        }
 
-            long startTime = System.nanoTime();
+        List<Callable<ReplacementEvaluation>> tasks = new ArrayList<>();
+        for (int i = 0; i < replacementCount && !deadlineReached(solution); i++) {
+            int replacementIndex = i;
+            DataSolution snapshot = updateSolution(solution);
+            tasks.add(() -> evaluateReplacement(
+                    snapshot,
+                    replacementIndex,
+                    trainingDataset,
+                    testingDataset,
+                    (AbstractClassifier) AbstractClassifier.makeCopy(classifier), dataIdentity));
+        }
 
-            DataSolution replaced = updateSolution(solution);
-            replaced.getSolutionFeatures().remove(i);
+        List<Future<ReplacementEvaluation>> futures;
+        Long deadlineEpochMs = solution.getDeadlineEpochMs();
+        if (deadlineEpochMs != null) {
+            long remainingMs = Math.max(1L, deadlineEpochMs - System.currentTimeMillis());
+            futures = neighborhoodExecutor().invokeAll(tasks, remainingMs, TimeUnit.MILLISECONDS);
+        } else {
+            futures = neighborhoodExecutor().invokeAll(tasks);
+        }
 
-            EvaluationResult scores = evaluateWithDataset(replaced, trainingDataset, testingDataset, classifier);
-
-            long endTime = System.nanoTime();
-
-            replaced.setF1Score(scores.getF1Score());
-            replaced.setAccuracy(scores.getAccuracy());
-            replaced.setPrecision(scores.getPrecision());
-            replaced.setRecall(scores.getRecall());
-            replaced.setRunnigTime((endTime - startTime) / 1_000_000L);
-            stampCandidate(replaced, "iwssr-replace-" + i);
-
-            collector.stopCollectingAndAwait();
-
-            logMetrics(replaced, collector);
-
-            if (scores.getF1Score() > bestReplace.getF1Score()) {
-                bestReplace = updateSolution(replaced);
-                log.debug("dls replacement improved search=IWSSR seedId={} f1={}", replaced.getSeedId(), scores.getF1Score());
+        // Futures are returned in submission order. This preserves the original
+        // deterministic tie rule even when evaluations finish out of order.
+        for (Future<ReplacementEvaluation> future : futures) {
+            if (future.isCancelled()) {
+                continue;
+            }
+            try {
+                bestReplace = chooseBetterReplacement(bestReplace, future.get());
+            } catch (CancellationException ignored) {
+                // A deadline cancellation is an expected bounded-search outcome.
+            } catch (ExecutionException error) {
+                Throwable cause = error.getCause();
+                if (cause instanceof CancellationException) {
+                    continue;
+                }
+                if (cause instanceof Exception exception) {
+                    throw exception;
+                }
+                if (cause instanceof Error fatal) {
+                    throw fatal;
+                }
+                throw new IllegalStateException("parallel replacement evaluation failed", cause);
             }
         }
 
         return bestReplace;
     }
 
-    private EvaluationResult evaluateWithDataset(
+    private ReplacementEvaluation evaluateReplacement(
+            DataSolution solution,
+            int replacementIndex,
+            Instances trainingDataset,
+            Instances testingDataset,
+            AbstractClassifier classifier,
+            String dataIdentity
+    ) throws Exception {
+        if (Thread.currentThread().isInterrupted() || deadlineReached(solution)) {
+            throw new CancellationException("replacement evaluation deadline reached");
+        }
+        MetricsCollector collector = new MetricsCollector();
+        collector.startCollecting();
+        long startTime = System.nanoTime();
+
+        DataSolution replaced = updateSolution(solution);
+        replaced.getSolutionFeatures().remove(replacementIndex);
+        EvaluationMemoizer.EvaluationOutcome outcome;
+        try {
+            outcome = evaluateWithDataset(replaced, trainingDataset, testingDataset, classifier, dataIdentity);
+        } finally {
+            collector.stopCollectingAndAwait();
+        }
+        applyScores(replaced, outcome.result());
+        replaced.setRunnigTime((System.nanoTime() - startTime) / 1_000_000L);
+        stampCandidate(replaced, "iwssr-replace-" + replacementIndex);
+
+        logMetrics(replaced, collector, outcome);
+        return new ReplacementEvaluation(replacementIndex, replaced, outcome);
+    }
+
+    private DataSolution chooseBetterReplacement(
+            DataSolution currentBest,
+            ReplacementEvaluation replacement
+    ) {
+        DataSolution candidate = replacement.solution();
+        if (candidate.getF1Score() > currentBest.getF1Score()) {
+            log.debug(
+                    "dls replacement improved search=IWSSR seedId={} replacementIndex={} f1={} evaluationSource={}",
+                    candidate.getSeedId(),
+                    replacement.index(),
+                    candidate.getF1Score(),
+                    replacement.outcome().memoized() ? "memoized" : "trained"
+            );
+            return updateSolution(candidate);
+        }
+        return currentBest;
+    }
+
+    private EvaluationMemoizer.EvaluationOutcome evaluateWithDataset(
             DataSolution solution,
             Instances training,
             Instances testing,
-            AbstractClassifier classifier
+            AbstractClassifier classifier,
+            String dataIdentity
     ) throws Exception {
-        return MachineLearning.evaluateSolution(
-                new ArrayList<>(solution.getSolutionFeatures()),
-                training,
-                testing,
-                classifier
-        );
+        EvaluationMemoizer.EvaluationKey key = EvaluationMemoizer.key(
+                solution.getRunId(),
+                solution.getTrainingFileName() + ":" + dataIdentity,
+                solution.getTestingFileName() + ":" + dataIdentity,
+                classifier.getClass().getName() + " " + String.join(" ", classifier.getOptions()),
+                solution.getSeed(),
+                solution.getSolutionFeatures());
+        return evaluationMemoizer().evaluate(
+                key,
+                () -> MachineLearning.evaluateSolution(
+                        new ArrayList<>(solution.getSolutionFeatures()),
+                        training,
+                        testing,
+                        classifier));
+    }
+
+    static String datasetIdentity(Instances data) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        digest.update((data.classIndex() + "\n" + new Instances(data, 0))
+                .getBytes(StandardCharsets.UTF_8));
+        ByteBuffer values = ByteBuffer.allocate((data.numAttributes() + 1) * Double.BYTES);
+        for (int i = 0; i < data.numInstances(); i++) {
+            values.clear();
+            values.putDouble(data.instance(i).weight());
+            for (int j = 0; j < data.numAttributes(); j++) {
+                values.putDouble(data.instance(i).value(j));
+            }
+            digest.update(values.array());
+            digest.update(data.instance(i).toString().getBytes(StandardCharsets.UTF_8));
+            digest.update((byte) '\n');
+        }
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private void applyScores(DataSolution solution, EvaluationResult scores) {
+        solution.setF1Score(scores.getF1Score());
+        solution.setAccuracy(scores.getAccuracy());
+        solution.setPrecision(scores.getPrecision());
+        solution.setRecall(scores.getRecall());
+    }
+
+    private record ReplacementEvaluation(
+            int index,
+            DataSolution solution,
+            EvaluationMemoizer.EvaluationOutcome outcome
+    ) {
     }
 
     public DataSolution resetDataSolution(DataSolution seed, DataSolution data) {
@@ -272,10 +420,63 @@ public class IwssrService implements DisposableBean {
         }
     }
 
-    private void logMetrics(DataSolution solution, MetricsCollector collector) throws Exception {
+    private EvaluationMemoizer evaluationMemoizer() {
+        EvaluationMemoizer current = evaluationMemoizer;
+        if (current != null) {
+            return current;
+        }
+        synchronized (optimizationLock) {
+            if (evaluationMemoizer == null) {
+                int maximumEntries = Math.max(1, evaluationMemoizationMaximumEntries);
+                evaluationMemoizer = new EvaluationMemoizer(
+                        evaluationMemoizationEnabled,
+                        maximumEntries);
+                log.info(
+                        "dls evaluation memoization configured search=IWSSR enabled={} maximumEntries={}",
+                        evaluationMemoizationEnabled,
+                        maximumEntries);
+            }
+            return evaluationMemoizer;
+        }
+    }
+
+    private int effectiveNeighborhoodParallelism(int workItems) {
+        return Math.max(1, Math.min(Math.max(1, neighborhoodParallelism), workItems));
+    }
+
+    private ExecutorService neighborhoodExecutor() {
+        ExecutorService current = neighborhoodExecutor;
+        if (current != null) {
+            return current;
+        }
+        synchronized (optimizationLock) {
+            if (neighborhoodExecutor == null) {
+                int parallelism = Math.max(1, neighborhoodParallelism);
+                AtomicInteger threadIndex = new AtomicInteger();
+                neighborhoodExecutor = Executors.newFixedThreadPool(parallelism, runnable -> {
+                    Thread thread = new Thread(
+                            runnable,
+                            "iwssr-neighborhood-" + threadIndex.incrementAndGet());
+                    thread.setDaemon(true);
+                    return thread;
+                });
+                log.info(
+                        "dls neighborhood executor configured search=IWSSR parallelism={}",
+                        parallelism);
+            }
+            return neighborhoodExecutor;
+        }
+    }
+
+    private void logMetrics(
+            DataSolution solution,
+            MetricsCollector collector,
+            EvaluationMemoizer.EvaluationOutcome outcome
+    ) throws Exception {
         float avgCpu = collector.getAvgCpu();
         float avgMemory = collector.getAvgMemory();
         float avgMemoryPercent = collector.getAvgMemoryPercent();
+        String evaluationSource = outcome.memoized() ? "memoized" : "trained";
 
         String f1Formatted = String.format(Locale.US, "%.4f", solution.getF1Score());
         String accFormatted = String.format(Locale.US, "%.4f", solution.getAccuracy());
@@ -291,13 +492,15 @@ public class IwssrService implements DisposableBean {
         solution.setMemoryUsagePercent(Float.isFinite(avgMemoryPercent) ? avgMemoryPercent : 0.0F);
 
         log.info(
-                "dls iteration search=IWSSR seedId={} iteration={} f1={} featureCount={} features={} campaignElapsedMs={}",
+                "dls iteration search=IWSSR seedId={} iteration={} f1={} featureCount={} features={} campaignElapsedMs={} evaluationSource={} evaluationKey={}",
                 solution.getSeedId(),
                 solution.getIterationLocalSearch(),
                 solution.getF1Score(),
                 solution.getSolutionFeatures().size(),
                 solution.getSolutionFeatures(),
-                solution.getMonotonicElapsedMs()
+                solution.getMonotonicElapsedMs(),
+                evaluationSource,
+                outcome.keyId()
         );
 
         String row = String.join(";",
@@ -316,7 +519,9 @@ public class IwssrService implements DisposableBean {
                 memPercentFormatted,
                 solution.getClassfier(),
                 solution.getTrainingFileName(),
-                solution.getTestingFileName()
+                solution.getTestingFileName(),
+                evaluationSource,
+                outcome.keyId()
         );
         synchronized (metricsLock) {
             ensureMetricsWriterLocked();
@@ -340,7 +545,7 @@ public class IwssrService implements DisposableBean {
         boolean writeHeader = !Files.exists(metricsPath) || Files.size(metricsPath) == 0L;
         metricsWriter = new BufferedWriter(new FileWriter(metricsFileName, true));
         if (writeHeader) {
-            metricsWriter.write("solutionFeatures;f1Score;accuracy;precision;recall;neighborhood;iterationNeighborhood;localSearch;iterationLocalSearch;runnigTime(ms);cpuUsage(%);memoryUsage(MB);memoryUsagePercent(%);classifier;trainingFileName;testingFileName");
+            metricsWriter.write("solutionFeatures;f1Score;accuracy;precision;recall;neighborhood;iterationNeighborhood;localSearch;iterationLocalSearch;runnigTime(ms);cpuUsage(%);memoryUsage(MB);memoryUsagePercent(%);classifier;trainingFileName;testingFileName;evaluationSource;evaluationKey");
             metricsWriter.newLine();
             metricsWriter.flush();
         }
@@ -348,6 +553,20 @@ public class IwssrService implements DisposableBean {
 
     @Override
     public void destroy() throws Exception {
+        ExecutorService executor = neighborhoodExecutor;
+        if (executor != null) {
+            executor.shutdownNow();
+            executor.awaitTermination(10, TimeUnit.SECONDS);
+        }
+        EvaluationMemoizer memoizer = evaluationMemoizer;
+        if (memoizer != null) {
+            log.info(
+                    "dls evaluation memoization summary search=IWSSR trained={} memoized={} capacityBypasses={} cachedEntries={}",
+                    memoizer.trainedEvaluations(),
+                    memoizer.memoizedEvaluations(),
+                    memoizer.capacityBypasses(),
+                    memoizer.cachedEntries());
+        }
         synchronized (metricsLock) {
             if (metricsWriter != null) {
                 metricsWriter.flush();
