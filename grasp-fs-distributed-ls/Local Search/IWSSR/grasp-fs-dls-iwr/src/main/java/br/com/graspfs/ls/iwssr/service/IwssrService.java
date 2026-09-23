@@ -69,6 +69,14 @@ public class IwssrService implements DisposableBean {
     @Value("${iwssr.neighborhood.parallelism:1}")
     private int neighborhoodParallelism;
 
+    @Value("${iwssr.progress.early.enabled:false}")
+    private boolean earlyProgressEnabled;
+
+    @Value("${iwssr.training.max.concurrent:0}")
+    private int trainingMaximumConcurrent;
+
+    private volatile TrainingLimiter trainingLimiter;
+
     private final Object metricsLock = new Object();
     private final Object optimizationLock = new Object();
     private BufferedWriter metricsWriter;
@@ -128,6 +136,7 @@ public class IwssrService implements DisposableBean {
         DataSolution localSolutionAdd = updateSolution(dataSolution);
         DataSolution localSolutionReplace = updateSolution(dataSolution);
         double lastPublishedBestF1 = Double.NEGATIVE_INFINITY;
+        EarlyProgress progress = new EarlyProgress(scoreOf(dataSolution));
 
         int n = resolveMaxIterations(localSolutionAdd);
         String dataIdentity = evaluationMemoizationEnabled
@@ -138,11 +147,15 @@ public class IwssrService implements DisposableBean {
              i < n && !deadlineReached(localSolutionAdd) && !localSolutionAdd.getRclfeatures().isEmpty();
              i++) {
             localSolutionAdd.setIterationLocalSearch(i);
-            localSolutionAdd = updateSolution(addMovement(
-                    localSolutionAdd, trainingDataset, testingDataset, classifier, dataIdentity));
-            localSolutionReplace = updateSolution(replaceMovement(
-                    localSolutionAdd, trainingDataset, testingDataset, classifier, dataIdentity));
-            lastPublishedBestF1 = publishProgressIfNeeded(
+            try {
+                localSolutionAdd = updateSolution(addMovement(
+                        localSolutionAdd, trainingDataset, testingDataset, classifier, dataIdentity, progress));
+                localSolutionReplace = updateSolution(replaceMovement(
+                        localSolutionAdd, trainingDataset, testingDataset, classifier, dataIdentity, progress));
+            } catch (CancellationException cancelled) {
+                break;
+            }
+            if (!earlyProgressEnabled) lastPublishedBestF1 = publishProgressIfNeeded(
                     updateSolution(localSolutionReplace),
                     i,
                     n,
@@ -168,7 +181,8 @@ public class IwssrService implements DisposableBean {
             Instances trainingDataset,
             Instances testingDataset,
             AbstractClassifier classifier,
-            String dataIdentity
+            String dataIdentity,
+            EarlyProgress progress
     ) throws Exception {
         long startTime = System.nanoTime();
 
@@ -195,6 +209,7 @@ public class IwssrService implements DisposableBean {
         applyScores(solution, scores);
         solution.setRunnigTime((endTime - startTime) / 1_000_000L);
         stampCandidate(solution, "iwssr-add");
+        progress.publish(solution);
 
         logMetrics(solution, collector, outcome);
         return solution;
@@ -205,7 +220,8 @@ public class IwssrService implements DisposableBean {
             Instances trainingDataset,
             Instances testingDataset,
             AbstractClassifier classifier,
-            String dataIdentity
+            String dataIdentity,
+            EarlyProgress progress
     ) throws Exception {
         DataSolution bestReplace = updateSolution(solution);
         int replacementCount = solution.getSolutionFeatures().size();
@@ -216,7 +232,7 @@ public class IwssrService implements DisposableBean {
         if (effectiveNeighborhoodParallelism(replacementCount) == 1) {
             for (int i = 0; i < replacementCount && !deadlineReached(solution); i++) {
                 ReplacementEvaluation replacement = evaluateReplacement(
-                        solution, i, trainingDataset, testingDataset, classifier, dataIdentity);
+                        solution, i, trainingDataset, testingDataset, classifier, dataIdentity, progress);
                 bestReplace = chooseBetterReplacement(bestReplace, replacement);
             }
             return bestReplace;
@@ -231,7 +247,7 @@ public class IwssrService implements DisposableBean {
                     replacementIndex,
                     trainingDataset,
                     testingDataset,
-                    (AbstractClassifier) AbstractClassifier.makeCopy(classifier), dataIdentity));
+                    (AbstractClassifier) AbstractClassifier.makeCopy(classifier), dataIdentity, progress));
         }
 
         List<Future<ReplacementEvaluation>> futures;
@@ -277,7 +293,8 @@ public class IwssrService implements DisposableBean {
             Instances trainingDataset,
             Instances testingDataset,
             AbstractClassifier classifier,
-            String dataIdentity
+            String dataIdentity,
+            EarlyProgress progress
     ) throws Exception {
         if (Thread.currentThread().isInterrupted() || deadlineReached(solution)) {
             throw new CancellationException("replacement evaluation deadline reached");
@@ -297,6 +314,7 @@ public class IwssrService implements DisposableBean {
         applyScores(replaced, outcome.result());
         replaced.setRunnigTime((System.nanoTime() - startTime) / 1_000_000L);
         stampCandidate(replaced, "iwssr-replace-" + replacementIndex);
+        progress.publish(replaced);
 
         logMetrics(replaced, collector, outcome);
         return new ReplacementEvaluation(replacementIndex, replaced, outcome);
@@ -336,11 +354,50 @@ public class IwssrService implements DisposableBean {
                 solution.getSolutionFeatures());
         return evaluationMemoizer().evaluate(
                 key,
-                () -> MachineLearning.evaluateSolution(
+                () -> trainingLimiter().evaluate(solution.getDeadlineEpochMs(),
+                        () -> {
+                            TrainingLimiter limiter = trainingLimiter();
+                            log.info("dls training admission limit={} active={} peakActive={}",
+                                    trainingMaximumConcurrent, limiter.active(), limiter.peak());
+                            return MachineLearning.evaluateSolution(
                         new ArrayList<>(solution.getSolutionFeatures()),
                         training,
                         testing,
-                        classifier));
+                        classifier);
+                        }));
+    }
+
+    private TrainingLimiter trainingLimiter() {
+        TrainingLimiter current = trainingLimiter;
+        if (current != null) return current;
+        synchronized (optimizationLock) {
+            if (trainingLimiter == null) {
+                trainingLimiter = new TrainingLimiter(trainingMaximumConcurrent);
+                log.info("dls runtime options earlyProgress={} trainingLimit={}",
+                        earlyProgressEnabled, trainingMaximumConcurrent);
+            }
+            return trainingLimiter;
+        }
+    }
+
+    /** Per-search high-water mark; publishing never changes ordered search reduction. */
+    private final class EarlyProgress {
+        private double best;
+        EarlyProgress(double initial) { best = initial; }
+
+        synchronized void publish(DataSolution candidate) {
+            if (!earlyProgressEnabled || "off".equalsIgnoreCase(progressMode)
+                    || deadlineReached(candidate) || Thread.currentThread().isInterrupted()
+                    || !Double.isFinite(scoreOf(candidate)) || scoreOf(candidate) <= best) return;
+            DataSolution snapshot = updateSolution(candidate);
+            snapshot.setStage("local_search_progress");
+            // Retain the evaluation completion timestamp and candidate identity.
+            kafkaSolutionsProducer.sendProgress(snapshot);
+            best = scoreOf(candidate);
+            log.info("dls early progress seedId={} candidateId={} f1={} evaluationCompletedUtc={} submittedUtc={}",
+                    snapshot.getSeedId(), snapshot.getCandidateId(), best,
+                    snapshot.getTimestampUtc(), Instant.now());
+        }
     }
 
     static String datasetIdentity(Instances data) throws Exception {
@@ -559,6 +616,12 @@ public class IwssrService implements DisposableBean {
             executor.awaitTermination(10, TimeUnit.SECONDS);
         }
         EvaluationMemoizer memoizer = evaluationMemoizer;
+        TrainingLimiter limiter = trainingLimiter;
+        if (limiter != null) {
+            log.info("dls training budget summary limit={} peakActive={} admissionWaitMs={} active={}",
+                    trainingMaximumConcurrent, limiter.peak(),
+                    limiter.waitingNanos() / 1_000_000L, limiter.active());
+        }
         if (memoizer != null) {
             log.info(
                     "dls evaluation memoization summary search=IWSSR trained={} memoized={} capacityBypasses={} cachedEntries={}",

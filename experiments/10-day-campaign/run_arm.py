@@ -702,6 +702,8 @@ def run_distributed(args: argparse.Namespace) -> int:
             "CAMPAIGN_IWSSR_NEIGHBORHOOD_PARALLELISM": str(
                 args.iwssr_neighborhood_parallelism
             ),
+            "CAMPAIGN_IWSSR_PROGRESS_EARLY_ENABLED": str(args.iwssr_early_progress).lower(),
+            "CAMPAIGN_IWSSR_TRAINING_MAX_CONCURRENT": str(args.iwssr_training_max_concurrent),
         }
     )
     if args.pipeline_workers >= 1:
@@ -904,6 +906,8 @@ def run_distributed(args: argparse.Namespace) -> int:
         result["local_search_unclassified_evaluation_count"] = evaluation_counts["local_search_unclassified"]
         result["iwssr_evaluation_memoization"] = args.iwssr_evaluation_memoization
         result["iwssr_neighborhood_parallelism"] = args.iwssr_neighborhood_parallelism
+        result["iwssr_early_progress"] = args.iwssr_early_progress
+        result["iwssr_training_max_concurrent"] = args.iwssr_training_max_concurrent
         result["iwssr_evaluation_memoization_max_entries"] = args.iwssr_evaluation_memoization_max_entries
         result["candidate_count"] = evaluation_counts["total"]
         result["candidate_count_definition"] = (
@@ -964,6 +968,8 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--iwssr-evaluation-memoization", action="store_true")
     result.add_argument("--iwssr-evaluation-memoization-max-entries", type=int, default=50000)
     result.add_argument("--iwssr-neighborhood-parallelism", type=int, default=1)
+    result.add_argument("--iwssr-early-progress", action="store_true")
+    result.add_argument("--iwssr-training-max-concurrent", type=int, default=0)
     result.add_argument("--use-training-cache", action="store_true")
     result.add_argument("--minimum-improvement", type=float, default=0.0001)
     result.add_argument("--max-accepted-improvements", type=int, default=500)
@@ -995,6 +1001,8 @@ def main() -> int:
         raise SystemExit("--iwssr-evaluation-memoization-max-entries must be positive")
     if args.iwssr_neighborhood_parallelism <= 0:
         raise SystemExit("--iwssr-neighborhood-parallelism must be positive")
+    if args.iwssr_training_max_concurrent < 0:
+        raise SystemExit("--iwssr-training-max-concurrent cannot be negative")
     return run_distributed(args)
 
 

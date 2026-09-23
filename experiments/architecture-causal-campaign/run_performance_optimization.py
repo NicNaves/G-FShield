@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import importlib.util
 import json
 import math
@@ -31,6 +32,16 @@ for workers in (1, 3):
         for memo in (False, True):
             EXPECTED_ARMS[f"distributed-w{workers}-n{neighbors}-m{int(memo)}"] = ("distributed", workers)
 
+V13_ID = "gfshield-performance-2026-v13"
+V13_ARMS = {"monolith": ("monolith", 0)}
+for early in (False, True):
+    for budget in (0, 3):
+        V13_ARMS[f"distributed-e{int(early)}-b{budget}"] = ("distributed", 3)
+
+
+def expected_arms(protocol: dict[str, Any]) -> dict[str, tuple[str, int]]:
+    return V13_ARMS if protocol["campaign_id"] == V13_ID else EXPECTED_ARMS
+
 
 
 def arm_map(protocol: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -41,22 +52,25 @@ def validate_inputs(
     protocol: dict[str, Any], repo_root: Path, tag: str, image_tag: str
 ) -> dict[str, Any]:
     seeds = [int(seed) for seed in protocol["seeds"]]
-    if len(seeds) != 11 or len(seeds) != len(set(seeds)) or min(seeds) < 128:
-        raise RuntimeError("v12 requires 11 unique formal seeds >= 128, separate from pilot seed 127")
+    v13 = protocol["campaign_id"] == V13_ID
+    expected = expected_arms(protocol)
+    seed_count, first_seed = (20, 150) if v13 else (11, 128)
+    if len(seeds) != seed_count or len(seeds) != len(set(seeds)) or min(seeds) < first_seed:
+        raise RuntimeError("invalid independent formal seeds")
     arms = arm_map(protocol)
     observed = {
         key: (str(value["architecture"]), int(value["pipeline_workers"]))
         for key, value in arms.items()
     }
-    if observed != EXPECTED_ARMS:
+    if observed != expected:
         raise RuntimeError(f"unexpected ablation arms: {observed}")
     orders = protocol["order_design"]["orders"]
-    if len(orders) != 9 or any(len(order) != 9 or set(order) != set(EXPECTED_ARMS) for order in orders):
-        raise RuntimeError("order design must contain nine complete arm permutations")
-    for position in range(9):
-        if {order[position] for order in orders} != set(EXPECTED_ARMS):
+    if len(orders) != len(expected) or any(len(order) != len(expected) or set(order) != set(expected) for order in orders):
+        raise RuntimeError("order design must contain complete arm permutations")
+    for position in range(len(expected)):
+        if {order[position] for order in orders} != set(expected):
             raise RuntimeError("each arm must occur once in every Latin-square position")
-    if len(protocol["arms"]) != 9:
+    if len(protocol["arms"]) != len(expected):
         raise RuntimeError("duplicate or missing arm")
     for arm_id, definition in arms.items():
         if arm_id == "monolith":
@@ -66,6 +80,13 @@ def validate_inputs(
             int(definition["neighborhood_parallelism"]),
             definition["memoization"],
         )
+        if v13:
+            early, budget = definition["early_progress"], definition["training_limit"]
+            if (type(early) is not bool or type(budget) is not int or budget not in (0, 3)
+                    or workers != 3 or neighbors != 3 or memo is not False
+                    or arm_id != f"distributed-e{int(early)}-b{budget}"):
+                raise RuntimeError("v13 factors do not match identity")
+            continue
         if not isinstance(memo, bool) or arm_id != f"distributed-w{workers}-n{neighbors}-m{int(memo)}":
             raise RuntimeError("arm factors do not match identity")
     if not 0 < int(protocol["maximum_seconds"]) <= 10 * 24 * 60 * 60:
@@ -192,6 +213,10 @@ def command_for(
     ]
     if definition["memoization"]:
         optimization_flags.append("--iwssr-evaluation-memoization")
+    if protocol["campaign_id"] == V13_ID:
+        optimization_flags += ["--iwssr-training-max-concurrent", str(definition["training_limit"])]
+        if definition["early_progress"]:
+            optimization_flags.append("--iwssr-early-progress")
     return [
         "python3", str(repo_root / "experiments/10-day-campaign/run_arm.py"),
         *common, *optimization_flags,
@@ -271,6 +296,30 @@ def valid_result(
             values = set(re.findall(name + r':\s*[\x22\x27]?([a-z0-9]+)', compose))
             if values != {expected_value}:
                 return False
+        if protocol["campaign_id"] == V13_ID:
+            if (result.get("iwssr_early_progress") is not definition["early_progress"]
+                    or result.get("iwssr_training_max_concurrent") != definition["training_limit"]):
+                return False
+            for name, value in (
+                ("IWSSR_PROGRESS_EARLY_ENABLED", str(definition["early_progress"]).lower()),
+                ("IWSSR_TRAINING_MAX_CONCURRENT", str(definition["training_limit"])),
+            ):
+                if set(re.findall(name + r':\s*[\x22\x27]?([a-z0-9]+)', compose)) != {value}:
+                    return False
+            try:
+                logs = path.with_name("compose.log").read_text(encoding="utf-8")
+            except OSError:
+                return False
+            admissions = re.findall(r"dls training admission limit=(\d+) active=(\d+) peakActive=(\d+)", logs)
+            if not admissions:
+                return False
+            limit = definition["training_limit"]
+            if any(int(row[0]) != limit or (limit and int(row[2]) > limit) for row in admissions):
+                return False
+            runtime_options = set(re.findall(
+                r"dls runtime options earlyProgress=(true|false) trainingLimit=(\d+)", logs))
+            if runtime_options != {(str(definition["early_progress"]).lower(), str(limit))}:
+                return False
     resources = path.with_name("resource-samples.jsonl")
     if not resources.exists() or resources.stat().st_size == 0:
         return False
@@ -343,12 +392,16 @@ def execute(args: argparse.Namespace) -> int:
         state = json.loads(args.state.read_text(encoding="utf-8"))
     else:
         start = base.utc_now()
+        deadline = min(
+            start + timedelta(seconds=protocol["maximum_seconds"]),
+            getattr(args, "shared_deadline", None) or start + timedelta(seconds=protocol["maximum_seconds"]),
+        )
         state = {
             "campaign_id": protocol["campaign_id"],
             "state": "RUNNING",
             "started_utc": base.iso(start),
             "deadline_utc": base.iso(
-                start + timedelta(seconds=protocol["maximum_seconds"])
+                deadline
             ),
             "completed": [],
             "attempts": [],
@@ -357,6 +410,8 @@ def execute(args: argparse.Namespace) -> int:
 
     completed = {(row["seed"], row["arm"]) for row in state["completed"]}
     deadline = datetime.fromisoformat(state["deadline_utc"])
+    if getattr(args, "shared_deadline", None) is not None and deadline > args.shared_deadline:
+        raise RuntimeError("existing formal deadline exceeds pilot campaign deadline")
     definitions = arm_map(protocol)
     for seed, arm_id in schedule(protocol, args.pilot_seed):
         if (seed, arm_id) in completed:
@@ -444,10 +499,12 @@ def execute(args: argparse.Namespace) -> int:
 
 def audit_pilot(path: Path, protocol_path: Path, repo_root: Path, image_tag: str) -> None:
     pilot = json.loads(path.read_text(encoding="utf-8"))
+    source_protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    expected = expected_arms(source_protocol)
     cells = pilot.get("completed", [])
-    if pilot.get("state") != "PILOT_COMPLETED" or len(cells) != 9:
-        raise RuntimeError("complete validated nine-arm pilot required")
-    if {cell["arm"] for cell in cells} != set(EXPECTED_ARMS):
+    if pilot.get("state") != "PILOT_COMPLETED" or len(cells) != len(expected):
+        raise RuntimeError("complete validated pilot required")
+    if {cell["arm"] for cell in cells} != set(expected):
         raise RuntimeError("pilot arms are incomplete")
     frozen = json.loads(path.with_name("frozen-manifest.json").read_text(encoding="utf-8"))
     if frozen["launch_commit"] != base.checked("git", "rev-parse", "HEAD", cwd=repo_root):
@@ -475,6 +532,30 @@ def audit_pilot(path: Path, protocol_path: Path, repo_root: Path, image_tag: str
                 raise RuntimeError(f"pilot artifact changed: {relative}")
 
 
+def execute_chain(args: argparse.Namespace) -> int:
+    """Explicit opt-in: technical pilot gate, then formal, sharing one deadline."""
+    code = execute(args)
+    if code or not getattr(args, "chain_formal", False):
+        return code
+    audit_pilot(args.state, args.protocol, Path(__file__).resolve().parents[2], args.image_tag)
+    state = json.loads(args.state.read_text(encoding="utf-8"))
+    formal = copy.copy(args)
+    formal.pilot_seed = None
+    formal.pilot_state = args.state
+    formal.shared_deadline = datetime.fromisoformat(state["deadline_utc"])
+    formal.state = args.state.parent.parent / "formal" / "state.json"
+    formal.results = formal.state.parent / "results"
+    containers = base.checked("docker", "ps", "--format", "{{.Image}}").splitlines()
+    if any(image.startswith("gfshield-campaign-") for image in containers):
+        raise RuntimeError("pilot left active experimental containers; formal blocked")
+    base.atomic_json(args.state.parent.parent / "schedule.json", {
+        "state": "FORMAL_RELEASED", "pilot_state": str(args.state),
+        "formal_state": str(formal.state), "deadline_utc": state["deadline_utc"],
+        "gate": "technical only; no selection by test F1", "released_utc": base.iso(base.utc_now()),
+    })
+    return execute(formal)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--protocol", type=Path, required=True)
@@ -485,11 +566,19 @@ def main() -> int:
     parser.add_argument("--pilot-seed", type=int)
     parser.add_argument("--previous-state", type=Path, required=True)
     parser.add_argument("--pilot-state", type=Path)
+    parser.add_argument("--chain-formal", action="store_true",
+                        help="v13 only: run formal after successful technical pilot audit")
     parser.add_argument("--pilot-run-timeout-seconds", type=int, default=900)
     parser.add_argument(
         "--pilot-finalization-reserve-seconds", type=int, default=300
     )
     args = parser.parse_args()
+    if args.chain_formal:
+        protocol = json.loads(args.protocol.read_text(encoding="utf-8"))
+        if (protocol["campaign_id"] != V13_ID or args.pilot_seed != 149
+                or args.state.name != "state.json" or args.state.parent.name != "pilot"
+                or args.results.resolve() != (args.state.parent / "results").resolve()):
+            parser.error("chain-formal requires v13 pilot seed 149 and separate pilot/state.json, pilot/results")
     if args.pilot_seed is not None:
         if args.pilot_run_timeout_seconds <= 0:
             parser.error("--pilot-run-timeout-seconds must be positive")
@@ -516,7 +605,7 @@ def main() -> int:
     if any(image.startswith("gfshield-campaign-") for image in containers):
         raise RuntimeError("another experimental container is active")
     with CampaignLock(args.previous_state.parent / "performance-v12.lock"):
-        return execute(args)
+        return execute_chain(args)
 
 
 if __name__ == "__main__":

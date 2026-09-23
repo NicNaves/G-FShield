@@ -11,6 +11,10 @@ import java.io.StringReader;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import br.com.graspfs.ls.iwssr.producer.KafkaSolutionsProducer;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import static org.mockito.Mockito.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -107,6 +111,104 @@ class IwssrOptimizationTest {
             assertNull(ReflectionTestUtils.getField(service, "evaluationMemoizer"));
             assertNull(ReflectionTestUtils.getField(service, "neighborhoodExecutor"));
         } finally {
+            service.destroy();
+        }
+    }
+
+    @Test
+    void earlyProgressAndTrainingLimitsPreserveFullSearchResult() throws Exception {
+        DataSolution expected = null;
+        for (boolean early : List.of(false, true)) {
+            for (int limit : List.of(0, 1, 3)) {
+                var service = service(3, false);
+                var producer = mock(KafkaSolutionsProducer.class);
+                ReflectionTestUtils.setField(service, "earlyProgressEnabled", early);
+                ReflectionTestUtils.setField(service, "trainingMaximumConcurrent", limit);
+                ReflectionTestUtils.setField(service, "progressMode", "improvement");
+                ReflectionTestUtils.setField(service, "kafkaSolutionsProducer", producer);
+                try {
+                    var result = service.incrementalWrapperSequencialSearch(seed(), dataset(), dataset(), new J48());
+                    if (expected == null) expected = result;
+                    assertEquals(expected.getSolutionFeatures(), result.getSolutionFeatures());
+                    assertEquals(expected.getF1Score(), result.getF1Score());
+                    assertEquals(expected.getPrecision(), result.getPrecision());
+                    assertEquals(expected.getRecall(), result.getRecall());
+                    var limiter = (TrainingLimiter) ReflectionTestUtils.getField(service, "trainingLimiter");
+                    if (limit > 0) assertTrue(limiter.peak() <= limit);
+                    verify(producer, atLeastOnce()).sendProgress(any());
+                } finally { service.destroy(); }
+            }
+        }
+    }
+
+    public static class BlockingJ48 extends J48 {
+        static AtomicInteger calls;
+        static CountDownLatch entered;
+        static CountDownLatch release;
+        @Override public void buildClassifier(Instances data) throws Exception {
+            if (calls.incrementAndGet() == 2) {
+                entered.countDown();
+                if (!release.await(10, TimeUnit.SECONDS)) throw new TimeoutException();
+            }
+            super.buildClassifier(data);
+        }
+    }
+
+    @Test
+    void earlyProgressRejectsLateAndDuplicateCandidatesAndCopiesSnapshots() throws Exception {
+        var service = service(1, false);
+        var producer = mock(KafkaSolutionsProducer.class);
+        ReflectionTestUtils.setField(service, "earlyProgressEnabled", true);
+        ReflectionTestUtils.setField(service, "progressMode", "improvement");
+        ReflectionTestUtils.setField(service, "kafkaSolutionsProducer", producer);
+        Class<?> trackerClass = Class.forName(IwssrService.class.getName() + "$EarlyProgress");
+        var constructor = trackerClass.getDeclaredConstructor(IwssrService.class, double.class);
+        constructor.setAccessible(true);
+        Object tracker = constructor.newInstance(service, 0.0);
+        var candidate = seed();
+        candidate.setF1Score(0.8F);
+        candidate.setDeadlineEpochMs(System.currentTimeMillis() - 1);
+        ReflectionTestUtils.invokeMethod(tracker, "publish", candidate);
+        verifyNoInteractions(producer);
+        candidate.setDeadlineEpochMs(null);
+        ReflectionTestUtils.invokeMethod(tracker, "publish", candidate);
+        ReflectionTestUtils.invokeMethod(tracker, "publish", candidate);
+        var capture = org.mockito.ArgumentCaptor.forClass(DataSolution.class);
+        verify(producer, times(1)).sendProgress(capture.capture());
+        candidate.getSolutionFeatures().clear();
+        assertEquals(List.of(1), capture.getValue().getSolutionFeatures());
+        candidate.setF1Score(0.9F);
+        ReflectionTestUtils.setField(service, "progressMode", "off");
+        ReflectionTestUtils.invokeMethod(tracker, "publish", candidate);
+        verifyNoMoreInteractions(producer);
+        service.destroy();
+    }
+
+    @Test
+    void firstImprovementIsPublishedBeforeReplacementCompletes() throws Exception {
+        var service = service(1, false);
+        var producer = mock(KafkaSolutionsProducer.class);
+        ReflectionTestUtils.setField(service, "earlyProgressEnabled", true);
+        ReflectionTestUtils.setField(service, "progressMode", "improvement");
+        ReflectionTestUtils.setField(service, "kafkaSolutionsProducer", producer);
+        BlockingJ48.calls = new AtomicInteger();
+        BlockingJ48.entered = new CountDownLatch(1);
+        BlockingJ48.release = new CountDownLatch(1);
+        var pool = Executors.newSingleThreadExecutor();
+        try {
+            var result = pool.submit(() -> service.incrementalWrapperSequencialSearch(
+                    seed(), dataset(), dataset(), new BlockingJ48()));
+            assertTrue(BlockingJ48.entered.await(10, TimeUnit.SECONDS));
+            assertFalse(result.isDone());
+            verify(producer, atLeastOnce()).sendProgress(argThat(s ->
+                    "local_search_progress".equals(s.getStage())
+                    && s.getCandidateId() != null && s.getTimestampUtc() != null));
+            BlockingJ48.release.countDown();
+            assertNotNull(result.get(10, TimeUnit.SECONDS));
+        } finally {
+            BlockingJ48.release.countDown();
+            pool.shutdownNow();
+            pool.awaitTermination(10, TimeUnit.SECONDS);
             service.destroy();
         }
     }

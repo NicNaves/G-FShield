@@ -1,0 +1,230 @@
+{
+  "schema_version": 1,
+  "campaign_id": "gfshield-performance-2026-v13",
+  "maximum_seconds": 864000,
+  "run_timeout_seconds": 3000,
+  "finalization_reserve_seconds": 300,
+  "startup_timeout_seconds": 300,
+  "graceful_shutdown_seconds": 300,
+  "maximum_attempts_per_cell": 1,
+  "seeds": [
+    150,
+    151,
+    152,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    159,
+    160,
+    161,
+    162,
+    163,
+    164,
+    165,
+    166,
+    167,
+    168,
+    169
+  ],
+  "arms": [
+    {
+      "id": "monolith",
+      "architecture": "monolith",
+      "pipeline_workers": 0,
+      "neighborhood_parallelism": 1,
+      "memoization": false,
+      "early_progress": false,
+      "training_limit": 0
+    },
+    {
+      "id": "distributed-e0-b0",
+      "architecture": "distributed",
+      "pipeline_workers": 3,
+      "neighborhood_parallelism": 3,
+      "memoization": false,
+      "early_progress": false,
+      "training_limit": 0
+    },
+    {
+      "id": "distributed-e0-b3",
+      "architecture": "distributed",
+      "pipeline_workers": 3,
+      "neighborhood_parallelism": 3,
+      "memoization": false,
+      "early_progress": false,
+      "training_limit": 3
+    },
+    {
+      "id": "distributed-e1-b0",
+      "architecture": "distributed",
+      "pipeline_workers": 3,
+      "neighborhood_parallelism": 3,
+      "memoization": false,
+      "early_progress": true,
+      "training_limit": 0
+    },
+    {
+      "id": "distributed-e1-b3",
+      "architecture": "distributed",
+      "pipeline_workers": 3,
+      "neighborhood_parallelism": 3,
+      "memoization": false,
+      "early_progress": true,
+      "training_limit": 3
+    }
+  ],
+  "order_design": {
+    "type": "cyclic Latin square, four complete cycles over 20 seeds",
+    "orders": [
+      [
+        "monolith",
+        "distributed-e0-b0",
+        "distributed-e0-b3",
+        "distributed-e1-b0",
+        "distributed-e1-b3"
+      ],
+      [
+        "distributed-e0-b0",
+        "distributed-e0-b3",
+        "distributed-e1-b0",
+        "distributed-e1-b3",
+        "monolith"
+      ],
+      [
+        "distributed-e0-b3",
+        "distributed-e1-b0",
+        "distributed-e1-b3",
+        "monolith",
+        "distributed-e0-b0"
+      ],
+      [
+        "distributed-e1-b0",
+        "distributed-e1-b3",
+        "monolith",
+        "distributed-e0-b0",
+        "distributed-e0-b3"
+      ],
+      [
+        "distributed-e1-b3",
+        "monolith",
+        "distributed-e0-b0",
+        "distributed-e0-b3",
+        "distributed-e1-b0"
+      ]
+    ],
+    "limitations": "position balanced; not fully carryover balanced"
+  },
+  "measurement_window": {
+    "selection_seconds": 2700,
+    "cold_start_reported_separately": true,
+    "final_evaluation_excluded_from_search_resource_costs": true,
+    "post_deadline_candidates_excluded": true,
+    "origin": "request_submission_after_distributed_service_readiness"
+  },
+  "algorithm": {
+    "feature_selector": "relieff",
+    "relieff_sample_size": 1000,
+    "rcl_cutoff": 30,
+    "initial_subset_size": 5,
+    "controller": "vnd",
+    "enabled_local_searches": [
+      "iwssr"
+    ],
+    "training_dataset_cache": true,
+    "neighborhood_cycles": 100,
+    "local_search_iterations": 100,
+    "minimum_improvement": 0.0001,
+    "maximum_accepted_improvements": 500,
+    "classifier": "Weka J48 3.8.6",
+    "classifier_parameters": {
+      "confidence_factor": 0.25,
+      "minimum_instances_per_leaf": 2,
+      "pruned": true
+    },
+    "selection_metric": "validation_macro_f1",
+    "holdout_policy": "test_once_after_validation_selection"
+  },
+  "resources": {
+    "cpuset": "8-15",
+    "numa_node": "1",
+    "aggregate_cpu_ceiling": 6,
+    "aggregate_memory": "12g",
+    "distributed_component_ceiling_sum": {
+      "rcl": {
+        "cpu": 1,
+        "memory_gib": 3
+      },
+      "iwssr": {
+        "cpu": 3,
+        "memory_gib": 4
+      },
+      "vnd": {
+        "cpu": 0.5,
+        "memory_gib": 1
+      },
+      "verifier": {
+        "cpu": 0.5,
+        "memory_gib": 1
+      },
+      "kafka": {
+        "cpu": 0.75,
+        "memory_gib": 2
+      },
+      "zookeeper": {
+        "cpu": 0.25,
+        "memory_gib": 1
+      }
+    },
+    "factor_changes": [
+      "early publication of completed improving candidates",
+      "process-wide admission limit for actual IWSSR training"
+    ]
+  },
+  "dataset": {
+    "split_manifest": "datasets/campaign/split-manifest.json",
+    "source_sha256": "60ebfcdc9c209e5c760e2bdbf5be75dfe4d931b81442597b0ef32e2f5fe6c1f6",
+    "train_sha256": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
+    "validation_sha256": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a",
+    "test_sha256": "05d393c5881aec032664ef4a84e18337988e819edc74664fe1255757961cfab4"
+  },
+  "hypotheses": {
+    "status": "Prespecified before v13 seed 149 pilot; pilot is a technical gate, not configuration selection.",
+    "quality_threshold_validation_macro_f1": 0.945,
+    "primary": "Two paired per-seed factorial main effects (early publication and training admission limit) on normalized quality-yield AUC, averaged over the other factor.",
+    "primary_test": "Two-sided exact paired sign-flip tests over 20 independent seeds, Holm correction across the two main effects; paired bootstrap 95% confidence intervals with seed 20260923 and 20000 replicates.",
+    "quality_yield_auc": "Integral of cumulative distinct published subsets with validation macro-F1 >= 0.945, divided by the fixed 2700-second selection horizon. Include zero-yield runs.",
+    "interaction": "Early-publication x admission-limit interaction is exploratory, reported regardless of sign.",
+    "architecture_contrast": "Each distributed arm versus sequential monolith is secondary descriptive; no claim versus a parallel monolith.",
+    "quality_guardrail": "One-sided 95% bootstrap lower bound of mean paired held-out F1 difference versus distributed-e0-b0, margin -0.005; nonsignificance is not equivalence.",
+    "holdout_policy": "No tuning or arm selection based on test F1. Test only after validation selection.",
+    "time_to_threshold": "Time until a qualified solution is externally available; failures right-censored at selection deadline. Report evaluation-completion-to-publication-submit separately; Kafka acknowledgement/consumer visibility must not be inferred from submission.",
+    "secondary_family": [
+      "trained evaluations",
+      "unique subsets",
+      "CPU-hours and GiB-hours integrated over timestamp-aligned selection samples, with coverage/gaps reported",
+      "F1 precision recall dimensionality reduction",
+      "cold-start and ready-service latency separately",
+      "admission peak and waiting time"
+    ],
+    "limitations": [
+      "Single host, single frozen dataset split",
+      "No parallel-monolith control in this campaign",
+      "20 seeds; fixed seed-shared split does not measure dataset uncertainty",
+      "Admission limit includes projection, training and validation and is per IWSSR process, not cluster-wide",
+      "Weka training may ignore interruption; supervisor provides hard stop",
+      "No batching/telemetry-removal or algorithm-portfolio changes included",
+      "Application background workload documented in frozen manifest"
+    ]
+  },
+  "automatic_release": {
+    "pilot_seed": 149,
+    "pilot_cells": 5,
+    "formal_cells": 100,
+    "global_limit_includes_pilot": true,
+    "gate": "All five technical results valid, checksums/source/images verified, no surviving experimental containers; no quality-based selection.",
+    "on_failure": "Stop for inspection, do not retry automatically"
+  }
+}
