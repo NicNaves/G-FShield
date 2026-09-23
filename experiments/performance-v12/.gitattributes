@@ -1,0 +1,2 @@
+# Preserve experimental artifact bytes and SHA-256 across Windows/Linux checkouts.
+evidence/** -text

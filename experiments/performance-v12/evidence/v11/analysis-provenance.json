@@ -1,0 +1,7 @@
+{
+  "analysis_scope": "preregistered_pipeline_ablation",
+  "analysis_seed": 20260917,
+  "bootstrap_repetitions": 20000,
+  "permutation_repetitions": 200000,
+  "state_sha256": "535468968128abc1c5e1c1d3a75ee3ea8ba5c9773245ccfdec9fe1880525fa87"
+}

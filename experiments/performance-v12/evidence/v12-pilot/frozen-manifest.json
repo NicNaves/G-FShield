@@ -1,0 +1,350 @@
+{
+  "campaign_tag": "e551db23a6be73542d8284ddf942564f8426b35b",
+  "dataset_hashes": {
+    "test": "05d393c5881aec032664ef4a84e18337988e819edc74664fe1255757961cfab4",
+    "train": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
+    "validation": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a"
+  },
+  "effective_protocol_sha256": "db75d49523acf703ffcf62fa5a8234ed6420dc72f14b97cbaa33f6d427f9ae19",
+  "expected_cells": 9,
+  "frozen_utc": "2026-09-23T01:00:27.691755+00:00",
+  "host": {
+    "concurrent_containers_jsonl": "{\"Command\":\"\\\"/docker-entrypoint.sh nginx -g 'daemon off;'\\\"\",\"CreatedAt\":\"2026-07-03 14:37:25 +0000 UTC\",\"ID\":\"6a910de7adcdf25639eca758ee3365378ca25a1e770340f8126325352f329d28\",\"Image\":\"halow-platform-frontend\",\"Labels\":\"com.docker.compose.container-number=1,com.docker.compose.depends_on=backend:service_started:false,com.docker.compose.project.working_dir=/home/diego/halow-platform/halow-platform,com.docker.compose.replace=b044624ac04196c961a5c923e01e764b3da121e39f6452c5815a3f9d9d78f907,com.docker.compose.version=2.18.1,com.docker.compose.config-hash=11c19bc1a0eea1f8ece7c650da3ee626634ab1d2d4ecdf41c430eea09fb0d336,com.docker.compose.oneoff=False,com.docker.compose.project=halow-platform,com.docker.compose.project.config_files=/home/diego/halow-platform/halow-platform/docker-compose.yml,com.docker.compose.service=frontend,maintainer=NGINX Docker Maintainers \\u003cdocker-maint@nginx.com\\u003e,com.docker.compose.image=sha256:d3c9c589df618cf889f4c36225e19dfcc8f2fe407f87e0e50d8f216159613fdd\",\"LocalVolumes\":\"0\",\"Mounts\":\"\",\"Names\":\"app-frontend\",\"Networks\":\"halow-platform_default\",\"Ports\":\"0.0.0.0:3080-\\u003e80/tcp, :::3080-\\u003e80/tcp\",\"RunningFor\":\"2 months ago\",\"Size\":\"474B (virtual 48.5MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"java -jar app.jar\\\"\",\"CreatedAt\":\"2026-07-03 14:37:24 +0000 UTC\",\"ID\":\"4e25a3febf9027f5437b6909249f114ae5841354fd1ffe4fe10621217703464f\",\"Image\":\"halow-platform-backend\",\"Labels\":\"com.docker.compose.project.config_files=/home/diego/halow-platform/halow-platform/docker-compose.yml,com.docker.compose.service=backend,com.docker.compose.depends_on=db:service_healthy:false,com.docker.compose.container-number=1,com.docker.compose.image=sha256:7bb8c3bdc8ff2121bf0224140ecad62f0d903cb31ea52f453cfc3b7eb43bea08,com.docker.compose.oneoff=False,com.docker.compose.project=halow-platform,com.docker.compose.project.working_dir=/home/diego/halow-platform/halow-platform,com.docker.compose.replace=21ab2018a49fdfca61d3c0e0855f5bf93b864c6fd324f57762af92d62f49b95e,com.docker.compose.version=2.18.1,com.docker.compose.config-hash=a7487af8bc30c7a6747d4e14f904c5158f9b008ee4a120fbdb13b609122649bb\",\"LocalVolumes\":\"0\",\"Mounts\":\"/home/diego/halow-platform/halow-platform/backend-data/tmp,/home/diego/halow-platform/halow-platform/simulator\",\"Names\":\"app-backend\",\"Networks\":\"halow-platform_default\",\"Ports\":\"0.0.0.0:8880-\\u003e8080/tcp, :::8880-\\u003e8080/tcp\",\"RunningFor\":\"2 months ago\",\"Size\":\"371MB (virtual 1.47GB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"docker-entrypoint.sh postgres\\\"\",\"CreatedAt\":\"2026-07-01 15:33:15 +0000 UTC\",\"ID\":\"12b82e6d0938ef7a04bf89b2df05ce4ddd33a5bdc1b5542fe54568467332001a\",\"Image\":\"postgres:16-alpine\",\"Labels\":\"com.docker.compose.container-number=1,com.docker.compose.image=sha256:e684c11a6c7c127c1b7602063cc6a13db0a12b62dfd770d83936c089751d498d,com.docker.compose.project=halow-platform,com.docker.compose.project.config_files=/home/diego/halow-platform/halow-platform/docker-compose.yml,com.docker.compose.project.working_dir=/home/diego/halow-platform/halow-platform,com.docker.compose.service=db,com.docker.compose.config-hash=8813541d8a2cc0decd95b8beadfa41875c2033d6f4aa55f23f49738af5318e70,com.docker.compose.depends_on=,com.docker.compose.oneoff=False,com.docker.compose.version=2.18.1\",\"LocalVolumes\":\"1\",\"Mounts\":\"halow-platform_postgres-data\",\"Names\":\"app-db\",\"Networks\":\"halow-platform_default\",\"Ports\":\"5432/tcp\",\"RunningFor\":\"2 months ago\",\"Size\":\"63B (virtual 294MB)\",\"State\":\"running\",\"Status\":\"Up 12 days (healthy)\"}\n{\"Command\":\"\\\"docker-entrypoint.sh redis-server --save 60 1 --appendonly yes\\\"\",\"CreatedAt\":\"2026-04-06 14:20:06 +0000 UTC\",\"ID\":\"7672b5bbd7db07814882cd3e5fc8870f291422696c21a53bf579ada6861ada37\",\"Image\":\"redis:7-alpine\",\"Labels\":\"com.docker.compose.depends_on=,com.docker.compose.image=sha256:aa189b5a1954929c393585e6dc5717a75b18f75a931df8bdcc00a3d3bd546be6,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/webservice/api/docker-compose.db.yml,/home/idscps/nicolas/G-FShield/webservice/api/docker-compose.db.server.yml,com.docker.compose.config-hash=87197370c65345813ed5e479a961b8ab426c9509952e5f31156ab8120f374e39,com.docker.compose.container-number=1,com.docker.compose.service=g-fshield-redis,com.docker.compose.version=2.18.1,com.docker.compose.project=api,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield/webservice/api\",\"LocalVolumes\":\"1\",\"Mounts\":\"api_g-fshield-webservice-api-redis-data\",\"Names\":\"g-fshield-redis\",\"Networks\":\"api_default\",\"Ports\":\"0.0.0.0:6379-\\u003e6379/tcp, :::6379-\\u003e6379/tcp\",\"RunningFor\":\"5 months ago\",\"Size\":\"0B (virtual 41.4MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"sh -c 'java ${JAVA_OPTS:--XX:+UseContainerSupport -XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -Djava.security.egd=file:/dev/./urandom} -jar /opt/app/app.jar'\\\"\",\"CreatedAt\":\"2026-04-06 14:18:47 +0000 UTC\",\"ID\":\"f8d1cf6d77e76d02d606dddea33de049e0a50a724d12ff0c3cb250b3e3391be5\",\"Image\":\"g-fshield-grasp-fs-dls-vnd\",\"Labels\":\"com.docker.compose.service=grasp-fs-dls-vnd,com.docker.compose.version=2.18.1,org.opencontainers.image.version=24.04,com.docker.compose.container-number=1,com.docker.compose.oneoff=False,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield,com.docker.compose.project=g-fshield,com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/docker-compose.yml,/home/idscps/nicolas/G-FShield/docker-compose.server.yml,org.opencontainers.image.ref.name=ubuntu,com.docker.compose.config-hash=4e15f5a189c6f1b09b8703430485844ea9f521d888ed164d1a0a6f427c29909a,com.docker.compose.depends_on=kafka:service_started:false,com.docker.compose.image=sha256:e6d1bdf30aca828fd0ce245f335c698a0d90cf5ea8604d24634b0a878b004f59\",\"LocalVolumes\":\"2\",\"Mounts\":\"g-fshield_dataset_volume,g-fshield_metrics_volume\",\"Names\":\"g-fshield-grasp-fs-dls-vnd-1\",\"Networks\":\"g-fshield_default\",\"Ports\":\"0.0.0.0:8091-\\u003e8091/tcp, :::8091-\\u003e8091/tcp\",\"RunningFor\":\"5 months ago\",\"Size\":\"32.8kB (virtual 336MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"sh -c 'java ${JAVA_OPTS:--XX:+UseContainerSupport -XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -Djava.security.egd=file:/dev/./urandom} -jar /opt/app/app.jar'\\\"\",\"CreatedAt\":\"2026-04-06 14:18:47 +0000 UTC\",\"ID\":\"08dec1f3b79330e66ada75ddf49b9945c49bdb07a8a98bec0a4a288cdf540adc\",\"Image\":\"g-fshield-grasp-fs-dls-iwr\",\"Labels\":\"com.docker.compose.container-number=1,com.docker.compose.oneoff=False,com.docker.compose.service=grasp-fs-dls-iwr,org.opencontainers.image.ref.name=ubuntu,org.opencontainers.image.version=24.04,com.docker.compose.config-hash=cab0625425a2d2be68246ebcf436556fe245e98e3fb5a0a04b78e89f848eebd0,com.docker.compose.depends_on=kafka:service_started:false,com.docker.compose.image=sha256:7da24a972a88c026e4cc7c995c1b0d9198de73472bd4ef948cc76323d3eaacab,com.docker.compose.project=g-fshield,com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/docker-compose.yml,/home/idscps/nicolas/G-FShield/docker-compose.server.yml,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield,com.docker.compose.version=2.18.1\",\"LocalVolumes\":\"2\",\"Mounts\":\"g-fshield_dataset_volume,g-fshield_metrics_volume\",\"Names\":\"g-fshield-grasp-fs-dls-iwr-1\",\"Networks\":\"g-fshield_default\",\"Ports\":\"0.0.0.0:8084-\\u003e8084/tcp, :::8084-\\u003e8084/tcp\",\"RunningFor\":\"5 months ago\",\"Size\":\"32.8kB (virtual 365MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"sh -c 'java ${JAVA_OPTS:--XX:+UseContainerSupport -XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -Djava.security.egd=file:/dev/./urandom} -jar /opt/app/app.jar'\\\"\",\"CreatedAt\":\"2026-04-06 14:18:47 +0000 UTC\",\"ID\":\"cf6d72bd635993ff16399c66ee85227afa0905eab9ae376cddbb7ea9df63dc11\",\"Image\":\"g-fshield-grasp-fs-rcl-su\",\"Labels\":\"com.docker.compose.service=grasp-fs-rcl-su,com.docker.compose.config-hash=70bdf0551dacafc2ca5bf360825c8953163bc656a1f412fdeac14e968f24be68,com.docker.compose.container-number=1,com.docker.compose.image=sha256:c9a6900e5f3a02ba99bee035d5e64f2a0d1494c80a78288c98e0da1022417bb0,com.docker.compose.oneoff=False,com.docker.compose.project=g-fshield,com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/docker-compose.yml,/home/idscps/nicolas/G-FShield/docker-compose.server.yml,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield,com.docker.compose.version=2.18.1,org.opencontainers.image.ref.name=ubuntu,com.docker.compose.depends_on=kafka:service_started:false,org.opencontainers.image.version=24.04\",\"LocalVolumes\":\"2\",\"Mounts\":\"g-fshield_dataset_volume,g-fshield_metrics_volume\",\"Names\":\"g-fshield-grasp-fs-rcl-su-1\",\"Networks\":\"g-fshield_default\",\"Ports\":\"0.0.0.0:8087-\\u003e8087/tcp, :::8087-\\u003e8087/tcp\",\"RunningFor\":\"5 months ago\",\"Size\":\"32.8kB (virtual 381MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"sh -c 'java ${JAVA_OPTS:--XX:+UseContainerSupport -XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -Djava.security.egd=file:/dev/./urandom} -jar /opt/app/app.jar'\\\"\",\"CreatedAt\":\"2026-04-06 14:18:47 +0000 UTC\",\"ID\":\"725f79ad8a5ccff6b3f42e72fea40b235cdc875367060e1234b8f9a83cabc6e3\",\"Image\":\"g-fshield-grasp-fs-rcl-rf\",\"Labels\":\"com.docker.compose.depends_on=kafka:service_started:false,com.docker.compose.image=sha256:97c85ecec84edfdde56d05476f46d72c3d0f9576d94b9739ab47d4a448b25443,com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/docker-compose.yml,/home/idscps/nicolas/G-FShield/docker-compose.server.yml,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield,com.docker.compose.service=grasp-fs-rcl-rf,com.docker.compose.version=2.18.1,org.opencontainers.image.ref.name=ubuntu,com.docker.compose.config-hash=b5ec948e8005ffdd2e1210668de70867207e51a59c64f96b4f1a8ed5dfe3586f,com.docker.compose.oneoff=False,com.docker.compose.project=g-fshield,org.opencontainers.image.version=24.04,com.docker.compose.container-number=1\",\"LocalVolumes\":\"2\",\"Mounts\":\"g-fshield_dataset_volume,g-fshield_metrics_volume\",\"Names\":\"g-fshield-grasp-fs-rcl-rf-1\",\"Networks\":\"g-fshield_default\",\"Ports\":\"0.0.0.0:8086-\\u003e8086/tcp, :::8086-\\u003e8086/tcp\",\"RunningFor\":\"5 months ago\",\"Size\":\"32.8kB (virtual 383MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"sh -c 'java ${JAVA_OPTS:--XX:+UseContainerSupport -XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -Djava.security.egd=file:/dev/./urandom} -jar /opt/app/app.jar'\\\"\",\"CreatedAt\":\"2026-04-06 14:18:47 +0000 UTC\",\"ID\":\"8c5fa83facc60845f2cab47eccae2a0c242f56aac3ba957196338b4c69f90e9d\",\"Image\":\"g-fshield-grasp-fs-rcl-gr\",\"Labels\":\"com.docker.compose.container-number=1,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/docker-compose.yml,/home/idscps/nicolas/G-FShield/docker-compose.server.yml,com.docker.compose.version=2.18.1,org.opencontainers.image.ref.name=ubuntu,com.docker.compose.service=grasp-fs-rcl-gr,org.opencontainers.image.version=24.04,com.docker.compose.config-hash=816bba53953e813f2d59d24090640883cd08c6984c3b1afd5001e1a9eeaf37f8,com.docker.compose.depends_on=kafka:service_started:false,com.docker.compose.image=sha256:7a7411774f8d07a77102d20e2ec591ba9bea09188b06afe23d17e95341a134f7,com.docker.compose.project=g-fshield,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield\",\"LocalVolumes\":\"2\",\"Mounts\":\"g-fshield_metrics_volume,g-fshield_dataset_volume\",\"Names\":\"g-fshield-grasp-fs-rcl-gr-1\",\"Networks\":\"g-fshield_default\",\"Ports\":\"0.0.0.0:8088-\\u003e8088/tcp, :::8088-\\u003e8088/tcp\",\"RunningFor\":\"5 months ago\",\"Size\":\"32.8kB (virtual 381MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"sh -c 'java ${JAVA_OPTS:--XX:+UseContainerSupport -XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -Djava.security.egd=file:/dev/./urandom} -jar /opt/app/app.jar'\\\"\",\"CreatedAt\":\"2026-04-06 14:18:47 +0000 UTC\",\"ID\":\"2537a652021a5ac923d7973f9a971878be47917f70adbc474538baca3b54304a\",\"Image\":\"g-fshield-grasp-fs.dls.verify\",\"Labels\":\"com.docker.compose.service=grasp-fs.dls.verify,com.docker.compose.version=2.18.1,org.opencontainers.image.ref.name=ubuntu,com.docker.compose.config-hash=7ba07032b6dc9054876eba7b32ea96b3ec2cb386b4167a7526db02d1dbe07529,com.docker.compose.container-number=1,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/docker-compose.yml,/home/idscps/nicolas/G-FShield/docker-compose.server.yml,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield,org.opencontainers.image.version=24.04,com.docker.compose.depends_on=kafka:service_started:false,com.docker.compose.image=sha256:3b77c5d09487950167cdb4d32898491ae6dfbe4e7425257708ac3ddedd3136e3,com.docker.compose.project=g-fshield\",\"LocalVolumes\":\"2\",\"Mounts\":\"g-fshield_dataset_volume,g-fshield_metrics_volume\",\"Names\":\"g-fshield-grasp-fs.dls.verify-1\",\"Networks\":\"g-fshield_default\",\"Ports\":\"0.0.0.0:8085-\\u003e8085/tcp, :::8085-\\u003e8085/tcp\",\"RunningFor\":\"5 months ago\",\"Size\":\"32.8kB (virtual 339MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"sh -c 'java ${JAVA_OPTS:--XX:+UseContainerSupport -XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -Djava.security.egd=file:/dev/./urandom} -jar /opt/app/app.jar'\\\"\",\"CreatedAt\":\"2026-04-06 14:18:47 +0000 UTC\",\"ID\":\"0320cab616fb30837b1e823ec9bbfec55b1e2e7e7adfba3249a7da0fc2995eb4\",\"Image\":\"g-fshield-grasp-fs-rcl-ig\",\"Labels\":\"com.docker.compose.depends_on=kafka:service_started:false,com.docker.compose.oneoff=False,com.docker.compose.project=g-fshield,org.opencontainers.image.version=24.04,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield,com.docker.compose.service=grasp-fs-rcl-ig,com.docker.compose.version=2.18.1,org.opencontainers.image.ref.name=ubuntu,com.docker.compose.config-hash=c72a79e23f8ab036320519005c34cf83b49cfe1c3b5d8edae63d3382184dbb21,com.docker.compose.container-number=1,com.docker.compose.image=sha256:69ece0f08a1f926d28f021a7afbf0f2c97a80389a6f788761dca9df19c794a5a,com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/docker-compose.yml,/home/idscps/nicolas/G-FShield/docker-compose.server.yml\",\"LocalVolumes\":\"2\",\"Mounts\":\"g-fshield_dataset_volume,g-fshield_metrics_volume\",\"Names\":\"g-fshield-grasp-fs-rcl-ig-1\",\"Networks\":\"g-fshield_default\",\"Ports\":\"0.0.0.0:8089-\\u003e8089/tcp, :::8089-\\u003e8089/tcp\",\"RunningFor\":\"5 months ago\",\"Size\":\"32.8kB (virtual 381MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"sh -c 'java ${JAVA_OPTS:--XX:+UseContainerSupport -XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -Djava.security.egd=file:/dev/./urandom} -jar /opt/app/app.jar'\\\"\",\"CreatedAt\":\"2026-04-06 14:18:47 +0000 UTC\",\"ID\":\"1eb248deefe3e185f411679d5fd2acef6c9b26eb64c012f20f53417bcf5941cf\",\"Image\":\"g-fshield-grasp-fs-dls-bf\",\"Labels\":\"com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/docker-compose.yml,/home/idscps/nicolas/G-FShield/docker-compose.server.yml,com.docker.compose.service=grasp-fs-dls-bf,com.docker.compose.version=2.18.1,com.docker.compose.config-hash=63402e3abce820fd26457aaaeb9e0c28f9e80220f2da75627cc297d01041e5d7,com.docker.compose.oneoff=False,com.docker.compose.image=sha256:31e6f9040c81af24dfcfcfcbc6b0e3ca2f0c71b57f832f97ffb12449b59629f7,com.docker.compose.project=g-fshield,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield,org.opencontainers.image.ref.name=ubuntu,org.opencontainers.image.version=24.04,com.docker.compose.container-number=1,com.docker.compose.depends_on=kafka:service_started:false\",\"LocalVolumes\":\"2\",\"Mounts\":\"g-fshield_dataset_volume,g-fshield_metrics_volume\",\"Names\":\"g-fshield-grasp-fs-dls-bf-1\",\"Networks\":\"g-fshield_default\",\"Ports\":\"0.0.0.0:8082-\\u003e8082/tcp, :::8082-\\u003e8082/tcp\",\"RunningFor\":\"5 months ago\",\"Size\":\"32.8kB (virtual 365MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"/bin/sh -c 'java --add-opens java.rmi/javax.rmi.ssl=ALL-UNNAMED  $JAVA_OPTS -jar api.jar'\\\"\",\"CreatedAt\":\"2026-04-06 14:18:47 +0000 UTC\",\"ID\":\"0c0b1f69083edaf8287849f1acbb99e0eed3af8884f3f9dbce1b1fe528e12df5\",\"Image\":\"ghcr.io/kafbat/kafka-ui:v1.4.2\",\"Labels\":\"com.docker.compose.container-number=1,com.docker.compose.depends_on=kafka:service_started:false,com.docker.compose.oneoff=False,com.docker.compose.project=g-fshield,com.docker.compose.service=kafbat-ui,com.docker.compose.version=2.18.1,com.docker.compose.config-hash=6420a27bc64138641deaa1607d88cd67c312c8d399bb0fb5b07b7af7e13bccbc,com.docker.compose.image=sha256:12e1f855cbcdab2b8ceddb60420dcba702fd5d163c93b7ca81292c61decd460a,com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/docker-compose.yml,/home/idscps/nicolas/G-FShield/docker-compose.server.yml,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield\",\"LocalVolumes\":\"0\",\"Mounts\":\"\",\"Names\":\"g-fshield-kafbat-ui-1\",\"Networks\":\"g-fshield_default\",\"Ports\":\"0.0.0.0:8080-\\u003e8080/tcp, :::8080-\\u003e8080/tcp\",\"RunningFor\":\"5 months ago\",\"Size\":\"32.8kB (virtual 354MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"sh -c 'java ${JAVA_OPTS:--XX:+UseContainerSupport -XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -Djava.security.egd=file:/dev/./urandom} -jar /opt/app/app.jar'\\\"\",\"CreatedAt\":\"2026-04-06 14:18:47 +0000 UTC\",\"ID\":\"ee89b4f6302296fbc8fec87fe71e3938599456030e277b0487dde69e6efd8510\",\"Image\":\"g-fshield-grasp-fs-dls-iw\",\"Labels\":\"com.docker.compose.container-number=1,com.docker.compose.depends_on=kafka:service_started:false,com.docker.compose.image=sha256:04a2b423b5c0a1ff7c30b4dddcacef3e27dc175419da959631179a3f82f58dcf,com.docker.compose.project=g-fshield,com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/docker-compose.yml,/home/idscps/nicolas/G-FShield/docker-compose.server.yml,com.docker.compose.config-hash=7cb4de97916f26a2082ad26a5d6ce676fbb84413ce3dd6b8096a2100097a7c82,com.docker.compose.oneoff=False,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield,com.docker.compose.service=grasp-fs-dls-iw,com.docker.compose.version=2.18.1,org.opencontainers.image.ref.name=ubuntu,org.opencontainers.image.version=24.04\",\"LocalVolumes\":\"2\",\"Mounts\":\"g-fshield_dataset_volume,g-fshield_metrics_volume\",\"Names\":\"g-fshield-grasp-fs-dls-iw-1\",\"Networks\":\"g-fshield_default\",\"Ports\":\"0.0.0.0:8083-\\u003e8083/tcp, :::8083-\\u003e8083/tcp\",\"RunningFor\":\"5 months ago\",\"Size\":\"65.5kB (virtual 365MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"sh -c 'java ${JAVA_OPTS:--XX:+UseContainerSupport -XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -Djava.security.egd=file:/dev/./urandom} -jar /opt/app/app.jar'\\\"\",\"CreatedAt\":\"2026-04-06 14:18:47 +0000 UTC\",\"ID\":\"9bec64bfb92d2f034a271e94ef0853a7b8f8ad2c9f62c77e9b16cfb7bce7cf52\",\"Image\":\"g-fshield-grasp-fs-dls-rvnd\",\"Labels\":\"com.docker.compose.project=g-fshield,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield,org.opencontainers.image.ref.name=ubuntu,com.docker.compose.container-number=1,com.docker.compose.depends_on=kafka:service_started:false,com.docker.compose.image=sha256:a027370031dc3c4f7d16134efd1b679d698b2c38f5934f620a9e4346dcabfc29,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/docker-compose.yml,/home/idscps/nicolas/G-FShield/docker-compose.server.yml,com.docker.compose.service=grasp-fs-dls-rvnd,com.docker.compose.version=2.18.1,org.opencontainers.image.version=24.04,com.docker.compose.config-hash=472a47c93b801d669ad0f21c196ffa400af72970f616ead9f21922fba6d0731b\",\"LocalVolumes\":\"2\",\"Mounts\":\"g-fshield_dataset_volume,g-fshield_metrics_volume\",\"Names\":\"g-fshield-grasp-fs-dls-rvnd-1\",\"Networks\":\"g-fshield_default\",\"Ports\":\"0.0.0.0:8090-\\u003e8090/tcp, :::8090-\\u003e8090/tcp\",\"RunningFor\":\"5 months ago\",\"Size\":\"65.5kB (virtual 337MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"/etc/confluent/docker/run\\\"\",\"CreatedAt\":\"2026-04-06 14:18:38 +0000 UTC\",\"ID\":\"399196ed71aede4527b8178700b6bf89e0da567e1aca0725b84d038969380aaa\",\"Image\":\"confluentinc/cp-kafka:7.4.0\",\"Labels\":\"io.k8s.description=The Universal Base Image Minimal is a stripped down image that uses microdnf as a package manager. This base image is freely redistributable, but Red Hat only supports Red Hat technologies through subscriptions for Red Hat products. This image is maintained by Red Hat and updated regularly.,com.docker.compose.image=sha256:8309da75aceda287cd7d7e55ec07ed31d056cb7118e53f41724fd2072484eb77,com.docker.compose.version=2.18.1,com.redhat.component=ubi8-minimal-container,io.openshift.expose-services=,name=cp-kafka,release=7.4.0,vendor=Confluent,com.docker.compose.service=kafka,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield,io.confluent.docker.build.number=5,build-date=2023-05-03T15:02:09,description=Common base image for Confluent's Docker images.,io.confluent.docker.git.id=d0965a30f,summary=Confluent platform Kafka.,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/docker-compose.yml,/home/idscps/nicolas/G-FShield/docker-compose.server.yml,com.redhat.license_terms=https://www.redhat.com/en/about/red-hat-end-user-license-agreements#UBI,distribution-scope=public,vcs-ref=dee8029ddcc7ecbfbebb0905d2b15e134338616c,architecture=x86_64,com.docker.compose.project=g-fshield,maintainer=partner-support@confluent.io,com.docker.compose.config-hash=d725f05ce88db50822e926ff1e68f4cc698af48ce784d0a377f7e33ede1cffb9,io.k8s.display-name=Red Hat Universal Base Image 8 Minimal,io.openshift.tags=minimal rhel8,io.confluent.docker=true,com.docker.compose.depends_on=zookeeper:service_started:false,io.buildah.version=1.27.3,io.confluent.docker.git.repo=confluentinc/kafka-images,url=https://access.redhat.com/containers/#/registry.access.redhat.com/ubi8-minimal/images/8.8-860,vcs-type=git,version=d0965a30f,com.docker.compose.container-number=1\",\"LocalVolumes\":\"2\",\"Mounts\":\"03167fbb1f59f6fa81452c54c1e6bc0facc6ad8aafa52254dfb09a998dca93fe,36b78a9c2f8ae102616ab6d853ac7df605a8b6b7dafbf733688996b156e8950e\",\"Names\":\"g-fshield-kafka-1\",\"Networks\":\"g-fshield_default\",\"Ports\":\"0.0.0.0:9999-\\u003e9999/tcp, :::9999-\\u003e9999/tcp, 0.0.0.0:29092-\\u003e29092/tcp, :::29092-\\u003e29092/tcp, 0.0.0.0:19092-\\u003e9092/tcp, :::19092-\\u003e9092/tcp\",\"RunningFor\":\"5 months ago\",\"Size\":\"113MB (virtual 958MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"/etc/confluent/docker/run\\\"\",\"CreatedAt\":\"2026-04-06 14:18:22 +0000 UTC\",\"ID\":\"bba537bfe695fadc7dfd1c03bfae16d17e3b80c77b0fa3da04dbf6443daca00c\",\"Image\":\"confluentinc/cp-zookeeper:7.4.0\",\"Labels\":\"com.docker.compose.depends_on=,io.buildah.version=1.27.3,com.docker.compose.config-hash=9e4b34d97446a8920c519a7d23f9d0ae75899ec5290c6c7fb004a716a1ad084e,com.redhat.license_terms=https://www.redhat.com/en/about/red-hat-end-user-license-agreements#UBI,vcs-ref=dee8029ddcc7ecbfbebb0905d2b15e134338616c,io.k8s.display-name=Red Hat Universal Base Image 8 Minimal,io.openshift.tags=minimal rhel8,com.docker.compose.container-number=1,com.docker.compose.image=sha256:5567928528f5a8b4b4fba2751b1a4d1a68bc96a6126baf6f14bf9f042e6103f6,com.docker.compose.oneoff=False,com.docker.compose.project=g-fshield,com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/docker-compose.yml,/home/idscps/nicolas/G-FShield/docker-compose.server.yml,io.k8s.description=The Universal Base Image Minimal is a stripped down image that uses microdnf as a package manager. This base image is freely redistributable, but Red Hat only supports Red Hat technologies through subscriptions for Red Hat products. This image is maintained by Red Hat and updated regularly.,release=7.4.0,summary=ZooKeeper is a centralized service for maintaining configuration information, naming, providing distributed synchronization, and providing group services.,url=https://access.redhat.com/containers/#/registry.access.redhat.com/ubi8-minimal/images/8.8-860,io.openshift.expose-services=,maintainer=partner-support@confluent.io,architecture=x86_64,io.confluent.docker.git.repo=confluentinc/kafka-images,name=cp-zookeeper,vendor=Confluent,vcs-type=git,com.docker.compose.version=2.18.1,description=ZooKeeper is a centralized service for maintaining configuration information, naming, providing distributed synchronization, and providing group services.,distribution-scope=public,io.confluent.docker=true,io.confluent.docker.build.number=5,io.confluent.docker.git.id=d0965a30f,build-date=2023-05-03T15:02:09,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield,com.docker.compose.service=zookeeper,com.redhat.component=ubi8-minimal-container,version=d0965a30f\",\"LocalVolumes\":\"3\",\"Mounts\":\"9f70bae8f989b970138b204913f6938da1283d17a9840cd4c3da307e9f6aba2c,2276f6f9f2f8470933ac6e3bf432a9f7edb69f5c5542023e4f601f6d0bf8804c,852c113c7426e81f07fcdf0ac352b3f87edef19518b0c482bdc30a9066d0872d\",\"Names\":\"g-fshield-zookeeper-1\",\"Networks\":\"g-fshield_default\",\"Ports\":\"2888/tcp, 0.0.0.0:2181-\\u003e2181/tcp, :::2181-\\u003e2181/tcp, 3888/tcp\",\"RunningFor\":\"5 months ago\",\"Size\":\"282kB (virtual 845MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}\n{\"Command\":\"\\\"docker-entrypoint.sh postgres\\\"\",\"CreatedAt\":\"2026-03-23 18:51:07 +0000 UTC\",\"ID\":\"3c3de386077448179e3928b2fb3a7779b19e6a5d9859b9d31a9fecfdf1543c38\",\"Image\":\"postgres:14\",\"Labels\":\"com.docker.compose.oneoff=False,com.docker.compose.project=api,com.docker.compose.project.working_dir=/home/idscps/nicolas/G-FShield/webservice/api,com.docker.compose.service=g-fshield-postgres,com.docker.compose.config-hash=367f0c284881179eb6bcd1181c26ab08b68e2eb23969b5e30ed39386fc9eed34,com.docker.compose.container-number=1,com.docker.compose.depends_on=,com.docker.compose.image=sha256:8d6fe29c89aee1a22efb019f9919a259caaad3f0a584a54c9808bfd08c758bbf,com.docker.compose.project.config_files=/home/idscps/nicolas/G-FShield/webservice/api/docker-compose.db.yml,/home/idscps/nicolas/G-FShield/webservice/api/docker-compose.db.server.yml,com.docker.compose.version=2.18.1\",\"LocalVolumes\":\"1\",\"Mounts\":\"api_g-fshield-webservice-api-pg-data\",\"Names\":\"g-fshield-postgres\",\"Networks\":\"api_default\",\"Ports\":\"0.0.0.0:5432-\\u003e5432/tcp, :::5432-\\u003e5432/tcp\",\"RunningFor\":\"6 months ago\",\"Size\":\"63B (virtual 426MB)\",\"State\":\"running\",\"Status\":\"Up 12 days (healthy)\"}\n{\"Command\":\"\\\"/run.sh\\\"\",\"CreatedAt\":\"2021-09-10 14:35:43 +0000 UTC\",\"ID\":\"a777ec4d3d7a21e8aee90e8e372d9f162ab0924838ce0fa87793973a4173dff8\",\"Image\":\"grafana/grafana\",\"Labels\":\"com.docker.compose.service=grafana,com.docker.compose.version=1.29.2,com.docker.compose.config-hash=261e955d4c7cbc5c1b3a4e68282b076ab4a440dc2e25d33c1f72c05f016ecc70,com.docker.compose.container-number=1,com.docker.compose.oneoff=False,com.docker.compose.project=grafana-dashboard,com.docker.compose.project.config_files=docker-compose.yml,com.docker.compose.project.working_dir=/home/anselmo/data-vis/grafana-dashboard\",\"LocalVolumes\":\"1\",\"Mounts\":\"/home/anselmo/data-vis/grafana-dashboard/grafana/provisioning,grafana-dashboard_grafana_data\",\"Names\":\"grafana\",\"Networks\":\"host\",\"Ports\":\"\",\"RunningFor\":\"5 years ago\",\"Size\":\"0B (virtual 213MB)\",\"State\":\"running\",\"Status\":\"Up 12 days\"}",
+    "docker": "24.0.2",
+    "docker_info_json": "{\"ID\":\"b6666f89-3133-4253-9b73-31f8383f6e07\",\"Containers\":75,\"ContainersRunning\":19,\"ContainersPaused\":0,\"ContainersStopped\":56,\"Images\":196,\"Driver\":\"overlay2\",\"DriverStatus\":[[\"Backing Filesystem\",\"extfs\"],[\"Supports d_type\",\"true\"],[\"Using metacopy\",\"false\"],[\"Native Overlay Diff\",\"true\"],[\"userxattr\",\"false\"]],\"Plugins\":{\"Volume\":[\"local\"],\"Network\":[\"bridge\",\"host\",\"ipvlan\",\"macvlan\",\"null\",\"overlay\"],\"Authorization\":null,\"Log\":[\"awslogs\",\"fluentd\",\"gcplogs\",\"gelf\",\"journald\",\"json-file\",\"local\",\"logentries\",\"splunk\",\"syslog\"]},\"MemoryLimit\":true,\"SwapLimit\":false,\"KernelMemoryTCP\":true,\"CpuCfsPeriod\":true,\"CpuCfsQuota\":true,\"CPUShares\":true,\"CPUSet\":true,\"PidsLimit\":true,\"IPv4Forwarding\":true,\"BridgeNfIptables\":true,\"BridgeNfIp6tables\":true,\"Debug\":false,\"NFd\":211,\"OomKillDisable\":true,\"NGoroutines\":188,\"SystemTime\":\"2026-09-23T01:00:27.590512502Z\",\"LoggingDriver\":\"json-file\",\"CgroupDriver\":\"cgroupfs\",\"CgroupVersion\":\"1\",\"NEventsListener\":0,\"KernelVersion\":\"4.15.0-213-generic\",\"OperatingSystem\":\"Ubuntu 18.04.6 LTS\",\"OSVersion\":\"18.04\",\"OSType\":\"linux\",\"Architecture\":\"x86_64\",\"IndexServerAddress\":\"https://index.docker.io/v1/\",\"RegistryConfig\":{\"AllowNondistributableArtifactsCIDRs\":null,\"AllowNondistributableArtifactsHostnames\":null,\"InsecureRegistryCIDRs\":[\"127.0.0.0/8\"],\"IndexConfigs\":{\"docker.io\":{\"Name\":\"docker.io\",\"Mirrors\":[],\"Secure\":true,\"Official\":true}},\"Mirrors\":null},\"NCPU\":32,\"MemTotal\":67447271424,\"GenericResources\":null,\"DockerRootDir\":\"/var/lib/docker\",\"HttpProxy\":\"\",\"HttpsProxy\":\"\",\"NoProxy\":\"\",\"Name\":\"mc2-server-01\",\"Labels\":[],\"ExperimentalBuild\":false,\"ServerVersion\":\"24.0.2\",\"Runtimes\":{\"io.containerd.runc.v2\":{\"path\":\"runc\"},\"runc\":{\"path\":\"runc\"}},\"DefaultRuntime\":\"runc\",\"Swarm\":{\"NodeID\":\"\",\"NodeAddr\":\"\",\"LocalNodeState\":\"inactive\",\"ControlAvailable\":false,\"Error\":\"\",\"RemoteManagers\":null},\"LiveRestoreEnabled\":false,\"Isolation\":\"\",\"InitBinary\":\"docker-init\",\"ContainerdCommit\":{\"ID\":\"3dce8eb055cbb6872793272b4f20ed16117344f8\",\"Expected\":\"3dce8eb055cbb6872793272b4f20ed16117344f8\"},\"RuncCommit\":{\"ID\":\"v1.1.7-0-g860f061\",\"Expected\":\"v1.1.7-0-g860f061\"},\"InitCommit\":{\"ID\":\"de40ad0\",\"Expected\":\"de40ad0\"},\"SecurityOptions\":[\"name=apparmor\",\"name=seccomp,profile=builtin\"],\"Warnings\":[\"WARNING: No swap limit support\"],\"ClientInfo\":{\"Debug\":false,\"Platform\":{\"Name\":\"Docker Engine - Community\"},\"Version\":\"24.0.2\",\"GitCommit\":\"cb74dfc\",\"GoVersion\":\"go1.20.4\",\"Os\":\"linux\",\"Arch\":\"amd64\",\"BuildTime\":\"Thu May 25 21:52:13 2023\",\"Context\":\"default\",\"Plugins\":[{\"SchemaVersion\":\"0.1.0\",\"Vendor\":\"Docker Inc.\",\"Version\":\"v0.10.5\",\"ShortDescription\":\"Docker Buildx\",\"Name\":\"buildx\",\"Path\":\"/usr/libexec/docker/cli-plugins/docker-buildx\"},{\"SchemaVersion\":\"0.1.0\",\"Vendor\":\"Docker Inc.\",\"Version\":\"v2.18.1\",\"ShortDescription\":\"Docker Compose\",\"Name\":\"compose\",\"Path\":\"/usr/libexec/docker/cli-plugins/docker-compose\"},{\"SchemaVersion\":\"0.1.0\",\"Vendor\":\"Docker Inc.\",\"Version\":\"v0.23.0\",\"ShortDescription\":\"Docker Scan\",\"Name\":\"scan\",\"Path\":\"/usr/libexec/docker/cli-plugins/docker-scan\"}],\"Warnings\":null}}",
+    "load_average": [
+      0.95,
+      0.81,
+      0.47
+    ],
+    "logical_cpus": 32,
+    "lscpu_json": "{\n   \"lscpu\": [\n      {\"field\": \"Architecture:\", \"data\": \"x86_64\"},\n      {\"field\": \"CPU op-mode(s):\", \"data\": \"32-bit, 64-bit\"},\n      {\"field\": \"Byte Order:\", \"data\": \"Little Endian\"},\n      {\"field\": \"CPU(s):\", \"data\": \"32\"},\n      {\"field\": \"On-line CPU(s) list:\", \"data\": \"0-31\"},\n      {\"field\": \"Thread(s) per core:\", \"data\": \"2\"},\n      {\"field\": \"Core(s) per socket:\", \"data\": \"8\"},\n      {\"field\": \"Socket(s):\", \"data\": \"2\"},\n      {\"field\": \"NUMA node(s):\", \"data\": \"2\"},\n      {\"field\": \"Vendor ID:\", \"data\": \"GenuineIntel\"},\n      {\"field\": \"CPU family:\", \"data\": \"6\"},\n      {\"field\": \"Model:\", \"data\": \"79\"},\n      {\"field\": \"Model name:\", \"data\": \"Intel(R) Xeon(R) CPU E5-2620 v4 @ 2.10GHz\"},\n      {\"field\": \"Stepping:\", \"data\": \"1\"},\n      {\"field\": \"CPU MHz:\", \"data\": \"1266.972\"},\n      {\"field\": \"CPU max MHz:\", \"data\": \"3000.0000\"},\n      {\"field\": \"CPU min MHz:\", \"data\": \"1200.0000\"},\n      {\"field\": \"BogoMIPS:\", \"data\": \"4190.33\"},\n      {\"field\": \"Virtualization:\", \"data\": \"VT-x\"},\n      {\"field\": \"L1d cache:\", \"data\": \"32K\"},\n      {\"field\": \"L1i cache:\", \"data\": \"32K\"},\n      {\"field\": \"L2 cache:\", \"data\": \"256K\"},\n      {\"field\": \"L3 cache:\", \"data\": \"20480K\"},\n      {\"field\": \"NUMA node0 CPU(s):\", \"data\": \"0-7,16-23\"},\n      {\"field\": \"NUMA node1 CPU(s):\", \"data\": \"8-15,24-31\"},\n      {\"field\": \"Flags:\", \"data\": \"fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 invpcid_single pti intel_ppin ssbd ibrs ibpb stibp tpr_shadow vnmi flexpriority ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm cqm rdt_a rdseed adx smap intel_pt xsaveopt cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts md_clear flush_l1d\"}\n   ]\n}",
+    "memory_info": "MemTotal:       65866476 kB\nMemFree:        28333804 kB\nMemAvailable:   57760516 kB\nBuffers:         2605956 kB\nCached:         25533896 kB\nSwapCached:            0 kB\nActive:         30304496 kB\nInactive:        4020412 kB\nActive(anon):    6199380 kB\nInactive(anon):    15544 kB\nActive(file):   24105116 kB\nInactive(file):  4004868 kB\nUnevictable:           0 kB\nMlocked:               0 kB\nSwapTotal:       8388604 kB\nSwapFree:        8388604 kB\nDirty:               376 kB\nWriteback:             0 kB\nAnonPages:       6185572 kB\nMapped:           428960 kB\nShmem:             29872 kB\nSlab:            2771176 kB\nSReclaimable:    1942556 kB\nSUnreclaim:       828620 kB\nKernelStack:       28672 kB\nPageTables:        34056 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    41321840 kB\nCommitted_AS:   16646900 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:           0 kB\nVmallocChunk:          0 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nCmaTotal:              0 kB\nCmaFree:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nDirectMap4k:     1435408 kB\nDirectMap2M:    40409088 kB\nDirectMap1G:    27262976 kB",
+    "node": "mc2-server-01",
+    "platform": "Linux-4.15.0-213-generic-x86_64-with-glibc2.27",
+    "python": "3.10.12"
+  },
+  "image_tag": "performance-v12-e551db2",
+  "images": {
+    "dls_iwssr": {
+      "image_id": "sha256:bce6770d3241dfca1e0bc9c6ce52de67ca3292ef64b9d62b701fd04fcaefeb81",
+      "reference": "gfshield-campaign-dls-iwssr:performance-v12-e551db2"
+    },
+    "dls_verify": {
+      "image_id": "sha256:d61377d6b48108c817d3e23d92d8caf01218b2a463eb809889a296b49445c6b6",
+      "reference": "gfshield-campaign-dls-verify:performance-v12-e551db2"
+    },
+    "dls_vnd": {
+      "image_id": "sha256:ed8df38f6e8349f499691c025e59dad386023dc725a57a4f85cc01981fa2ac26",
+      "reference": "gfshield-campaign-dls-vnd:performance-v12-e551db2"
+    },
+    "evaluator": {
+      "image_id": "sha256:2ad687c2a575486117045d912036d0ab81d5ee94be206252906e454c87f0b782",
+      "reference": "gfshield-campaign-evaluator:performance-v12-e551db2"
+    },
+    "monolith": {
+      "image_id": "sha256:440f1c1cf0e62244c64dcec3792145ec8833cbf0eb82d0655f65427cbac1a331",
+      "reference": "gfshield-campaign-monolith2:performance-v12-e551db2"
+    },
+    "rcl_relief": {
+      "image_id": "sha256:f3058f4910a907a2762fb73a2e5ea4d4e198778ce495d7363382a25f792df70e",
+      "reference": "gfshield-campaign-rcl-relieff:performance-v12-e551db2"
+    }
+  },
+  "launch_commit": "e551db23a6be73542d8284ddf942564f8426b35b",
+  "protocol": {
+    "algorithm": {
+      "classifier": "Weka J48 3.8.6",
+      "classifier_parameters": {
+        "confidence_factor": 0.25,
+        "minimum_instances_per_leaf": 2,
+        "pruned": true
+      },
+      "controller": "vnd",
+      "enabled_local_searches": [
+        "iwssr"
+      ],
+      "feature_selector": "relieff",
+      "holdout_policy": "test_once_after_validation_selection",
+      "initial_subset_size": 5,
+      "local_search_iterations": 100,
+      "maximum_accepted_improvements": 500,
+      "minimum_improvement": 0.0001,
+      "neighborhood_cycles": 100,
+      "rcl_cutoff": 30,
+      "relieff_sample_size": 1000,
+      "selection_metric": "validation_macro_f1",
+      "training_dataset_cache": true
+    },
+    "arms": [
+      {
+        "architecture": "monolith",
+        "id": "monolith",
+        "memoization": false,
+        "neighborhood_parallelism": 1,
+        "pipeline_workers": 0
+      },
+      {
+        "architecture": "distributed",
+        "id": "distributed-w1-n1-m0",
+        "memoization": false,
+        "neighborhood_parallelism": 1,
+        "pipeline_workers": 1
+      },
+      {
+        "architecture": "distributed",
+        "id": "distributed-w1-n1-m1",
+        "memoization": true,
+        "neighborhood_parallelism": 1,
+        "pipeline_workers": 1
+      },
+      {
+        "architecture": "distributed",
+        "id": "distributed-w1-n3-m0",
+        "memoization": false,
+        "neighborhood_parallelism": 3,
+        "pipeline_workers": 1
+      },
+      {
+        "architecture": "distributed",
+        "id": "distributed-w1-n3-m1",
+        "memoization": true,
+        "neighborhood_parallelism": 3,
+        "pipeline_workers": 1
+      },
+      {
+        "architecture": "distributed",
+        "id": "distributed-w3-n1-m0",
+        "memoization": false,
+        "neighborhood_parallelism": 1,
+        "pipeline_workers": 3
+      },
+      {
+        "architecture": "distributed",
+        "id": "distributed-w3-n1-m1",
+        "memoization": true,
+        "neighborhood_parallelism": 1,
+        "pipeline_workers": 3
+      },
+      {
+        "architecture": "distributed",
+        "id": "distributed-w3-n3-m0",
+        "memoization": false,
+        "neighborhood_parallelism": 3,
+        "pipeline_workers": 3
+      },
+      {
+        "architecture": "distributed",
+        "id": "distributed-w3-n3-m1",
+        "memoization": true,
+        "neighborhood_parallelism": 3,
+        "pipeline_workers": 3
+      }
+    ],
+    "campaign_id": "gfshield-performance-2026-v12",
+    "dataset": {
+      "source_sha256": "60ebfcdc9c209e5c760e2bdbf5be75dfe4d931b81442597b0ef32e2f5fe6c1f6",
+      "split_manifest": "datasets/campaign/split-manifest.json",
+      "test_sha256": "05d393c5881aec032664ef4a84e18337988e819edc74664fe1255757961cfab4",
+      "train_sha256": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
+      "validation_sha256": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a"
+    },
+    "finalization_reserve_seconds": 300,
+    "graceful_shutdown_seconds": 300,
+    "hypotheses": {
+      "architecture_contrast": "distributed-w1-n1-m0 minus monolith (descriptive secondary contrast).",
+      "holdout_policy": "Do not tune code or choose configurations on held-out results. Report all arms regardless of outcome.",
+      "interactions": "Report two-factor and three-factor interactions as exploratory with uncertainty; no selective omission.",
+      "limitations": [
+        "11 seeds limits power",
+        "cyclic order not fully carryover-balanced",
+        "per-evaluation CPU is a shared-process sample, not exclusive worker consumption",
+        "queue waiting/idle/restarts require separate telemetry audit"
+      ],
+      "primary": "Three paired per-seed main effects (pipeline, neighborhood, memoization) on normalized quality-yield AUC; factorial contrasts average over other factors.",
+      "primary_test": "Two-sided paired sign-flip permutation tests, Holm-adjusted across three primary effects; 11 independent seeds.",
+      "quality_guardrail": "Report paired held-out F1 differences and one-sided 95% lower confidence bounds versus distributed-w1-n1-m0; noninferiority margin -0.005. An inconclusive interval is not evidence of equivalence.",
+      "quality_threshold_validation_macro_f1": 0.945,
+      "quality_yield_auc": "Integral of cumulative distinct published subsets with validation macro-F1 >= 0.945, divided by selection horizon.",
+      "secondary_family": [
+        "CPU-hours",
+        "GiB-hours",
+        "time to first qualified subset",
+        "trained and memoized counts",
+        "unique subsets",
+        "held-out F1 precision recall",
+        "dimensionality reduction"
+      ],
+      "status": "Prepared before v12 pilot; formal execution requires pilot validation and frozen source/images.",
+      "time_to_threshold": "Include failures as right-censored at deadline; never average only successful runs."
+    },
+    "maximum_attempts_per_cell": 3,
+    "maximum_seconds": 864000,
+    "measurement_window": {
+      "cold_start_reported_separately": true,
+      "final_evaluation_excluded_from_search_resource_costs": true,
+      "origin": "request_submission_after_distributed_service_readiness",
+      "post_deadline_candidates_excluded": true,
+      "selection_seconds": 600
+    },
+    "order_design": {
+      "orders": [
+        [
+          "monolith",
+          "distributed-w1-n1-m0",
+          "distributed-w1-n1-m1",
+          "distributed-w1-n3-m0",
+          "distributed-w1-n3-m1",
+          "distributed-w3-n1-m0",
+          "distributed-w3-n1-m1",
+          "distributed-w3-n3-m0",
+          "distributed-w3-n3-m1"
+        ],
+        [
+          "distributed-w1-n1-m0",
+          "distributed-w1-n1-m1",
+          "distributed-w1-n3-m0",
+          "distributed-w1-n3-m1",
+          "distributed-w3-n1-m0",
+          "distributed-w3-n1-m1",
+          "distributed-w3-n3-m0",
+          "distributed-w3-n3-m1",
+          "monolith"
+        ],
+        [
+          "distributed-w1-n1-m1",
+          "distributed-w1-n3-m0",
+          "distributed-w1-n3-m1",
+          "distributed-w3-n1-m0",
+          "distributed-w3-n1-m1",
+          "distributed-w3-n3-m0",
+          "distributed-w3-n3-m1",
+          "monolith",
+          "distributed-w1-n1-m0"
+        ],
+        [
+          "distributed-w1-n3-m0",
+          "distributed-w1-n3-m1",
+          "distributed-w3-n1-m0",
+          "distributed-w3-n1-m1",
+          "distributed-w3-n3-m0",
+          "distributed-w3-n3-m1",
+          "monolith",
+          "distributed-w1-n1-m0",
+          "distributed-w1-n1-m1"
+        ],
+        [
+          "distributed-w1-n3-m1",
+          "distributed-w3-n1-m0",
+          "distributed-w3-n1-m1",
+          "distributed-w3-n3-m0",
+          "distributed-w3-n3-m1",
+          "monolith",
+          "distributed-w1-n1-m0",
+          "distributed-w1-n1-m1",
+          "distributed-w1-n3-m0"
+        ],
+        [
+          "distributed-w3-n1-m0",
+          "distributed-w3-n1-m1",
+          "distributed-w3-n3-m0",
+          "distributed-w3-n3-m1",
+          "monolith",
+          "distributed-w1-n1-m0",
+          "distributed-w1-n1-m1",
+          "distributed-w1-n3-m0",
+          "distributed-w1-n3-m1"
+        ],
+        [
+          "distributed-w3-n1-m1",
+          "distributed-w3-n3-m0",
+          "distributed-w3-n3-m1",
+          "monolith",
+          "distributed-w1-n1-m0",
+          "distributed-w1-n1-m1",
+          "distributed-w1-n3-m0",
+          "distributed-w1-n3-m1",
+          "distributed-w3-n1-m0"
+        ],
+        [
+          "distributed-w3-n3-m0",
+          "distributed-w3-n3-m1",
+          "monolith",
+          "distributed-w1-n1-m0",
+          "distributed-w1-n1-m1",
+          "distributed-w1-n3-m0",
+          "distributed-w1-n3-m1",
+          "distributed-w3-n1-m0",
+          "distributed-w3-n1-m1"
+        ],
+        [
+          "distributed-w3-n3-m1",
+          "monolith",
+          "distributed-w1-n1-m0",
+          "distributed-w1-n1-m1",
+          "distributed-w1-n3-m0",
+          "distributed-w1-n3-m1",
+          "distributed-w3-n1-m0",
+          "distributed-w3-n1-m1",
+          "distributed-w3-n3-m0"
+        ]
+      ],
+      "type": "cyclic Latin square; positions balanced for first nine seeds, not carryover-balanced"
+    },
+    "pilot_seed": 127,
+    "resources": {
+      "aggregate_cpu_ceiling": 6,
+      "aggregate_memory": "12g",
+      "cpuset": "8-15",
+      "distributed_component_ceiling_sum": {
+        "iwssr": {
+          "cpu": 3,
+          "memory_gib": 4
+        },
+        "kafka": {
+          "cpu": 0.75,
+          "memory_gib": 2
+        },
+        "rcl": {
+          "cpu": 1,
+          "memory_gib": 3
+        },
+        "verifier": {
+          "cpu": 0.5,
+          "memory_gib": 1
+        },
+        "vnd": {
+          "cpu": 0.5,
+          "memory_gib": 1
+        },
+        "zookeeper": {
+          "cpu": 0.25,
+          "memory_gib": 1
+        }
+      },
+      "factor_changes": [
+        "consumer concurrency and Kafka partitions",
+        "bounded neighborhood executor",
+        "exact run-scoped evaluation memoization"
+      ],
+      "numa_node": "1"
+    },
+    "run_timeout_seconds": 900,
+    "schema_version": 1,
+    "seeds": [
+      128,
+      129,
+      130,
+      131,
+      132,
+      133,
+      134,
+      135,
+      136,
+      137,
+      138
+    ],
+    "startup_timeout_seconds": 300
+  },
+  "source_protocol_sha256": "4ed2d742998851e167d1951b5212a88fef7da7bf9ee27663b10ced1736ccefae"
+}

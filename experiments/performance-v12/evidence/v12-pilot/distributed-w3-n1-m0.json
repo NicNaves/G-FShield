@@ -1,0 +1,404 @@
+{
+  "accepted_improvement_count": 3,
+  "accuracy": 0.861125,
+  "algorithm": "G-FShield",
+  "arm_id": "matched-rf-vnd-iwssr-distributed-w3-n1-m0",
+  "campaign_id": "gfshield-performance-2026-v12",
+  "candidate_count": 69,
+  "candidate_count_definition": "construction evaluations plus completed IWSSR evaluation requests (including memoized requests); use trained stage counts for actual training throughput and deduplicate subsets separately",
+  "candidate_id": "b663145a-ed54-377d-854e-233064f682f0",
+  "candidate_time_ms": 15718,
+  "class_labels": [
+    "grayhole",
+    "normal",
+    "injection",
+    "high_StNum",
+    "random_replay",
+    "masquerade_fake_normal",
+    "inverse_replay",
+    "masquerade_fake_fault",
+    "poisoned_high_rate"
+  ],
+  "classifier": "Weka J48",
+  "classifier_parameters": {
+    "confidence_factor": 0.25,
+    "minimum_instances_per_leaf": 2,
+    "pruned": true
+  },
+  "classifier_time_ms": 6831,
+  "classifier_version": "weka-stable 3.8.6",
+  "cold_start_end_to_end_time_ms": 794758,
+  "construction_evaluation_count": 10,
+  "container_cpu_percent": null,
+  "container_memory_mb": null,
+  "cpu_throttled_seconds": null,
+  "dataset_hash": "60ebfcdc9c209e5c760e2bdbf5be75dfe4d931b81442597b0ef32e2f5fe6c1f6",
+  "dimensionality_reduction_percent": 86.27450980392157,
+  "disk_read_bytes": null,
+  "disk_write_bytes": null,
+  "end_to_end_time_ms": 684557,
+  "error_code": null,
+  "feature_selector": "relieff",
+  "host_cpu_percent": null,
+  "host_memory_mb": null,
+  "iwssr_evaluation_memoization": false,
+  "iwssr_evaluation_memoization_max_entries": 50000,
+  "iwssr_neighborhood_parallelism": 1,
+  "kafka_lag": null,
+  "local_search": "iwssr",
+  "local_search_evaluation_count": 59,
+  "local_search_memoized_evaluation_count": 0,
+  "local_search_trained_evaluation_count": 59,
+  "local_search_unclassified_evaluation_count": 0,
+  "measurement_definition": "request_to_result_after_service_readiness",
+  "measurement_start_offset_ms": 110178,
+  "measurement_started_utc": "2026-09-23T02:05:58.364475+00:00",
+  "monotonic_elapsed_ms": 684557,
+  "neighborhood_controller": "vnd",
+  "network_rx_bytes": null,
+  "network_tx_bytes": null,
+  "parent_id": "58f2b637-a2ff-338e-a2d6-0b90f323ffaa",
+  "process_cpu_percent": null,
+  "process_rss_mb": null,
+  "request_id": "optimization-distributed-w3-n1-m0-s127-34168962dd84-request",
+  "restart_count": null,
+  "run_elapsed_ms": 684557,
+  "run_id": "optimization-distributed-w3-n1-m0-s127-34168962dd84",
+  "seed": 127,
+  "selected_features": [
+    5,
+    21,
+    22,
+    23,
+    36,
+    44,
+    47
+  ],
+  "selection_deadline_utc": "2026-09-23T02:15:58.364475+00:00",
+  "selection_duration_ms": 600000,
+  "selection_elapsed_ms": 600000,
+  "selection_finished_utc": "2026-09-23T02:15:58.368874+00:00",
+  "stage": "end_to_end",
+  "status": "timeout",
+  "stop_reason": "run_timeout",
+  "subset_size": 7,
+  "test_confusion_matrix": [
+    [
+      2902.0,
+      1017.0,
+      0.0,
+      0.0,
+      77.0,
+      1.0,
+      3.0,
+      0.0,
+      0.0
+    ],
+    [
+      1161.0,
+      6299.0,
+      0.0,
+      0.0,
+      531.0,
+      2.0,
+      6.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      13.0,
+      3972.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      14.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      3999.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      48.0,
+      2206.0,
+      2.0,
+      0.0,
+      1421.0,
+      162.0,
+      18.0,
+      3.0,
+      140.0
+    ],
+    [
+      6.0,
+      2.0,
+      0.0,
+      0.0,
+      60.0,
+      3918.0,
+      6.0,
+      8.0,
+      0.0
+    ],
+    [
+      8.0,
+      3.0,
+      0.0,
+      0.0,
+      2.0,
+      8.0,
+      3979.0,
+      0.0,
+      0.0
+    ],
+    [
+      1.0,
+      1.0,
+      5.0,
+      0.0,
+      2.0,
+      4.0,
+      0.0,
+      3987.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      32.0,
+      0.0,
+      0.0,
+      0.0,
+      3968.0
+    ]
+  ],
+  "test_f1_macro": 0.869659014009,
+  "test_f1_weighted": 0.854513419318,
+  "test_hash": "05d393c5881aec032664ef4a84e18337988e819edc74664fe1255757961cfab4",
+  "test_per_class_metrics": {
+    "grayhole": {
+      "f1": 0.714250553778,
+      "precision": 0.703344643723,
+      "recall": 0.7255
+    },
+    "high_StNum": {
+      "f1": 0.999874984373,
+      "precision": 1.0,
+      "recall": 0.99975
+    },
+    "injection": {
+      "f1": 0.995613485399,
+      "precision": 0.998240764011,
+      "recall": 0.993
+    },
+    "inverse_replay": {
+      "f1": 0.993260109835,
+      "precision": 0.991774675972,
+      "recall": 0.99475
+    },
+    "masquerade_fake_fault": {
+      "f1": 0.995132909023,
+      "precision": 0.993521056566,
+      "recall": 0.99675
+    },
+    "masquerade_fake_normal": {
+      "f1": 0.967885375494,
+      "precision": 0.95654296875,
+      "recall": 0.9795
+    },
+    "normal": {
+      "f1": 0.7182030671,
+      "precision": 0.660203332984,
+      "recall": 0.787375
+    },
+    "poisoned_high_rate": {
+      "f1": 0.978786383818,
+      "precision": 0.965920155794,
+      "recall": 0.992
+    },
+    "random_replay": {
+      "f1": 0.463924257264,
+      "precision": 0.668391345249,
+      "recall": 0.35525
+    }
+  },
+  "test_precision_macro": 0.881993215894,
+  "test_recall_macro": 0.869319444444,
+  "timestamp_utc": "2026-09-23T02:17:22.921560+00:00",
+  "train_hash": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
+  "validation_confusion_matrix": [
+    [
+      2841.0,
+      1074.0,
+      0.0,
+      0.0,
+      84.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0
+    ],
+    [
+      1133.0,
+      6319.0,
+      0.0,
+      0.0,
+      540.0,
+      2.0,
+      6.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      11.0,
+      3975.0,
+      0.0,
+      7.0,
+      1.0,
+      0.0,
+      6.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      3995.0,
+      0.0,
+      3.0,
+      0.0,
+      0.0,
+      2.0
+    ],
+    [
+      42.0,
+      2207.0,
+      0.0,
+      0.0,
+      1450.0,
+      156.0,
+      20.0,
+      2.0,
+      123.0
+    ],
+    [
+      7.0,
+      8.0,
+      0.0,
+      0.0,
+      80.0,
+      3897.0,
+      5.0,
+      3.0,
+      0.0
+    ],
+    [
+      4.0,
+      5.0,
+      0.0,
+      0.0,
+      1.0,
+      2.0,
+      3988.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      3.0,
+      3.0,
+      0.0,
+      3991.0,
+      2.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      21.0,
+      0.0,
+      0.0,
+      0.0,
+      3979.0
+    ]
+  ],
+  "validation_f1_macro": 0.87001564055,
+  "validation_f1_weighted": 0.854723109631,
+  "validation_hash": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a",
+  "validation_per_class_metrics": {
+    "grayhole": {
+      "f1": 0.707860969229,
+      "precision": 0.705487956295,
+      "recall": 0.71025
+    },
+    "high_StNum": {
+      "f1": 0.999374609131,
+      "precision": 1.0,
+      "recall": 0.99875
+    },
+    "injection": {
+      "f1": 0.996740220662,
+      "precision": 0.999748490946,
+      "recall": 0.99375
+    },
+    "inverse_replay": {
+      "f1": 0.994513715711,
+      "precision": 0.992039800995,
+      "recall": 0.997
+    },
+    "masquerade_fake_fault": {
+      "f1": 0.997500624844,
+      "precision": 0.997251374313,
+      "recall": 0.99775
+    },
+    "masquerade_fake_normal": {
+      "f1": 0.966517857143,
+      "precision": 0.958907480315,
+      "recall": 0.97425
+    },
+    "normal": {
+      "f1": 0.717090331366,
+      "precision": 0.656587697423,
+      "recall": 0.789875
+    },
+    "poisoned_high_rate": {
+      "f1": 0.981741919566,
+      "precision": 0.969069654165,
+      "recall": 0.99475
+    },
+    "random_replay": {
+      "f1": 0.468800517297,
+      "precision": 0.663311985361,
+      "recall": 0.3625
+    }
+  },
+  "validation_precision_macro": 0.882489382201,
+  "validation_precision_weighted": 0.859899213724,
+  "validation_recall_macro": 0.868763888889,
+  "validation_recall_weighted": 0.860875,
+  "validation_time_to_target_ms": null,
+  "validation_time_to_targets_ms": {
+    "0.78": 203667,
+    "0.88": null,
+    "0.93": null,
+    "0.94": null,
+    "0.945": null,
+    "0.95": null
+  }
+}
