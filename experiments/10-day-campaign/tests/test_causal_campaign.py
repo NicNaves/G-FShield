@@ -98,6 +98,15 @@ class CausalCampaignTest(unittest.TestCase):
             construction, local_search = ANALYSIS.distributed_phase_intervals(path)
             self.assertAlmostEqual(2.0, ANALYSIS.intersection_duration(construction, local_search))
 
+    def test_docker_timestamp_fraction_is_normalized_without_rounding(self):
+        parse = ANALYSIS.docker_timestamp_seconds
+        self.assertEqual(parse("2026-09-03T12:00:10.918101913Z"),
+                         parse("2026-09-03T12:00:10.918101Z"))
+        self.assertEqual(parse("2026-09-03T12:00:10.1Z"),
+                         parse("2026-09-03T12:00:10.100000Z"))
+        self.assertEqual(parse("2026-09-03T12:00:10Z"),
+                         parse("2026-09-03T12:00:10.000000000Z"))
+
     def test_internal_candidate_trace_uses_common_monotonic_clock(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "compose.log"

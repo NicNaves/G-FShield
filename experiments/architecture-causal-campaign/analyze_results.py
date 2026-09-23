@@ -96,6 +96,17 @@ ELAPSED_MS = re.compile(r"elapsedMs=(\d+)")
 SEED_ID = re.compile(r"seedId=([^ ]+)")
 
 
+def docker_timestamp_seconds(value: str) -> float:
+    # Docker emits nanoseconds; datetime stores microseconds. Normalize explicitly
+    # so Python 3.10 and newer versions apply the same truncation (not rounding).
+    normalized = re.sub(
+        r"\.(\d+)(?=Z$)",
+        lambda match: "." + match.group(1)[:6].ljust(6, "0"),
+        value,
+    )
+    return datetime.fromisoformat(normalized.replace("Z", "+00:00")).timestamp()
+
+
 def distributed_phase_intervals(path: Path) -> tuple[list[tuple[float, float]], list[tuple[float, float]]]:
     construction: list[tuple[float, float]] = []
     local_search: list[tuple[float, float]] = []
@@ -108,9 +119,7 @@ def distributed_phase_intervals(path: Path) -> tuple[list[tuple[float, float]], 
             timestamp = DOCKER_TIMESTAMP.search(line)
             if timestamp is None:
                 continue
-            finished = datetime.fromisoformat(
-                timestamp.group(1).replace("Z", "+00:00")
-            ).timestamp()
+            finished = docker_timestamp_seconds(timestamp.group(1))
             elapsed = ELAPSED_MS.search(line)
             if "rcl generation published algorithm=" in line:
                 if elapsed is not None:
