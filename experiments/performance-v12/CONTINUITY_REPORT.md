@@ -1,5 +1,9 @@
 # Continuidade: performance-v12
 
+Nota nesta branch v13: o trabalho atual esta em
+[performance-v13/STATUS.md](../performance-v13/STATUS.md).
+O texto abaixo preserva o estado historico da v12.
+
 Atualizado em 2026-09-23. Branch: experiment/performance-v12.
 Estado mais recente: [auditoria do piloto](STATUS_2026-09-23.md).
 V11 concluida e analisada; piloto v12 concluido, nove celulas validas.
