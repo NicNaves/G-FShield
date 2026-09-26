@@ -144,6 +144,8 @@ def monolith_arguments(args: argparse.Namespace) -> tuple[str, str, list[str]]:
                 "--ls_iters", "100", "--vnd_cycles", "100",
                 "--bitflip_tries", "0", "--relief_sample_size", "1000",
                 "--java_iwssr_semantics", "1", "--java_compatible_rng", "1",
+                "--neighborhood_parallelism", str(getattr(args, "neighborhood_parallelism", 1)),
+                *(["--strict_selection_deadline"] if getattr(args, "strict_selection_deadline", False) else []),
                 "--build_restarts", "2147483647",
                 "--seed", str(args.seed), "--delimiter", ";", "--fsync_logs", "0",
                 "--log_flush_every", "50", "--log_all_iters", "1",
@@ -249,6 +251,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--monolith", choices=("monolith1", "monolith2"), required=True)
     parser.add_argument("--matched-architecture", action="store_true")
+    parser.add_argument("--neighborhood-parallelism", type=int, choices=(1, 3), default=1)
+    parser.add_argument("--strict-selection-deadline", action="store_true")
     parser.add_argument("--campaign-id", required=True)
     parser.add_argument("--arm-id", required=True)
     parser.add_argument("--run-id", required=True)
@@ -268,6 +272,8 @@ def main() -> int:
     args = parser.parse_args()
     if args.matched_architecture and args.monolith != "monolith2":
         parser.error("--matched-architecture requires --monolith monolith2")
+    if (args.neighborhood_parallelism > 1 or args.strict_selection_deadline) and not args.matched_architecture:
+        parser.error("parallel/strict control requires matched architecture")
     signal.signal(signal.SIGTERM, handle_termination)
     return execute(args)
 

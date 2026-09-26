@@ -9,9 +9,11 @@ import json
 import os
 import time
 import random
+import queue
 import select
 import signal
 import subprocess
+import threading
 import uuid
 from datetime import datetime, timezone
 from typing import List, Tuple, Iterable, Optional
@@ -51,6 +53,13 @@ RUN_STARTED_MONOTONIC = None
 VALIDATION_THRESHOLDS = (0.78, 0.88, 0.93, 0.94, 0.945, 0.95)
 VALIDATION_TARGET_TIMES_MS = {}
 OBSERVED_BEST_F1 = float("-inf")
+OBSERVED_BEST_SNAPSHOT = None
+NEIGHBORHOOD_PARALLELISM = 1
+STRICT_SELECTION_DEADLINE = False
+
+
+class SelectionDeadlineReached(Exception):
+    pass
 
 
 class JavaRandom:
@@ -85,16 +94,30 @@ class JavaRandom:
 
 
 class WekaEvaluatorClient:
-    def __init__(self, jar, training, validation, testing, deadline):
+    def __init__(self, jar, training, validation, testing, deadline, workers=1):
         self.deadline = deadline
+        self.workers = workers
+        self.peak_active = 1
         self.process = subprocess.Popen(
             ["java", "-jar", jar, "--train", training,
-             "--validation", validation, "--test", testing],
+             "--validation", validation, "--test", testing, "--workers", str(workers)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             text=True,
             bufsize=1,
         )
+        self.responses = None
+        if workers > 1:
+            # select() cannot see lines already buffered by TextIOWrapper.
+            self.responses = queue.Queue()
+            def read_responses():
+                try:
+                    for line in self.process.stdout:
+                        self.responses.put(line)
+                finally:
+                    self.responses.put(None)
+            self.reader = threading.Thread(target=read_responses, daemon=True)
+            self.reader.start()
         ready = self._readline().strip()
         if ready != "READY\tweka-stable-3.8.6\tJ48-default":
             raise RuntimeError(f"Weka evaluator did not become ready: {ready}")
@@ -106,6 +129,10 @@ class WekaEvaluatorClient:
         )
         self.process.stdin.flush()
         response = self._readline().strip().split("\t")
+        return self.parse_metrics(response)
+
+    @staticmethod
+    def parse_metrics(response):
         if not response or response[0] != "OK":
             raise RuntimeError("Weka evaluation failed: " + "\t".join(response))
         values = [float(value) for value in response[1:8]]
@@ -139,6 +166,38 @@ class WekaEvaluatorClient:
             "confusion_matrix": confusion_matrix,
         }
 
+    def evaluate_many(self, subsets, selection_deadline, completed):
+        """Receive completions immediately; return results in submission/tie order."""
+        budget_ms = max(0, int((selection_deadline - time.monotonic()) * 1000))
+        encoded = ";".join(",".join(map(str, features)) for features in subsets)
+        self.process.stdin.write(f"batch-validation\t{budget_ms}\t{encoded}\n")
+        self.process.stdin.flush()
+        results, seen, errors = [None] * len(subsets), set(), []
+        while True:
+            response = self._readline().strip().split("\t")
+            if response[0] == "BATCH_DONE":
+                self.peak_active = max(self.peak_active, int(response[1]))
+                if self.peak_active > self.workers:
+                    raise RuntimeError("evaluator concurrency bound violated")
+                break
+            if response[0] not in {"BATCH_RESULT", "BATCH_SKIP", "BATCH_ERROR"}:
+                raise RuntimeError("invalid batch response: " + "\t".join(response))
+            position = int(response[1])
+            if not 0 <= position < len(subsets) or position in seen:
+                raise RuntimeError("duplicate or out-of-range batch result")
+            seen.add(position)
+            if response[0] == "BATCH_ERROR":
+                errors.append("\t".join(response[2:]))
+            elif response[0] == "BATCH_RESULT":
+                metrics = self.parse_metrics(response[3:])
+                in_time = response[2] == "true" and time.monotonic() <= selection_deadline
+                completed(subsets[position], metrics, in_time)
+                if in_time:
+                    results[position] = metrics
+        if len(seen) != len(subsets) or errors:
+            raise RuntimeError("incomplete/failed batch: " + "; ".join(errors))
+        return results
+
     def rank_relief(self, sample_size, seed):
         self.process.stdin.write(f"rank-relieff\t{int(sample_size)}\t{int(seed)}\n")
         self.process.stdin.flush()
@@ -151,6 +210,14 @@ class WekaEvaluatorClient:
         remaining = self.deadline - time.monotonic()
         if remaining <= 0:
             raise TimeoutError("Weka evaluator exceeded the absolute run deadline")
+        if self.responses is not None:
+            try:
+                line = self.responses.get(timeout=remaining)
+            except queue.Empty as error:
+                raise TimeoutError("Weka evaluator exceeded the absolute run deadline") from error
+            if line is None:
+                raise RuntimeError("Weka evaluator closed its output")
+            return line
         readable, _, _ = select.select([self.process.stdout], [], [], remaining)
         if not readable:
             raise TimeoutError("Weka evaluator exceeded the absolute run deadline")
@@ -174,7 +241,9 @@ def stop_requested() -> bool:
 
 
 def record_global_best(features, metrics, seed_id):
-    global OBSERVED_BEST_F1
+    global OBSERVED_BEST_F1, OBSERVED_BEST_SNAPSHOT
+    if STRICT_SELECTION_DEADLINE and time.monotonic() > RUN_DEADLINE:
+        return
     if RUN_STARTED_MONOTONIC is None:
         raise RuntimeError("run start was not initialized")
     elapsed_ms = int((time.monotonic() - RUN_STARTED_MONOTONIC) * 1000.0)
@@ -182,6 +251,7 @@ def record_global_best(features, metrics, seed_id):
     if score <= OBSERVED_BEST_F1:
         return
     OBSERVED_BEST_F1 = score
+    OBSERVED_BEST_SNAPSHOT = (list(features), dict(metrics))
     for threshold in VALIDATION_THRESHOLDS:
         if score >= threshold and threshold not in VALIDATION_TARGET_TIMES_MS:
             VALIDATION_TARGET_TIMES_MS[threshold] = elapsed_ms
@@ -383,7 +453,8 @@ def get_classifier(name: str):
 # =============================================================================
 def evaluate_subset(X_train, y_train, X_test, y_test, feat_idx0b: List[int], clf_name: str):
     global CANDIDATE_COUNT
-    CANDIDATE_COUNT += 1
+    if not STRICT_SELECTION_DEADLINE:
+        CANDIDATE_COUNT += 1
     if not feat_idx0b:
         return {"f1": 0.0, "acc": 0.0, "prec": 0.0, "rec": 0.0}
     if clf_name.upper() == "J48":
@@ -391,8 +462,12 @@ def evaluate_subset(X_train, y_train, X_test, y_test, feat_idx0b: List[int], clf
         if WEKA_EVALUATOR is None or split is None:
             raise RuntimeError("Weka evaluator or split mapping is not initialized")
         metrics = WEKA_EVALUATOR.evaluate(split, feat_idx0b)
+        if STRICT_SELECTION_DEADLINE:
+            CANDIDATE_COUNT += 1
         if split == "validation":
             record_candidate_evaluation(feat_idx0b, metrics)
+            if STRICT_SELECTION_DEADLINE and time.monotonic() > RUN_DEADLINE:
+                raise SelectionDeadlineReached()
         return metrics
     Xtr = X_train.iloc[:, feat_idx0b]
     Xte = X_test.iloc[:, feat_idx0b]
@@ -567,7 +642,23 @@ def java_iwssr_once(
 
         cycle_solution = list(add_solution)
         cycle_metrics = add_metrics
+        replacements = [add_solution[:i] + add_solution[i + 1:] for i in range(len(add_solution))]
+        batch_metrics = None
+        if NEIGHBORHOOD_PARALLELISM > 1 and not stop_requested():
+            def on_completed(features, metrics, in_time):
+                global CANDIDATE_COUNT
+                CANDIDATE_COUNT += 1
+                record_candidate_evaluation(features, metrics)
+                if in_time:
+                    record_global_best(features, metrics, seed_id)
+            batch_metrics = WEKA_EVALUATOR.evaluate_many(replacements, RUN_DEADLINE, on_completed)
         for position in range(len(add_solution)):
+            if batch_metrics is not None:
+                candidate_metrics = batch_metrics[position]
+                if candidate_metrics is not None and candidate_metrics["f1"] > cycle_metrics["f1"]:
+                    cycle_solution = replacements[position]
+                    cycle_metrics = candidate_metrics
+                continue
             if stop_requested():
                 break
             candidate_started = time.perf_counter()
@@ -891,6 +982,8 @@ def parse_args():
     p.add_argument("--vnd_cycles", type=int, default=100)
     p.add_argument("--java_iwssr_semantics", type=int, choices=[0, 1], default=0)
     p.add_argument("--java_compatible_rng", type=int, choices=[0, 1], default=0)
+    p.add_argument("--neighborhood_parallelism", type=int, choices=[1, 3], default=1)
+    p.add_argument("--strict_selection_deadline", action="store_true")
 
     p.add_argument("--build_restarts", type=int, default=3000, help="soluções iniciais por FS×Neighborhood")
 
@@ -922,7 +1015,17 @@ def main():
     global RUN_DEADLINE, MAX_ACCEPTED_IMPROVEMENTS, MINIMUM_IMPROVEMENT
     global WEKA_EVALUATOR, WEKA_SPLIT_BY_OBJECT_ID, CONSTRUCTION_RANDOM
     global RUN_STARTED_MONOTONIC, VALIDATION_TARGET_TIMES_MS, OBSERVED_BEST_F1
+    global OBSERVED_BEST_SNAPSHOT, NEIGHBORHOOD_PARALLELISM, STRICT_SELECTION_DEADLINE
     args = parse_args()
+    NEIGHBORHOOD_PARALLELISM = args.neighborhood_parallelism
+    STRICT_SELECTION_DEADLINE = args.strict_selection_deadline
+    if NEIGHBORHOOD_PARALLELISM > 1 and not STRICT_SELECTION_DEADLINE:
+        raise ValueError("parallel control requires strict selection deadline")
+    if (STRICT_SELECTION_DEADLINE or NEIGHBORHOOD_PARALLELISM > 1) and (
+            args.classifier != "J48" or not args.java_iwssr_semantics
+            or args.fs_algos != "relieff" or args.neighborhoods != "vnd" or args.ls_ops != "iwssr"):
+        raise ValueError("strict/parallel control requires matched ReliefF/J48/VND/IWSSR")
+    OBSERVED_BEST_SNAPSHOT = None
     random.seed(args.seed)
     np.random.seed(args.seed)
     run_started = time.monotonic()
@@ -993,7 +1096,8 @@ def main():
     }
     if args.classifier == "J48":
         WEKA_EVALUATOR = WekaEvaluatorClient(
-            args.weka_evaluator_jar, args.train, args.validation, args.test, absolute_deadline
+            args.weka_evaluator_jar, args.train, args.validation, args.test, absolute_deadline,
+            workers=NEIGHBORHOOD_PARALLELISM,
         )
 
     n_feats = X_train.shape[1]
@@ -1134,7 +1238,11 @@ def main():
                                 }
                                 record_global_best(candidate, validation_metrics, seed_id)
 
+                        except SelectionDeadlineReached:
+                            break
                         except Exception as e_build:
+                            if STRICT_SELECTION_DEADLINE:
+                                raise  # Technical errors must fail the cell, not silently retry.
                             log_error(f"FS={fs} NGH={ngh} build #{b} falhou: {e_build}")
                             continue
 
@@ -1145,10 +1253,16 @@ def main():
                     iwssr_writer.flush()
 
             except Exception as e_files:
+                if STRICT_SELECTION_DEADLINE:
+                    raise
                 log_error(f"FS={fs} NGH={ngh}: falha abrindo/escrevendo CSVs: {e_files}")
                 continue
 
     err_fh.close()
+
+    if STRICT_SELECTION_DEADLINE and OBSERVED_BEST_SNAPSHOT is not None:
+        best_solution, best_validation = OBSERVED_BEST_SNAPSHOT
+        best_configuration = {"feature_selector": "relieff", "neighborhood_controller": "vnd", "local_search": ["iwssr"]}
 
     if best_solution is None or best_validation is None or best_configuration is None:
         raise RuntimeError("No candidate completed before the selection deadline")
@@ -1195,6 +1309,10 @@ def main():
         "request_id": f"{args.run_id}-monolith",
         "stage": "end_to_end",
         "algorithm": "GRASP-FS monolith2-graspy",
+        "neighborhood_parallelism": NEIGHBORHOOD_PARALLELISM,
+        "strict_selection_deadline": STRICT_SELECTION_DEADLINE,
+        "evaluation_peak_active": WEKA_EVALUATOR.peak_active if WEKA_EVALUATOR else None,
+        "evaluation_memoization": False,
         "feature_selector": best_configuration["feature_selector"],
         "neighborhood_controller": best_configuration["neighborhood_controller"],
         "local_search": ",".join(best_configuration["local_search"]),

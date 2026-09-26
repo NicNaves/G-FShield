@@ -33,6 +33,9 @@ for workers in (1, 3):
             EXPECTED_ARMS[f"distributed-w{workers}-n{neighbors}-m{int(memo)}"] = ("distributed", workers)
 
 V13_ID = "gfshield-performance-2026-v13"
+V14_ID = "gfshield-performance-2026-v14"
+V14_ARMS = {"monolith": ("monolith", 0), "monolith-n3": ("monolith", 0),
+            "distributed-w1-n3": ("distributed", 1), "distributed-w3-n3": ("distributed", 3)}
 V13_ARMS = {"monolith": ("monolith", 0)}
 for early in (False, True):
     for budget in (0, 3):
@@ -40,6 +43,8 @@ for early in (False, True):
 
 
 def expected_arms(protocol: dict[str, Any]) -> dict[str, tuple[str, int]]:
+    if protocol["campaign_id"] == V14_ID:
+        return V14_ARMS
     return V13_ARMS if protocol["campaign_id"] == V13_ID else EXPECTED_ARMS
 
 
@@ -53,8 +58,9 @@ def validate_inputs(
 ) -> dict[str, Any]:
     seeds = [int(seed) for seed in protocol["seeds"]]
     v13 = protocol["campaign_id"] == V13_ID
+    v14 = protocol["campaign_id"] == V14_ID
     expected = expected_arms(protocol)
-    seed_count, first_seed = (20, 150) if v13 else (11, 128)
+    seed_count, first_seed = (20, 200) if v14 else ((20, 150) if v13 else (11, 128))
     if len(seeds) != seed_count or len(seeds) != len(set(seeds)) or min(seeds) < first_seed:
         raise RuntimeError("invalid independent formal seeds")
     arms = arm_map(protocol)
@@ -73,6 +79,14 @@ def validate_inputs(
     if len(protocol["arms"]) != len(expected):
         raise RuntimeError("duplicate or missing arm")
     for arm_id, definition in arms.items():
+        if v14:
+            n = 1 if arm_id == "monolith" else 3
+            is_mono = definition["architecture"] == "monolith"
+            if (definition["neighborhood_parallelism"] != n or definition["memoization"] is not False
+                    or definition["training_limit"] != n or definition["early_progress"] is not is_mono
+                    or (is_mono and definition.get("strict_selection_deadline") is not True)):
+                raise RuntimeError("v14 control identity mismatch")
+            continue
         if arm_id == "monolith":
             continue
         workers, neighbors, memo = (
@@ -202,10 +216,15 @@ def command_for(
     dataset = protocol["dataset"]
     algorithm = protocol["algorithm"]
     if architecture == "monolith":
+        control_flags = []
+        if protocol["campaign_id"] == V14_ID:
+            control_flags = ["--neighborhood-parallelism", str(definition["neighborhood_parallelism"]),
+                             "--strict-selection-deadline"]
         return [
             "python3", str(repo_root / "experiments/10-day-campaign/run_monolith.py"),
             "--monolith", "monolith2", "--matched-architecture", *common,
             "--dataset-hash", dataset["source_sha256"],
+            *control_flags,
         ]
     optimization_flags = [
         "--iwssr-neighborhood-parallelism", str(definition["neighborhood_parallelism"]),
@@ -213,7 +232,7 @@ def command_for(
     ]
     if definition["memoization"]:
         optimization_flags.append("--iwssr-evaluation-memoization")
-    if protocol["campaign_id"] == V13_ID:
+    if protocol["campaign_id"] in {V13_ID, V14_ID}:
         optimization_flags += ["--iwssr-training-max-concurrent", str(definition["training_limit"])]
         if definition["early_progress"]:
             optimization_flags.append("--iwssr-early-progress")
@@ -266,7 +285,24 @@ def valid_result(
     }
     if any(result.get(key) != value for key, value in expected.items()):
         return False
-    if arm_id != "monolith":
+    if arm_map(protocol)[arm_id]["architecture"] == "monolith" and protocol["campaign_id"] == V14_ID:
+        limit = arm_map(protocol)[arm_id]["neighborhood_parallelism"]
+        peak = result.get("evaluation_peak_active")
+        if (result.get("neighborhood_parallelism") != limit
+                or result.get("strict_selection_deadline") is not True
+                or result.get("evaluation_memoization") is not False
+                or type(peak) is not int or not 1 <= peak <= limit
+                or (limit == 3 and peak <= 1)):
+            return False
+        try:
+            trace = [json.loads(line) for line in path.with_name("best-solution-trace.jsonl").read_text().splitlines() if line]
+            if not trace or any(row["monotonic_elapsed_ms"] > protocol["measurement_window"]["selection_seconds"] * 1000 for row in trace):
+                return False
+            if abs(result["validation_f1_macro"] - max(row["validation_f1_macro"] for row in trace)) > 1e-10:
+                return False
+        except (OSError, KeyError, ValueError):
+            return False
+    if arm_map(protocol)[arm_id]["architecture"] == "distributed":
         counters = [result.get(name) for name in (
             "local_search_trained_evaluation_count", "local_search_memoized_evaluation_count",
             "local_search_unclassified_evaluation_count", "local_search_evaluation_count",
@@ -296,7 +332,7 @@ def valid_result(
             values = set(re.findall(name + r':\s*[\x22\x27]?([a-z0-9]+)', compose))
             if values != {expected_value}:
                 return False
-        if protocol["campaign_id"] == V13_ID:
+        if protocol["campaign_id"] in {V13_ID, V14_ID}:
             if (result.get("iwssr_early_progress") is not definition["early_progress"]
                     or result.get("iwssr_training_max_concurrent") != definition["training_limit"]):
                 return False
@@ -597,6 +633,11 @@ def main() -> int:
         if args.pilot_state is None:
             parser.error("formal execution requires --pilot-state")
         audit_pilot(args.pilot_state, args.protocol, Path(__file__).resolve().parents[2], args.image_tag)
+        protocol = json.loads(args.protocol.read_text(encoding="utf-8"))
+        if protocol["campaign_id"] == V14_ID:
+            # A separate formal invocation must not restart the global ten-day clock.
+            pilot = json.loads(args.pilot_state.read_text(encoding="utf-8"))
+            args.shared_deadline = datetime.fromisoformat(pilot["deadline_utc"])
     sys_path = str(Path(__file__).resolve().parents[1] / "10-day-campaign")
     import sys
     sys.path.insert(0, sys_path)

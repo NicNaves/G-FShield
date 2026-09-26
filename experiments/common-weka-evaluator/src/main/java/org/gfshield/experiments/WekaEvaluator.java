@@ -12,6 +12,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import weka.attributeSelection.ReliefFAttributeEval;
 import weka.classifiers.Evaluation;
@@ -34,15 +38,68 @@ public final class WekaEvaluator {
 
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
         PrintWriter output = new PrintWriter(System.out, true);
+        int workers = Integer.parseInt(paths.getOrDefault("workers", "1"));
+        if (workers < 1 || workers > 3) throw new IllegalArgumentException("workers must be 1..3");
+        ExecutorService pool = Executors.newFixedThreadPool(workers);
+        AtomicInteger active = new AtomicInteger();
+        AtomicInteger peak = new AtomicInteger();
         output.println("READY\tweka-stable-3.8.6\tJ48-default");
 
         String line;
+        try {
         while ((line = input.readLine()) != null) {
             if (line.equals("QUIT")) {
                 return;
             }
             try {
                 String[] fields = line.split("\\t", -1);
+                if (fields.length == 3 && fields[0].equals("batch-validation")) {
+                    long budgetMs = Long.parseLong(fields[1]);
+                    if (budgetMs < 0 || budgetMs > 864000000L) {
+                        throw new IllegalArgumentException("invalid batch time budget");
+                    }
+                    List<int[]> subsets = new ArrayList<>();
+                    for (String encoded : fields[2].split(";", -1)) {
+                        int[] subset = Arrays.stream(encoded.split(",")).mapToInt(Integer::parseInt).toArray();
+                        if (subset.length == 0 || Arrays.stream(subset).anyMatch(f -> f < 0 || f >= training.classIndex())) {
+                            throw new IllegalArgumentException("invalid batch subset");
+                        }
+                        subsets.add(subset);
+                    }
+                    if (subsets.size() > training.classIndex()) throw new IllegalArgumentException("batch too large");
+                    long deadline = System.nanoTime() + budgetMs * 1000000L;
+                    List<Future<?>> futures = new ArrayList<>();
+                    for (int index = 0; index < subsets.size(); index++) {
+                        final int position = index;
+                        futures.add(pool.submit(() -> {
+                            if (System.nanoTime() >= deadline) {
+                                synchronized (output) { output.println("BATCH_SKIP\t" + position); }
+                                return;
+                            }
+                            int current = active.incrementAndGet();
+                            peak.accumulateAndGet(current, Math::max);
+                            long started = System.nanoTime();
+                            try {
+                                // Each call creates its own projections, classifier and Evaluation.
+                                Metrics metrics = evaluate(training, evaluationSets.get("validation"), subsets.get(position));
+                                long finished = System.nanoTime();
+                                synchronized (output) {
+                                    output.println("BATCH_RESULT\t" + position + "\t" + (finished <= deadline)
+                                            + "\t" + formatMetrics(metrics, (finished - started) / 1000000L));
+                                }
+                            } catch (Exception error) {
+                                synchronized (output) {
+                                    output.println("BATCH_ERROR\t" + position + "\t"
+                                            + error.toString().replace('\t', ' ').replace('\n', ' '));
+                                }
+                            } finally { active.decrementAndGet(); }
+                        }));
+                    }
+                    // Drain actual work before reading another command (especially the holdout).
+                    for (Future<?> future : futures) future.get();
+                    output.println("BATCH_DONE\t" + peak.get());
+                    continue;
+                }
                 if (fields.length == 3 && fields[0].equals("rank-relieff")) {
                     int sampleSize = Integer.parseInt(fields[1]);
                     int seed = Integer.parseInt(fields[2]);
@@ -70,21 +127,21 @@ public final class WekaEvaluator {
                 long started = System.nanoTime();
                 Metrics metrics = evaluate(training, evaluationSets.get(fields[0]), features);
                 long elapsedMs = (System.nanoTime() - started) / 1_000_000L;
-                output.printf(
-                        Locale.ROOT,
-                        "OK\t%.12f\t%.12f\t%.12f\t%.12f\t%.12f\t%.12f\t%.12f\t%d\t%s\t%s\t%s%n",
-                        metrics.f1Macro, metrics.f1Weighted,
-                        metrics.precisionMacro, metrics.precisionWeighted,
-                        metrics.recallMacro, metrics.recallWeighted,
-                        metrics.accuracy, elapsedMs,
-                        encodeLabels(metrics.classLabels),
-                        encodeRows(metrics.perClass),
-                        encodeRows(metrics.confusionMatrix));
+                output.println(formatMetrics(metrics, elapsedMs));
             } catch (Exception error) {
                 String message = error.getMessage() == null ? error.getClass().getName() : error.getMessage();
                 output.println("ERROR\t" + message.replace('\t', ' ').replace('\n', ' '));
             }
         }
+        } finally { pool.shutdownNow(); }
+    }
+
+    private static String formatMetrics(Metrics metrics, long elapsedMs) {
+        return String.format(Locale.ROOT,
+                "OK\t%.12f\t%.12f\t%.12f\t%.12f\t%.12f\t%.12f\t%.12f\t%d\t%s\t%s\t%s",
+                metrics.f1Macro, metrics.f1Weighted, metrics.precisionMacro, metrics.precisionWeighted,
+                metrics.recallMacro, metrics.recallWeighted, metrics.accuracy, elapsedMs,
+                encodeLabels(metrics.classLabels), encodeRows(metrics.perClass), encodeRows(metrics.confusionMatrix));
     }
 
     private static Map<String, String> parseArguments(String[] args) {

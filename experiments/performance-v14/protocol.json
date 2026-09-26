@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "campaign_id": "gfshield-performance-2026-v14",
+  "maximum_seconds": 864000,
+  "run_timeout_seconds": 3000,
+  "finalization_reserve_seconds": 300,
+  "startup_timeout_seconds": 300,
+  "graceful_shutdown_seconds": 300,
+  "maximum_attempts_per_cell": 1,
+  "seeds": [
+    200,
+    201,
+    202,
+    203,
+    204,
+    205,
+    206,
+    207,
+    208,
+    209,
+    210,
+    211,
+    212,
+    213,
+    214,
+    215,
+    216,
+    217,
+    218,
+    219
+  ],
+  "arms": [
+    {
+      "id": "monolith",
+      "architecture": "monolith",
+      "pipeline_workers": 0,
+      "neighborhood_parallelism": 1,
+      "memoization": false,
+      "early_progress": true,
+      "training_limit": 1,
+      "strict_selection_deadline": true
+    },
+    {
+      "id": "monolith-n3",
+      "architecture": "monolith",
+      "pipeline_workers": 0,
+      "neighborhood_parallelism": 3,
+      "memoization": false,
+      "early_progress": true,
+      "training_limit": 3,
+      "strict_selection_deadline": true
+    },
+    {
+      "id": "distributed-w1-n3",
+      "architecture": "distributed",
+      "pipeline_workers": 1,
+      "neighborhood_parallelism": 3,
+      "memoization": false,
+      "early_progress": false,
+      "training_limit": 3
+    },
+    {
+      "id": "distributed-w3-n3",
+      "architecture": "distributed",
+      "pipeline_workers": 3,
+      "neighborhood_parallelism": 3,
+      "memoization": false,
+      "early_progress": false,
+      "training_limit": 3
+    }
+  ],
+  "order_design": {
+    "type": "cyclic Latin square, five cycles over 20 seeds",
+    "orders": [
+      [
+        "monolith",
+        "monolith-n3",
+        "distributed-w1-n3",
+        "distributed-w3-n3"
+      ],
+      [
+        "monolith-n3",
+        "distributed-w1-n3",
+        "distributed-w3-n3",
+        "monolith"
+      ],
+      [
+        "distributed-w1-n3",
+        "distributed-w3-n3",
+        "monolith",
+        "monolith-n3"
+      ],
+      [
+        "distributed-w3-n3",
+        "monolith",
+        "monolith-n3",
+        "distributed-w1-n3"
+      ]
+    ],
+    "limitations": "position balanced, not fully carryover balanced"
+  },
+  "measurement_window": {
+    "selection_seconds": 2700,
+    "cold_start_reported_separately": true,
+    "final_evaluation_excluded_from_search_resource_costs": true,
+    "post_deadline_candidates_excluded": true,
+    "origin": "monolith application start (includes data/JVM initialization); distributed request after readiness; report this asymmetry and cold-start separately; no end-to-end latency equivalence claim"
+  },
+  "algorithm": {
+    "feature_selector": "relieff",
+    "relieff_sample_size": 1000,
+    "rcl_cutoff": 30,
+    "initial_subset_size": 5,
+    "controller": "vnd",
+    "enabled_local_searches": [
+      "iwssr"
+    ],
+    "training_dataset_cache": true,
+    "neighborhood_cycles": 100,
+    "local_search_iterations": 100,
+    "minimum_improvement": 0.0001,
+    "maximum_accepted_improvements": 500,
+    "classifier": "Weka J48 3.8.6",
+    "classifier_parameters": {
+      "confidence_factor": 0.25,
+      "minimum_instances_per_leaf": 2,
+      "pruned": true
+    },
+    "selection_metric": "validation_macro_f1",
+    "holdout_policy": "test_once_after_validation_selection"
+  },
+  "resources": {
+    "cpuset": "8-15",
+    "numa_node": "1",
+    "aggregate_cpu_ceiling": 6,
+    "aggregate_memory": "12g",
+    "distributed_component_ceiling_sum": {
+      "rcl": {
+        "cpu": 1,
+        "memory_gib": 3
+      },
+      "iwssr": {
+        "cpu": 3,
+        "memory_gib": 4
+      },
+      "vnd": {
+        "cpu": 0.5,
+        "memory_gib": 1
+      },
+      "verifier": {
+        "cpu": 0.5,
+        "memory_gib": 1
+      },
+      "kafka": {
+        "cpu": 0.75,
+        "memory_gib": 2
+      },
+      "zookeeper": {
+        "cpu": 0.25,
+        "memory_gib": 1
+      }
+    },
+    "factor_changes": [
+      "sequential versus parallel replacement evaluation inside one monolith Java process",
+      "distributed pipeline 1 versus 3 with fixed neighborhood parallelism 3 and IWSSR admission cap 3"
+    ]
+  },
+  "dataset": {
+    "split_manifest": "datasets/campaign/split-manifest.json",
+    "source_sha256": "60ebfcdc9c209e5c760e2bdbf5be75dfe4d931b81442597b0ef32e2f5fe6c1f6",
+    "train_sha256": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
+    "validation_sha256": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a",
+    "test_sha256": "05d393c5881aec032664ef4a84e18337988e819edc74664fe1255757961cfab4"
+  },
+  "hypotheses": {
+    "status": "Prespecified before v14 seed 199 technical pilot. New controls motivated by v13; no confirmatory reuse of v13 outcomes.",
+    "primary": "Completed trained validation evaluations / 2700 s; exclude post-deadline completions and holdout. Two paired contrasts: monolith-n3 minus monolith; distributed-w1-n3 minus monolith-n3.",
+    "primary_test": "Two-sided exact paired sign-flip tests over 20 seeds, Holm across two primary contrasts. Paired percentile bootstrap 95% CI, 20000 replicates, seed 20260926.",
+    "quality_threshold_validation_macro_f1": 0.945,
+    "quality_guardrail": "Individual one-sided 95% bootstrap lower bound, mean paired held-out macro-F1 difference, margin -0.005. Monolith-n3 vs monolith; each distributed vs monolith-n3. No simultaneous guarantee.",
+    "secondary_family": [
+      "unique trained subsets and qualified distinct subsets",
+      "published quality-yield AUC, descriptive due to publication policy differences",
+      "distributed-w3-n3 versus distributed-w1-n3 pipeline contrast",
+      "CPU-hours and GiB-hours with coverage, CPU cost per trained evaluation",
+      "macro-F1, precision, recall, subset size, dimensionality reduction",
+      "late and rejected work, actual concurrency peak, initialization and end-to-end time"
+    ],
+    "holdout_policy": "Test once after validation selection. No tuning, exclusion or arm choice based on test performance.",
+    "technical_gate": "All artifacts valid, actual parallel peak >1 and <=3 for monolith-n3, same classifier outputs on synthetic fixed subsets, ordered ties preserved, no late final selection, no surviving containers. Low quality is not failure.",
+    "limitations": [
+      "Single host and frozen split, search seeds do not replicate datasets",
+      "Monolithic neighborhood parallelism does not overlap construction with local search",
+      "No pipeline-parallel monolith in this stage: distributed w3 contrast cannot isolate distribution from pipeline scheduling",
+      "Monolithic controller uses Python and embedded Java evaluator; distributed uses Spring/Kafka, with different overhead and component CPU partitions",
+      "Monolith initialization inside selection versus distributed service readiness outside selection is an explicit timing asymmetry",
+      "Publication events and Kafka consumer endpoints differ; no inference of lower client latency from these alone",
+      "New controls do not retroactively validate a universal architectural superiority claim"
+    ]
+  },
+  "automatic_release": {
+    "pilot_seed": 199,
+    "pilot_cells": 4,
+    "formal_cells": 80,
+    "global_limit_includes_pilot": true,
+    "enabled": false,
+    "gate": "Manual audit after technical pilot; no automatic formal release for v14",
+    "on_failure": "Stop; no automatic retries and no selecting by holdout"
+  }
+}
