@@ -1,10 +1,15 @@
 # Continuidade e agendamento - performance v13
 
-Atualizado em 23/09/2026, aproximadamente 01:50 de Brasilia.
+Atualizado em 26/09/2026: campanha e analise offline CONCLUIDAS.
+Formal: 100/100 execucoes, 20 sementes por braco, finalizada as 10:31:20 de Brasilia.
+Piloto: 5/5 concluidas. Nenhum experimento adicional iniciado nesta analise.
+Relatorio atual: [ANALISE_RESULTADOS.md](ANALISE_RESULTADOS.md).
+Dados derivados: [evidence/analysis-20260926](evidence/analysis-20260926/REPORT.md).
 Branch publicada: experiment/performance-v13.
 Worktree local: C:/Users/Rider V/Downloads/G-FShield/.worktrees/performance-v12
 (o nome da pasta e historico; a branch atual e v13).
-Nao modificar o checkout congelado do servidor enquanto a sequencia estiver ativa.
+Preservar o checkout de execucao congelado e os artefatos brutos.
+Analise executada em checkout separado G-FShield-analysis-v13, commit b2fc64a.
 
 ## Implementado nesta rodada
 
@@ -50,24 +55,26 @@ Commit enviado ao GitHub antes do inicio.
 
 Checkout dedicado: /home/idscps/nicolas/G-FShield-performance-v13.
 Artefatos: /home/idscps/nicolas/experiment-artifacts/performance-v13.
-Sessao tmux persistente: gfshield-v13-chain.
+Sessao tmux usada: gfshield-v13-chain; encerrada ao concluir a campanha.
 Tag de imagens: performance-v13-5ad942c.
 Imagem IWSSR:
 sha256:405fc5ae342a954cffaa31c98f11305763bae10e37722bcc3ccd6655a1640f3b.
 
 O build das seis imagens terminou. Piloto iniciado em
 2026-09-23T04:47:13.217133+00:00 (23/09, 01:47:13 de Brasilia).
-Ultima consulta: RUNNING, primeiro braco monolito da semente 149,
-conteiner gfs10d-optimization-monolith-s149-ca656a62e339 ativo.
-Isso NAO significa que as cinco celulas piloto ja foram aprovadas.
+O piloto foi aprovado e liberou a formal, agora CAMPAIGN_COMPLETED.
+Fim formal: 2026-09-26T13:31:20.019078+00:00, 100 tentativas e 100 concluidas.
+Foram verificados os 1.220 hashes dos artefatos; todos conferem.
+SHA-256 do estado formal:
+b502b622e8533dd2c70e11cd657d692566f042b4ff6c741e9da1fc7c7b8449b4.
+Nao restaram conteineres experimentais nem sessao tmux da campanha na auditoria final.
 
 Manifesto congelado do piloto:
 8beb8af878e80ae3cdcee3b462902b76fd79844af971dee42840fd1fc2fa1393 (SHA-256).
 Ele inclui commit, protocolo efetivo, hashes dos dados e IDs das imagens.
 
-A formal esta PROGRAMADA pela opcao --chain-formal, mas ainda NAO INICIADA.
-Ela so sera liberada se as cinco celulas e seus hashes/flags/telemetria passarem
-pela auditoria e nenhum conteiner experimental sobreviver ao piloto.
+A formal foi liberada pela opcao --chain-formal apos as cinco celulas e seus
+hashes/flags/telemetria passarem pela auditoria, sem conteiner experimental sobrevivente.
 A verificacao nao escolhe configuracoes por F1; resultados desfavoraveis sao mantidos.
 O teto global termina em 2026-10-03T04:47:13.217133+00:00, incluindo piloto.
 Nao ha tentativas automaticas adicionais para uma celula tecnicamente invalida.
@@ -100,7 +107,18 @@ Nao iniciar outra campanha, rebuildar imagens com a mesma tag ou atualizar o
 checkout congelado. Uma retomada deve preservar os caminhos e prazo originais.
 Atualizacoes posteriores de documentacao no Git nao devem ser puxadas no servidor.
 
-## Limites e proximos passos
+## Analise concluida e proximos passos
+
+Analisador fatorial e integracao temporal implementados e executados em 26/09.
+93 testes Python locais aprovados; no Linux 93 executados, um skip, zero falhas.
+Resultados: efeito do limite 3 positivo (p Holm=0,01171875), publicacao antecipada
+nao confirmada (p Holm=0,1640625). Nao inferioridade de F1 sustentada individualmente
+para os tres bracos modificados versus e0-b0. Frente ao monolito, maior vazao
+observada mas tambem maior CPU/RAM; sem prova de superioridade geral.
+Cobertura minima da integracao: 97,96% (limite de lacuna 120 s), ou 90,52%
+na sensibilidade de 60 s. Relatorio detalha limitacoes e todos os bracos.
+
+Checklist anterior, agora atendido nos itens 1-5; item 6 ainda pendente:
 
 1. Auditar o piloto e acompanhar a liberacao automatica/estado da formal.
 2. Concluir o analisador offline fatorial com dois efeitos principais, interacao,

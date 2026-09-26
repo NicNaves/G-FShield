@@ -48,8 +48,17 @@ keeps the original deadline, and does not relaunch completed cells.
 The protocol freezes two factorial main effects and their multiplicity correction.
 Do not reuse v11's four-arm statistical conclusions. CPU/RAM must be integrated
 from resource samples within the correct window, reporting missing coverage.
-The v13 offline factorial/resource analyzer remains to be completed; no performance
-claim is authorized by passing unit tests or the technical pilot.
+The campaign and offline factorial/resource analysis completed on 2026-09-26.
+See [the results and interpretation](ANALISE_RESULTADOS.md) and
+[generated evidence](evidence/analysis-20260926/REPORT.md).
+The training-admission main effect was positive (Holm p=0.01171875); the early
+publication main effect was not confirmed. Distributed throughput was higher
+than the sequential monolith, with substantially greater CPU and memory cost.
+This is not evidence of universal architectural superiority.
+
+Analyzer: `experiments/architecture-causal-campaign/analyze_performance_v13.py`.
+It verifies all 1,220 artifact checksums and emits run-level metrics, contrasts,
+provenance and a Markdown report without changing raw data. It requires NumPy.
 
 Changes to algorithms, projections/telemetry cost, multi-fidelity training,
 multi-host execution, failures and a parallel-monolith baseline are NOT included.

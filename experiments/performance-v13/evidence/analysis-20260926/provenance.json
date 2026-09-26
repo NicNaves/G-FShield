@@ -1,0 +1,243 @@
+{
+  "execution_commit": "5ad942cd22360231d4d2a9e968ad91c1bc9b9a19",
+  "state_sha256": "b502b622e8533dd2c70e11cd657d692566f042b4ff6c741e9da1fc7c7b8449b4",
+  "frozen_manifest_sha256": "303aaff2e6e8e15d995858f3ff1216a59bc0a75134bc17bd445dcca528550a4e",
+  "analyzer_sha256": "e49a8751ad1f0b11cecbcc6eea265aa98eda1d8cadf83409eeaa8279adf24737",
+  "protocol": {
+    "algorithm": {
+      "classifier": "Weka J48 3.8.6",
+      "classifier_parameters": {
+        "confidence_factor": 0.25,
+        "minimum_instances_per_leaf": 2,
+        "pruned": true
+      },
+      "controller": "vnd",
+      "enabled_local_searches": [
+        "iwssr"
+      ],
+      "feature_selector": "relieff",
+      "holdout_policy": "test_once_after_validation_selection",
+      "initial_subset_size": 5,
+      "local_search_iterations": 100,
+      "maximum_accepted_improvements": 500,
+      "minimum_improvement": 0.0001,
+      "neighborhood_cycles": 100,
+      "rcl_cutoff": 30,
+      "relieff_sample_size": 1000,
+      "selection_metric": "validation_macro_f1",
+      "training_dataset_cache": true
+    },
+    "arms": [
+      {
+        "architecture": "monolith",
+        "early_progress": false,
+        "id": "monolith",
+        "memoization": false,
+        "neighborhood_parallelism": 1,
+        "pipeline_workers": 0,
+        "training_limit": 0
+      },
+      {
+        "architecture": "distributed",
+        "early_progress": false,
+        "id": "distributed-e0-b0",
+        "memoization": false,
+        "neighborhood_parallelism": 3,
+        "pipeline_workers": 3,
+        "training_limit": 0
+      },
+      {
+        "architecture": "distributed",
+        "early_progress": false,
+        "id": "distributed-e0-b3",
+        "memoization": false,
+        "neighborhood_parallelism": 3,
+        "pipeline_workers": 3,
+        "training_limit": 3
+      },
+      {
+        "architecture": "distributed",
+        "early_progress": true,
+        "id": "distributed-e1-b0",
+        "memoization": false,
+        "neighborhood_parallelism": 3,
+        "pipeline_workers": 3,
+        "training_limit": 0
+      },
+      {
+        "architecture": "distributed",
+        "early_progress": true,
+        "id": "distributed-e1-b3",
+        "memoization": false,
+        "neighborhood_parallelism": 3,
+        "pipeline_workers": 3,
+        "training_limit": 3
+      }
+    ],
+    "automatic_release": {
+      "formal_cells": 100,
+      "gate": "All five technical results valid, checksums/source/images verified, no surviving experimental containers; no quality-based selection.",
+      "global_limit_includes_pilot": true,
+      "on_failure": "Stop for inspection, do not retry automatically",
+      "pilot_cells": 5,
+      "pilot_seed": 149
+    },
+    "campaign_id": "gfshield-performance-2026-v13",
+    "dataset": {
+      "source_sha256": "60ebfcdc9c209e5c760e2bdbf5be75dfe4d931b81442597b0ef32e2f5fe6c1f6",
+      "split_manifest": "datasets/campaign/split-manifest.json",
+      "test_sha256": "05d393c5881aec032664ef4a84e18337988e819edc74664fe1255757961cfab4",
+      "train_sha256": "5876bf5570b7f71d7bc4eb51ebb1792f6e7357c7010cce78248a121420a870af",
+      "validation_sha256": "c44a00ca554c63e8134e01e1e5a2b2c1c167e4bcd02cd6e318d3d602a5f1031a"
+    },
+    "finalization_reserve_seconds": 300,
+    "graceful_shutdown_seconds": 300,
+    "hypotheses": {
+      "architecture_contrast": "Each distributed arm versus sequential monolith is secondary descriptive; no claim versus a parallel monolith.",
+      "holdout_policy": "No tuning or arm selection based on test F1. Test only after validation selection.",
+      "interaction": "Early-publication x admission-limit interaction is exploratory, reported regardless of sign.",
+      "limitations": [
+        "Single host, single frozen dataset split",
+        "No parallel-monolith control in this campaign",
+        "20 seeds; fixed seed-shared split does not measure dataset uncertainty",
+        "Admission limit includes projection, training and validation and is per IWSSR process, not cluster-wide",
+        "Weka training may ignore interruption; supervisor provides hard stop",
+        "No batching/telemetry-removal or algorithm-portfolio changes included",
+        "Application background workload documented in frozen manifest"
+      ],
+      "primary": "Two paired per-seed factorial main effects (early publication and training admission limit) on normalized quality-yield AUC, averaged over the other factor.",
+      "primary_test": "Two-sided exact paired sign-flip tests over 20 independent seeds, Holm correction across the two main effects; paired bootstrap 95% confidence intervals with seed 20260923 and 20000 replicates.",
+      "quality_guardrail": "One-sided 95% bootstrap lower bound of mean paired held-out F1 difference versus distributed-e0-b0, margin -0.005; nonsignificance is not equivalence.",
+      "quality_threshold_validation_macro_f1": 0.945,
+      "quality_yield_auc": "Integral of cumulative distinct published subsets with validation macro-F1 >= 0.945, divided by the fixed 2700-second selection horizon. Include zero-yield runs.",
+      "secondary_family": [
+        "trained evaluations",
+        "unique subsets",
+        "CPU-hours and GiB-hours integrated over timestamp-aligned selection samples, with coverage/gaps reported",
+        "F1 precision recall dimensionality reduction",
+        "cold-start and ready-service latency separately",
+        "admission peak and waiting time"
+      ],
+      "status": "Prespecified before v13 seed 149 pilot; pilot is a technical gate, not configuration selection.",
+      "time_to_threshold": "Time until a qualified solution is externally available; failures right-censored at selection deadline. Report evaluation-completion-to-publication-submit separately; Kafka acknowledgement/consumer visibility must not be inferred from submission."
+    },
+    "maximum_attempts_per_cell": 1,
+    "maximum_seconds": 864000,
+    "measurement_window": {
+      "cold_start_reported_separately": true,
+      "final_evaluation_excluded_from_search_resource_costs": true,
+      "origin": "request_submission_after_distributed_service_readiness",
+      "post_deadline_candidates_excluded": true,
+      "selection_seconds": 2700
+    },
+    "order_design": {
+      "limitations": "position balanced; not fully carryover balanced",
+      "orders": [
+        [
+          "monolith",
+          "distributed-e0-b0",
+          "distributed-e0-b3",
+          "distributed-e1-b0",
+          "distributed-e1-b3"
+        ],
+        [
+          "distributed-e0-b0",
+          "distributed-e0-b3",
+          "distributed-e1-b0",
+          "distributed-e1-b3",
+          "monolith"
+        ],
+        [
+          "distributed-e0-b3",
+          "distributed-e1-b0",
+          "distributed-e1-b3",
+          "monolith",
+          "distributed-e0-b0"
+        ],
+        [
+          "distributed-e1-b0",
+          "distributed-e1-b3",
+          "monolith",
+          "distributed-e0-b0",
+          "distributed-e0-b3"
+        ],
+        [
+          "distributed-e1-b3",
+          "monolith",
+          "distributed-e0-b0",
+          "distributed-e0-b3",
+          "distributed-e1-b0"
+        ]
+      ],
+      "type": "cyclic Latin square, four complete cycles over 20 seeds"
+    },
+    "pilot_seed": null,
+    "resources": {
+      "aggregate_cpu_ceiling": 6,
+      "aggregate_memory": "12g",
+      "cpuset": "8-15",
+      "distributed_component_ceiling_sum": {
+        "iwssr": {
+          "cpu": 3,
+          "memory_gib": 4
+        },
+        "kafka": {
+          "cpu": 0.75,
+          "memory_gib": 2
+        },
+        "rcl": {
+          "cpu": 1,
+          "memory_gib": 3
+        },
+        "verifier": {
+          "cpu": 0.5,
+          "memory_gib": 1
+        },
+        "vnd": {
+          "cpu": 0.5,
+          "memory_gib": 1
+        },
+        "zookeeper": {
+          "cpu": 0.25,
+          "memory_gib": 1
+        }
+      },
+      "factor_changes": [
+        "early publication of completed improving candidates",
+        "process-wide admission limit for actual IWSSR training"
+      ],
+      "numa_node": "1"
+    },
+    "run_timeout_seconds": 3000,
+    "schema_version": 1,
+    "seeds": [
+      150,
+      151,
+      152,
+      153,
+      154,
+      155,
+      156,
+      157,
+      158,
+      159,
+      160,
+      161,
+      162,
+      163,
+      164,
+      165,
+      166,
+      167,
+      168,
+      169
+    ],
+    "startup_timeout_seconds": 300
+  },
+  "python": "3.10.12",
+  "numpy": "2.2.6",
+  "artifact_checksums_verified": 1220,
+  "analysis_seed": 20260923,
+  "bootstrap_repetitions": 20000,
+  "primary_p_method": "exact two-sided sign flips, Holm across two main effects"
+}

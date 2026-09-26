@@ -1,0 +1,2 @@
+# Preserve the exact bytes/hashes copied from the Linux analysis output.
+evidence/** -text
