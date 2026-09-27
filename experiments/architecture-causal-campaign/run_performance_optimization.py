@@ -53,6 +53,16 @@ def arm_map(protocol: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {str(row["id"]): row for row in protocol["arms"]}
 
 
+def inherited_deadline(path: Path, campaign_id: str) -> datetime:
+    state = json.loads(path.read_text(encoding="utf-8"))
+    if state.get("campaign_id") != campaign_id:
+        raise RuntimeError("deadline parent belongs to another campaign")
+    deadline = datetime.fromisoformat(state["deadline_utc"])
+    if deadline.tzinfo is None:
+        raise RuntimeError("deadline parent must contain an explicit UTC offset")
+    return deadline
+
+
 def validate_inputs(
     protocol: dict[str, Any], repo_root: Path, tag: str, image_tag: str
 ) -> dict[str, Any]:
@@ -412,6 +422,12 @@ def execute(args: argparse.Namespace) -> int:
         }
     )
     frozen_path = args.state.with_name("frozen-manifest.json")
+    if getattr(args, "deadline_state", None) is not None:
+        frozen["deadline_parent"] = {
+            "state": str(args.deadline_state.resolve()),
+            "sha256": base.sha256_file(args.deadline_state),
+            "deadline_utc": base.iso(args.shared_deadline),
+        }
     if frozen_path.exists():
         previous = json.loads(frozen_path.read_text(encoding="utf-8"))
         if (
@@ -608,6 +624,8 @@ def main() -> int:
     parser.add_argument("--pilot-seed", type=int)
     parser.add_argument("--previous-state", type=Path, required=True)
     parser.add_argument("--pilot-state", type=Path)
+    parser.add_argument("--deadline-state", type=Path,
+                        help="inherit original global deadline after an audited technical restart")
     parser.add_argument("--chain-formal", action="store_true",
                         help="v13 only: run formal after successful technical pilot audit")
     parser.add_argument("--pilot-run-timeout-seconds", type=int, default=900)
@@ -615,6 +633,9 @@ def main() -> int:
         "--pilot-finalization-reserve-seconds", type=int, default=300
     )
     args = parser.parse_args()
+    if args.deadline_state is not None:
+        protocol = json.loads(args.protocol.read_text(encoding="utf-8"))
+        args.shared_deadline = inherited_deadline(args.deadline_state, protocol["campaign_id"])
     if args.chain_formal:
         protocol = json.loads(args.protocol.read_text(encoding="utf-8"))
         if (protocol["campaign_id"] != V13_ID or args.pilot_seed != 149
@@ -643,7 +664,8 @@ def main() -> int:
         if protocol["campaign_id"] == V14_ID:
             # A separate formal invocation must not restart the global ten-day clock.
             pilot = json.loads(args.pilot_state.read_text(encoding="utf-8"))
-            args.shared_deadline = datetime.fromisoformat(pilot["deadline_utc"])
+            pilot_deadline = datetime.fromisoformat(pilot["deadline_utc"])
+            args.shared_deadline = min(getattr(args, "shared_deadline", pilot_deadline), pilot_deadline)
     sys_path = str(Path(__file__).resolve().parents[1] / "10-day-campaign")
     import sys
     sys.path.insert(0, sys_path)

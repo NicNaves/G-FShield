@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import time
+import tempfile
 from datetime import datetime, timezone
 import unittest
 from pathlib import Path
@@ -115,6 +116,15 @@ class ParallelMonolithTest(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('v14_runner_test', REPO / 'experiments/architecture-causal-campaign/run_performance_optimization.py')
         runner = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(runner)
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary) / 'state.json'
+            parent.write_text(json.dumps({'campaign_id': 'v14', 'deadline_utc': '2026-10-07T00:26:32+00:00'}))
+            self.assertEqual(datetime(2026, 10, 7, 0, 26, 32, tzinfo=timezone.utc), runner.inherited_deadline(parent, 'v14'))
+            with self.assertRaises(RuntimeError):
+                runner.inherited_deadline(parent, 'other')
+            parent.write_text(json.dumps({'campaign_id': 'v14', 'deadline_utc': '2026-10-07T00:26:32'}))
+            with self.assertRaises(RuntimeError):
+                runner.inherited_deadline(parent, 'v14')
         protocol = json.loads((REPO / 'experiments/performance-v14/protocol.json').read_text())
         self.assertEqual(80, len(runner.schedule(protocol)))
         for arm in protocol['arms']:
