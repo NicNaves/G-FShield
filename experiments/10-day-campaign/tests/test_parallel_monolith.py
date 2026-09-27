@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import time
+from datetime import datetime, timezone
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -81,6 +82,24 @@ class ParallelMonolithTest(unittest.TestCase):
                 'train', 'validation', 'seed', False, {'f1': .4}))
         self.assertEqual(results[0], results[1])
         self.assertEqual([1], results[0][0])  # First removal wins the equal-F1 tie, not completion order.
+
+    def test_strict_global_snapshot_rejects_late_and_copies_features(self):
+        clock = SimpleNamespace(monotonic=lambda: 10)
+        namespace = {'time': clock, 'STRICT_SELECTION_DEADLINE': True, 'RUN_DEADLINE': 20,
+                     'RUN_STARTED_MONOTONIC': 0, 'OBSERVED_BEST_F1': float('-inf'),
+                     'OBSERVED_BEST_SNAPSHOT': None, 'VALIDATION_THRESHOLDS': (.945,),
+                     'VALIDATION_TARGET_TIMES_MS': {}, 'CANDIDATE_COUNT': 1, 'ACCEPTED_IMPROVEMENTS': 0,
+                     'datetime': datetime, 'timezone': timezone, 'json': json,
+                     'os': SimpleNamespace(fsync=lambda *a: None), 'open': mock.mock_open()}
+        exec(declarations('record_global_best'), namespace)
+        features = [0, 1]
+        namespace['record_global_best'](features, {'f1': .9, 'prec': .9, 'rec': .9, 'acc': .9}, 'seed')
+        features.append(2)
+        self.assertEqual([0, 1], namespace['OBSERVED_BEST_SNAPSHOT'][0])
+        clock.monotonic = lambda: 21
+        namespace['record_global_best']([2], {'f1': .99, 'prec': .99, 'rec': .99, 'acc': .99}, 'seed')
+        self.assertEqual(.9, namespace['OBSERVED_BEST_F1'])
+        self.assertEqual({}, namespace['VALIDATION_TARGET_TIMES_MS'])
 
     def test_protocol_has_balanced_fresh_80_cells_and_no_auto_release(self):
         protocol = json.loads((REPO / 'experiments/performance-v14/protocol.json').read_text())

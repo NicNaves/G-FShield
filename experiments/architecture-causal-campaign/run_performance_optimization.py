@@ -496,6 +496,8 @@ def execute(args: argparse.Namespace) -> int:
             attempt["artifact_valid"] = valid_result(
                 output / "final-result.json", protocol, arm_id, seed, run_id
             )
+            if protocol["campaign_id"] == V14_ID and attempt["return_code"] != 0:
+                attempt["artifact_valid"] = False
             checksums = base.checksum_manifest(output)
             attempt["checksums_path"] = str(checksums)
             attempt["checksums_sha256"] = base.sha256_file(checksums)
@@ -536,6 +538,10 @@ def execute(args: argparse.Namespace) -> int:
 def audit_pilot(path: Path, protocol_path: Path, repo_root: Path, image_tag: str) -> None:
     pilot = json.loads(path.read_text(encoding="utf-8"))
     source_protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    if source_protocol["campaign_id"] == V14_ID and (
+            len(pilot.get("attempts", [])) != len(V14_ARMS)
+            or any(a.get("return_code") != 0 for a in pilot["attempts"])):
+        raise RuntimeError("v14 pilot contains failed or missing process exits")
     expected = expected_arms(source_protocol)
     cells = pilot.get("completed", [])
     if pilot.get("state") != "PILOT_COMPLETED" or len(cells) != len(expected):
