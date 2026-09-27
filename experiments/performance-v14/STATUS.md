@@ -7,9 +7,16 @@ Implementados: lote paralelo no mesmo JVM, consumo imediato de conclusões,
 redução ordenada, prazo estrito e seleção final por snapshot de validação.
 Protocolo: quatro braços, 80 execuções formais planejadas, teto global de dez dias.
 
-Validação local inicial: 102 testes, zero falhas; dois testes de integração
-J48 aguardam JAR recém-compilado. O servidor será usado para compilação e
-validação desses testes antes do piloto.
+Validação local: 103 testes, zero falhas; dois testes de integração J48 exigem
+JAR recém-compilado. No servidor a suite inicial de 102 passou com apenas um
+skip de Windows, incluindo J48 real: resultados serial/paralelo iguais,
+concorrência >1 e <=3, prazo zero sem avaliação e comando posterior íntegro.
+A suite será repetida no commit de lançamento, incluindo o teste adicional.
+
+O build Docker convencional falhou por DNS ao buscar plugin Maven, antes de
+criar a imagem. O JAR compilado/testado com Maven no host está disponível.
+Fallback: Dockerfile.parallel-prebuilt, sobre a imagem monolith2 da v13;
+preservar imagem original, conferir SHA-256 do JAR e registrar ID da base.
 
 Formal NÃO iniciada e NÃO programada automaticamente. Piloto ainda não iniciado
 neste registro inicial. Não interpretar a preparação como resultado experimental.

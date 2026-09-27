@@ -1,0 +1,12 @@
+# Offline overlay: build/test the JAR from this checkout before invoking Docker.
+# Record and verify BASE_IMAGE's local image ID in the campaign build provenance.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+ARG SOURCE_COMMIT
+ARG EVALUATOR_SHA256
+LABEL org.opencontainers.image.revision=${SOURCE_COMMIT}
+LABEL org.gfshield.evaluator.sha256=${EVALUATOR_SHA256}
+COPY experiments/monoliths/monolith2-graspy/main.py /app/main.py
+COPY experiments/common-weka-evaluator/target/common-weka-evaluator.jar /app/common-weka-evaluator.jar
+RUN test "$(sha256sum /app/common-weka-evaluator.jar | cut -d ' ' -f1)" = "$EVALUATOR_SHA256"
+ENTRYPOINT ["python", "/app/main.py"]
