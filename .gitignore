@@ -65,3 +65,9 @@ tmp/
 **/.env
 **/.env.*
 !**/.env.example
+
+# Academic sources are maintained in the separate private repository.
+/Dissertação_Nicolas/
+/Dissertação_English/
+/Dissertacao/
+/Apresentation/
