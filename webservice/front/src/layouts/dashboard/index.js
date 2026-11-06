@@ -4176,7 +4176,7 @@ function Dashboard() {
     () => ({
       responsive: true,
       maintainAspectRatio: false,
-      parsing: false,
+      parsing: true,
       normalized: true,
       animation: false,
       indexAxis: "y",

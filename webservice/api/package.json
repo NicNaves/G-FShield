@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "jest",
+    "test:monitor": "jest --config jest.monitor.config.cjs --runInBand",
     "dev": "nodemon src/index.js",
     "db:up": "docker compose -f docker-compose.db.yml up -d",
     "db:down": "docker compose -f docker-compose.db.yml down",

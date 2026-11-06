@@ -13,6 +13,12 @@ class GraspExecutionMonitorService {
     this.startPromise = null;
     this.keepRunning = false;
     this.reconnectTimer = null;
+    this.readinessTimer = null;
+    this.connectionEpoch = 0;
+    this.connectionState = "stopped";
+    this.groupJoinedAt = null;
+    this.lastConnectionError = null;
+    this.readyTimeoutMs = Math.max(Number(process.env.GRASP_MONITOR_READY_TIMEOUT_MS || 60000), 1000);
     this.reconnectDelayMs = Math.max(Number(process.env.GRASP_MONITOR_RECONNECT_DELAY_MS || 5000), 1000);
     this.clients = new Set();
     this.runs = new Map();
@@ -177,7 +183,7 @@ class GraspExecutionMonitorService {
   async start() {
     this.keepRunning = true;
 
-    if (this.started) {
+    if (this.started || this.consumer) {
       return;
     }
 
@@ -185,11 +191,39 @@ class GraspExecutionMonitorService {
       return this.startPromise;
     }
 
-    this.startPromise = (async () => {
+    const epoch = ++this.connectionEpoch;
+    const attempt = (async () => {
       await this.rehydrateFromStore();
-      await this.connect();
+      if (!this.keepRunning || epoch !== this.connectionEpoch) {
+        return;
+      }
+      await this.connect(epoch);
     })();
-    return this.startPromise;
+    this.startPromise = attempt;
+    try {
+      await attempt;
+    } finally {
+      if (this.startPromise === attempt) {
+        this.startPromise = null;
+      }
+    }
+  }
+
+  getConnectionStatus() {
+    return {
+      ready: this.started,
+      state: this.connectionState,
+      groupJoinedAt: this.groupJoinedAt,
+      lastError: this.lastConnectionError,
+      retryScheduled: Boolean(this.reconnectTimer),
+    };
+  }
+
+  clearReadinessTimer() {
+    if (this.readinessTimer) {
+      clearTimeout(this.readinessTimer);
+      this.readinessTimer = null;
+    }
   }
 
   async rehydrateFromStore() {
@@ -221,6 +255,10 @@ class GraspExecutionMonitorService {
 
   async stop() {
     this.keepRunning = false;
+    this.connectionEpoch += 1;
+    this.clearReadinessTimer();
+    this.connectionState = "stopped";
+    this.groupJoinedAt = null;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -252,10 +290,23 @@ class GraspExecutionMonitorService {
       return;
     }
 
+    const failedConsumer = this.consumer;
+    this.connectionEpoch += 1;
+    this.clearReadinessTimer();
+    this.connectionState = "reconnecting";
+    this.groupJoinedAt = null;
+    this.lastConnectionError = metadata.error || reason;
     this.started = false;
     this.startPromise = null;
     this.consumer = null;
     this.kafka = null;
+
+    // Invalidate first: intentional disconnect events from this instance are stale.
+    if (failedConsumer) {
+      Promise.resolve().then(() => failedConsumer.disconnect()).catch((error) => {
+        logger.warn("Falha ao liberar consumidor antigo", { error: error.message });
+      });
+    }
 
     logger.warn("Agendando reconexao do monitor Kafka", {
       reason,
@@ -279,8 +330,12 @@ class GraspExecutionMonitorService {
     }, this.reconnectDelayMs);
   }
 
-  async connect() {
+  async connect(epoch = this.connectionEpoch) {
+    let consumer = null;
+    const isCurrent = () => this.keepRunning
+      && epoch === this.connectionEpoch && this.consumer === consumer;
     try {
+      this.connectionState = "connecting";
       this.kafka = new Kafka({
         clientId: process.env.KAFKA_CLIENT_ID || "grasp-fs-monitor",
         brokers: kafkaBrokers,
@@ -288,9 +343,25 @@ class GraspExecutionMonitorService {
 
       this.consumer = this.kafka.consumer({
         groupId: process.env.KAFKA_MONITOR_GROUP_ID || "grasp-fs-monitor-group",
+        // One owner for recovery: the application reconnect timer.
+        retry: { restartOnFailure: async () => false },
+      });
+      consumer = this.consumer;
+
+      consumer.on(consumer.events.GROUP_JOIN, () => {
+        if (!isCurrent()) return;
+        this.clearReadinessTimer();
+        this.started = true;
+        this.connectionState = "ready";
+        this.groupJoinedAt = new Date().toISOString();
+        this.lastConnectionError = null;
+        logger.info("Monitor Kafka pronto: grupo atribuido", {
+          brokers: kafkaBrokers, topics: monitorTopics,
+        });
       });
 
-      this.consumer.on(this.consumer.events.CRASH, async (event) => {
+      consumer.on(consumer.events.CRASH, (event) => {
+        if (!isCurrent()) return;
         const error = event.payload?.error;
         logger.error("Consumer do monitor Kafka sofreu crash", {
           error: error?.message || "Erro desconhecido",
@@ -299,52 +370,70 @@ class GraspExecutionMonitorService {
         });
 
         this.scheduleReconnect("consumer-crash", {
+          error: error?.message || "Erro desconhecido",
           groupId: event.payload?.groupId || null,
           restart: event.payload?.restart ?? null,
         });
       });
 
-      this.consumer.on(this.consumer.events.DISCONNECT, () => {
+      consumer.on(consumer.events.DISCONNECT, () => {
+        if (!isCurrent()) return;
         logger.warn("Consumer do monitor Kafka desconectado");
         this.scheduleReconnect("consumer-disconnect");
       });
 
-      await this.consumer.connect();
+      await consumer.connect();
+      if (!isCurrent()) return;
 
-      const fromBeginning = String(process.env.KAFKA_MONITOR_FROM_BEGINNING || "false").toLowerCase() === "true";
+      // A partition without a committed offset must not skip retained events
+      // published while the monitor was offline. Existing offsets take precedence.
+      const fromBeginning = String(process.env.KAFKA_MONITOR_FROM_BEGINNING || "true").toLowerCase() === "true";
 
       for (const topic of monitorTopics) {
-        await this.consumer.subscribe({ topic, fromBeginning });
+        await consumer.subscribe({ topic, fromBeginning });
+        if (!isCurrent()) return;
       }
 
-      await this.consumer.run({
-        eachMessage: async ({ topic, partition, message }) => {
-          if (!message.value) {
-            return;
-          }
-
+      this.connectionState = "joining";
+      this.readinessTimer = setTimeout(() => {
+        if (isCurrent() && !this.started) {
+          this.scheduleReconnect("group-join-timeout", { error: "Grupo Kafka nao atribuido no prazo" });
+        }
+      }, this.readyTimeoutMs);
+      await consumer.run({
+        autoCommit: false,
+        eachMessage: async ({ topic, partition, message, heartbeat }) => {
           try {
-            const payload = JSON.parse(message.value.toString());
-            this.recordKafkaMessage(topic, payload, {
-              partition,
-              offset: message.offset,
-            });
+            if (message.value) {
+              const payload = JSON.parse(message.value.toString());
+              await this.recordKafkaMessage(topic, payload, {
+                partition,
+                offset: message.offset,
+              });
+            }
+            if (heartbeat) await heartbeat();
+            // Persist first, then acknowledge. A crash in between can replay;
+            // the store's unique topic/partition/offset fingerprint absorbs it.
+            await consumer.commitOffsets([{
+              topic, partition, offset: (BigInt(message.offset) + 1n).toString(),
+            }]);
           } catch (error) {
             logger.error("Falha ao processar mensagem do Kafka", {
               topic,
               error: error.message,
             });
+            // Never resolve a failed handler: leave the offset uncommitted.
+            throw error;
           }
         },
       });
 
-      this.started = true;
-      this.startPromise = null;
-      logger.info("Monitor Kafka iniciado", { brokers: kafkaBrokers, topics: monitorTopics, fromBeginning });
+      // run() can resolve after CRASH. Only GROUP_JOIN may set ready=true.
     } catch (error) {
       logger.error("Falha ao iniciar monitor Kafka", { error: error.message, brokers: kafkaBrokers });
-      this.startPromise = null;
-      this.scheduleReconnect("connect-failure", { error: error.message });
+      if (isCurrent()) {
+        this.scheduleReconnect("connect-failure", { error: error.message });
+      }
       throw error;
     }
   }
@@ -377,7 +466,7 @@ class GraspExecutionMonitorService {
     return event;
   }
 
-  recordKafkaMessage(topic, payload, source = {}) {
+  async recordKafkaMessage(topic, payload, source = {}) {
     const seedId = payload.seedId ? String(payload.seedId) : `unknown-${Date.now()}`;
     const now = new Date().toISOString();
     const stage = this.resolveStage(topic, payload);
@@ -521,8 +610,6 @@ class GraspExecutionMonitorService {
         : current.history,
     };
 
-    this.runs.set(seedId, run);
-    graspMonitorProjectionService.applyRun(run);
     const { history, ...runWithoutHistory } = run;
 
     const event = {
@@ -542,20 +629,19 @@ class GraspExecutionMonitorService {
       },
     };
 
+    if (eventType !== "kafka.progress" || this.persistProgressEvents) {
+      await graspExecutionStoreService.recordKafkaUpdate(event);
+    }
+
+    // Failed persistence must not publish a successful live projection.
+    this.runs.set(seedId, run);
+    graspMonitorProjectionService.applyRun(run);
     if (!this.isProgressTopic(topic) || this.exposeProgressEvents) {
       const broadcastEvent = this.pushEvent(event);
       graspMonitorProjectionService.applyEvent(broadcastEvent);
     }
 
-    if (eventType !== "kafka.progress" || this.persistProgressEvents) {
-      graspExecutionStoreService.recordKafkaUpdate(event).catch((error) => {
-        logger.error("Falha ao persistir update do Kafka", {
-          topic,
-          seedId,
-          error: error.message,
-        });
-      });
-    }
+    return event;
   }
 
   resolveStage(topic, payload) {
