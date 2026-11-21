@@ -71,3 +71,31 @@ tmp/
 /Dissertação_English/
 /Dissertacao/
 /Apresentation/
+
+# Local archives, experimental workspaces and academic deliverables.
+/backups/
+/tmp_metrics/
+/worktrees/
+/.worktrees/
+/.playwright-mcp/
+/experiments/
+/*.pptx
+/*.mp3
+/*.tar.gz
+__pycache__/
+*.pyc
+
+# New academic prose and editorial tooling belong to the private repository.
+/docs/dissertation-comment-resolution.md
+/docs/dissertation-review/CONTINUIDADE_*.md
+/docs/dissertation-review/feedback-*/
+/docs/dissertation-review/final-acronyms-*/
+/docs/dissertation-review/final-style-*/
+/docs/dissertation-review/publicacao-*/
+/scripts/*feedback*
+/scripts/*editorial*
+/scripts/*bibliography*
+/scripts/*acronym*
+/scripts/*prose_style*
+/scripts/*style_delivery*
+/scripts/*overleaf*
